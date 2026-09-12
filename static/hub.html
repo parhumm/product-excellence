@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Team server · Product Excellence</title><link rel="stylesheet" href="/static/style.css"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23235c40%22/%3E%3Cpath d=%22M11 24V8h6a5 5 0 0 1 0 10h-6%22 fill=%22none%22 stroke=%22%23fbfdfb%22 stroke-width=%223%22/%3E%3C/svg%3E"></head>
+<body><main style="max-width:960px;margin:40px auto;padding:24px"><h1>Team server <button id="signout" class="compact" style="float:right">Sign out</button></h1><div id="admin"></div></main><script src="/static/hub-admin.js"></script><script>
+document.getElementById('signout').onclick=window.signOut;
+renderHubAdmin(document.getElementById('admin'),async(method,path,body)=>{
+ const r=await fetch('/hub/admin/'+path,{method,headers:{'Content-Type':'application/json','X-PEX-Request':'1'},body:body?JSON.stringify(body):undefined});
+ const result=await r.json();if(!r.ok)throw Error(typeof result.detail==='string'?result.detail:'Check the form fields');return result;
+});
+</script></body></html>

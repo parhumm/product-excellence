@@ -1,0 +1,13 @@
+services:
+  browser:
+    build: .
+    ports:
+      - '127.0.0.1:8752:8752'
+      - '127.0.0.1:8753:8753'
+    environment:
+      PEX_NETEM_TOKEN: ${PEX_NETEM_TOKEN:?Set PEX_NETEM_TOKEN}
+    cap_add:
+      - NET_ADMIN
+    shm_size: 1gb
+    init: true
+    restart: unless-stopped

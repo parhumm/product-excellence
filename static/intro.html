@@ -3,705 +3,238 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Product Excellence · a local console for evidence-backed web testing</title>
-<meta name="description" content="A local console that runs goal-driven browser journeys with a bounded AI worker and records evidence you can challenge.">
+<title>Product Excellence · open-source website testing with evidence</title>
+<meta name="description" content="Run AI-guided website journeys on your Mac, keep the evidence locally, and share completed results from your own server. Open source under Apache 2.0.">
+<meta name="theme-color" content="#0d3b29">
+<meta property="og:title" content="Product Excellence">
+<meta property="og:description" content="Open-source website testing that runs on your Mac and records evidence you can challenge.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/static/intro/02-run.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230d3b29%22/%3E%3Cpath d=%22M10 23V9h6a4.5 4.5 0 0 1 0 9h-6%22 fill=%22none%22 stroke=%22%23f1f7ef%22 stroke-width=%223%22/%3E%3C/svg%3E">
 <style>
 :root{
-  --paper:oklch(96.4% .014 95);
-  --mount:oklch(98.6% .008 95);
-  --rule:oklch(86% .018 100);
-  --rule-soft:oklch(91% .014 100);
-  --ink:oklch(23% .026 155);
-  --ink-soft:oklch(43% .022 150);
-  --green:oklch(28% .06 155);
-  --green-deep:oklch(21% .05 155);
-  --green-mid:oklch(39% .088 155);
-  --on-green:oklch(95.5% .018 145);
-  --on-green-soft:oklch(78% .032 150);
-  --on-green-rule:oklch(38% .05 155);
-  --danger:oklch(43% .13 28);
-  --warn:oklch(42% .09 65);
-  --sans:"Schibsted Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --ease:cubic-bezier(.22,1,.36,1);
-  --gutter:clamp(1.25rem,5vw,4.5rem);
-  --margin-col:13.5rem;
-  --step--1:.8125rem;
-  --step-0:1.0625rem;
-  --step-1:clamp(1.3rem,.9rem + 1vw,1.55rem);
-  --step-2:clamp(1.7rem,1.05rem + 2.1vw,2.45rem);
-  --step-3:clamp(2.4rem,1.2rem + 4vw,4.1rem);
-  --step-4:clamp(3rem,1rem + 7.5vw,6.75rem);
+  --paper:oklch(97% .012 105);--paper-strong:oklch(99% .006 105);
+  --ink:oklch(22% .03 155);--muted:oklch(46% .025 155);
+  --green:oklch(27% .065 155);--green-deep:oklch(20% .05 155);--green-soft:oklch(38% .08 155);
+  --on-green:oklch(96% .018 145);--on-green-muted:oklch(79% .034 150);
+  --line:oklch(86% .02 130);--line-dark:oklch(39% .05 155);--lime:oklch(86% .12 124);
+  --sans:"Schibsted Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  --gutter:clamp(1.25rem,5vw,4.5rem);--ease:cubic-bezier(.22,1,.36,1)
 }
 *,*::before,*::after{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{
-  margin:0;background:var(--paper);color:var(--ink);
-  font:400 var(--step-0)/1.6 var(--sans);
-  font-synthesis-weight:none;
-  -webkit-font-smoothing:antialiased;
-  text-rendering:optimizeLegibility;
-}
-img{max-width:100%;display:block}
-h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.02em;line-height:1.06;text-wrap:balance}
-p{margin:0;text-wrap:pretty}
-a{color:inherit}
-:focus-visible{outline:2px solid var(--green-mid);outline-offset:3px;border-radius:2px}
-.band-green :focus-visible{outline-color:var(--on-green)}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 1rem/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%;height:auto}a{color:inherit;text-underline-offset:.22em}
+h1,h2,h3,p{margin-top:0}h1,h2,h3{letter-spacing:-.035em;line-height:1.02;text-wrap:balance}p{text-wrap:pretty}
+:focus-visible{outline:3px solid var(--lime);outline-offset:4px;border-radius:3px}
+.skip{position:fixed;z-index:20;top:.75rem;left:.75rem;transform:translateY(-160%);padding:.7rem 1rem;background:var(--on-green);color:var(--green-deep);font-weight:700}.skip:focus{transform:none}
+.wrap{width:min(calc(100% - 2 * var(--gutter)),76rem);margin-inline:auto}
+.eyebrow{margin-bottom:.8rem;color:var(--green-soft);font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.on-dark .eyebrow{color:var(--lime)}.muted{color:var(--muted)}.on-dark{background:var(--green);color:var(--on-green)}
+.button{display:inline-flex;align-items:center;justify-content:center;gap:.55rem;min-height:3rem;padding:.75rem 1.15rem;border:1px solid transparent;border-radius:4px;font-weight:700;text-decoration:none;transition:background-color 150ms var(--ease),border-color 150ms var(--ease),color 150ms var(--ease),transform 150ms var(--ease)}
+.button:hover{transform:translateY(-1px)}.button-primary{background:var(--lime);color:var(--green-deep)}.button-primary:hover{background:oklch(91% .1 124)}
+.button-secondary{border-color:var(--line-dark);color:var(--on-green)}.button-secondary:hover{border-color:var(--on-green-muted)}
+.button-paper{background:var(--green);color:var(--on-green)}.button-paper:hover{background:var(--green-deep)}
+.button-ghost{border-color:var(--line);color:var(--ink)}.button-ghost:hover{border-color:var(--green-soft);color:var(--green-soft)}
+.button::after{content:"↗";font-size:.9em}
 
-/* ---------- ledger grid ---------- */
-.ledger{
-  max-width:78rem;margin-inline:auto;
-  padding-inline:var(--gutter);
-  display:grid;
-  grid-template-columns:var(--margin-col) minmax(0,1fr);
-  column-gap:clamp(1.5rem,3.5vw,4rem);
-  align-items:start;
-}
-.ledger > *{grid-column:2}
-.marginal{
-  grid-column:1;
-  font-size:var(--step--1);line-height:1.45;color:var(--ink-soft);
-  border-top:1px solid var(--rule);padding-top:.65rem;
-}
-.band-green .marginal{color:var(--on-green-soft);border-top-color:var(--on-green-rule)}
-.exhibit-no{
-  display:block;font-weight:700;font-size:1.5rem;line-height:1;letter-spacing:-.03em;
-  color:var(--ink);font-variant-numeric:tabular-nums;margin-bottom:.5rem;
-}
-.band-green .exhibit-no{color:var(--on-green)}
-.eyebrow{
-  font-size:.75rem;font-weight:500;letter-spacing:.11em;text-transform:uppercase;
-  color:var(--ink-soft);margin:0;
-}
-.band-green .eyebrow{color:var(--on-green-soft)}
-.lede{font-size:var(--step-1);line-height:1.45;max-width:34ch;letter-spacing:-.01em}
-.prose{max-width:66ch}
-.prose + .prose{margin-top:1rem}
-.num{font-variant-numeric:tabular-nums}
-code,.ev{font:500 .8125em/1 var(--mono);letter-spacing:0}
-.ev{
-  display:inline-block;padding:.25em .45em;border:1px solid var(--rule);
-  background:var(--mount);border-radius:2px;color:var(--ink-soft);white-space:nowrap;
-}
+/* Header and hero */
+.site-header{padding-top:max(1.1rem,env(safe-area-inset-top));background:var(--green);color:var(--on-green)}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:2rem;min-height:4rem;border-bottom:1px solid var(--line-dark)}
+.brand{display:flex;align-items:center;gap:.7rem;font-weight:700;letter-spacing:-.025em;text-decoration:none}
+.mark{display:grid;place-items:center;width:2rem;height:2rem;border:1px solid var(--line-dark);border-radius:7px;background:var(--on-green);color:var(--green-deep);font-size:.8rem;letter-spacing:-.1em}.mark span{color:var(--green-soft)}
+.nav-links{display:flex;align-items:center;gap:1.35rem;font-size:.84rem}.nav-links a{color:var(--on-green-muted);text-decoration:none}.nav-links a:hover{color:var(--on-green)}
+.github-link{padding:.5rem .75rem;border:1px solid var(--line-dark);border-radius:4px;color:var(--on-green)!important}
+.hero{padding-block:clamp(4.5rem,9vw,8rem) clamp(4rem,8vw,7rem)}
+.hero-grid{display:grid;grid-template-columns:minmax(0,.86fr) minmax(30rem,1.14fr);gap:clamp(2.5rem,7vw,7rem);align-items:center}
+.status{display:inline-flex;align-items:center;gap:.5rem;margin-bottom:1.5rem;color:var(--on-green-muted);font-size:.78rem}.status::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--lime);box-shadow:0 0 0 4px oklch(86% .12 124/.12)}
+.hero h1{max-width:9ch;margin-bottom:1.5rem;font-size:clamp(3.3rem,7vw,6.8rem);font-weight:700;letter-spacing:-.065em;line-height:.88}.hero h1 span{color:var(--on-green-muted)}
+.hero-copy{max-width:39rem;margin-bottom:1.7rem;color:var(--on-green-muted);font-size:clamp(1.08rem,1.3vw,1.3rem);line-height:1.52}.hero-copy strong{color:var(--on-green);font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:.8rem}.microproof{display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;margin:1.5rem 0 0;padding:0;list-style:none;color:var(--on-green-muted);font-size:.77rem}.microproof li::before{content:"✓";margin-right:.4rem;color:var(--lime);font-weight:700}
+.product-shot{margin:0;transform:rotate(.6deg)}.product-shot img{width:100%;border:1px solid var(--line-dark);border-radius:7px;background:var(--paper-strong);box-shadow:0 2rem 5rem oklch(14% .04 155/.3)}.product-shot figcaption{margin-top:.85rem;color:var(--on-green-muted);font-size:.74rem}
 
-/* ---------- sections ---------- */
-section{padding-block:clamp(4rem,9vw,8.5rem)}
-.band-green{background:var(--green);color:var(--on-green)}
-.band-green h2,.band-green h3{color:var(--on-green)}
-.rule-top{border-top:1px solid var(--rule)}
+/* Page sections */
+section{padding-block:clamp(4.5rem,9vw,8rem)}
+.section-head{display:grid;grid-template-columns:minmax(0,.65fr) minmax(20rem,1.35fr);gap:2rem;margin-bottom:clamp(2.5rem,5vw,4.5rem);align-items:end}.section-head h2{max-width:12ch;margin:0;font-size:clamp(2.5rem,5vw,5rem)}.section-head p{max-width:44rem;margin:0 0 .4rem;color:var(--muted);font-size:1.05rem}
 
-/* ---------- hero ---------- */
-.hero{
-  background:var(--green);color:var(--on-green);
-  padding-block:clamp(3.5rem,8vw,7rem) clamp(4rem,9vw,8rem);
-  padding-top:max(clamp(3.5rem,8vw,7rem),env(safe-area-inset-top));
-}
-.hero .ledger{row-gap:clamp(2rem,4vw,3.25rem)}
-.wordmark{
-  font-size:var(--step-4);font-weight:700;letter-spacing:-.045em;line-height:.9;
-  margin:0;max-width:11ch;
-}
-.wordmark em{font-style:normal;color:var(--on-green-soft);display:block}
-.hero-def{font-size:var(--step-1);line-height:1.4;max-width:40ch;color:var(--on-green);letter-spacing:-.012em}
-.negatives{list-style:none;margin:0;padding:0;display:grid;gap:.55rem;max-width:44ch}
-.negatives li{
-  font-size:var(--step--1);color:var(--on-green-soft);
-  padding-left:1.6rem;position:relative;line-height:1.45;
-}
-.negatives li::before{
-  content:"NO";position:absolute;left:0;top:.05em;
-  font-size:.625rem;font-weight:700;letter-spacing:.08em;color:var(--on-green);
-}
-.hero-actions{display:flex;flex-wrap:wrap;gap:1rem 1.25rem;align-items:center}
-.jump{
-  display:flex;flex-wrap:wrap;gap:.35rem 1.15rem;list-style:none;margin:0;padding:0;
-  font-size:var(--step--1);
-}
-.jump a{color:var(--on-green-soft);text-decoration-color:var(--on-green-rule);text-underline-offset:.25em}
-.jump a:hover{color:var(--on-green);text-decoration-color:currentColor}
+/* Demo videos */
+.video-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(18rem,1fr);gap:clamp(1rem,2.5vw,2rem);align-items:start}.video-layout figure{margin:0}.video-stack{display:grid;gap:clamp(1rem,2.5vw,2rem)}
+.video-frame{overflow:hidden;border:1px solid var(--line);border-radius:6px;background:var(--green-deep);aspect-ratio:16/9}.video-frame iframe{display:block;width:100%;height:100%;border:0}
+.video-layout figcaption{display:flex;justify-content:space-between;gap:1rem;margin-top:.75rem;font-size:.8rem;color:var(--muted)}.video-layout figcaption strong{color:var(--ink);font-size:.9rem}.video-layout figcaption a{white-space:nowrap}
 
-/* ---------- buttons ---------- */
-.btn{
-  display:inline-flex;align-items:center;gap:.6rem;
-  font:500 var(--step-0)/1 var(--sans);letter-spacing:-.01em;
-  padding:.95rem 1.5rem;border-radius:3px;border:1px solid transparent;
-  text-decoration:none;cursor:pointer;
-  transition:background-color 140ms var(--ease),color 140ms var(--ease),border-color 140ms var(--ease);
-}
-.btn-primary{background:var(--on-green);color:var(--green-deep);font-weight:700}
-.btn-primary:hover{background:oklch(100% .012 145)}
-.band-paper .btn-primary{background:var(--green);color:var(--on-green)}
-.band-paper .btn-primary:hover{background:var(--green-deep)}
-.btn-ghost{border-color:var(--rule);color:var(--ink)}
-.btn-ghost:hover{border-color:var(--green-mid);color:var(--green-mid)}
-.btn::after{content:"→";font-size:1.05em;line-height:1}
+/* Product flow */
+.proof{background:var(--paper-strong);border-block:1px solid var(--line)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);margin:0;padding:0;list-style:none;counter-reset:flow}.flow li{counter-increment:flow;min-height:12rem;padding:1.3rem 1.5rem 1.5rem 0;border-top:1px solid var(--line)}.flow li+li{padding-left:1.5rem;border-left:1px solid var(--line)}.flow li::before{content:"0" counter(flow);display:block;margin-bottom:2.2rem;color:var(--green-soft);font:700 .72rem/1 var(--mono)}.flow h3{margin-bottom:.7rem;font-size:1.15rem}.flow p{margin:0;color:var(--muted);font-size:.86rem;line-height:1.55}
+.presets{margin-top:1.5rem;border-block:1px solid var(--line)}.presets summary{padding:1rem 0;cursor:pointer;font-weight:700}.presets ul{display:grid;grid-template-columns:1fr 1fr;gap:.55rem 2rem;margin:0 0 1.25rem;padding:0;list-style:none;color:var(--muted);font-size:.82rem}.presets li::before{content:"✓";margin-right:.5rem;color:var(--green-soft);font-weight:700}
+.evidence-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(18rem,.8fr);gap:clamp(2rem,6vw,6rem);margin-top:clamp(3rem,7vw,6rem);align-items:center}.evidence-grid figure{margin:0}.evidence-grid img{width:100%;border:1px solid var(--line);border-radius:6px;background:var(--paper)}.evidence-grid figcaption{margin-top:.75rem;color:var(--muted);font-size:.75rem}
+.evidence-copy h3{max-width:15ch;margin-bottom:1.2rem;font-size:clamp(2rem,3.5vw,3.6rem)}.evidence-copy p{max-width:35rem;color:var(--muted)}.pillars{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.5rem 0 0;padding:0;list-style:none}.pillars li{padding:.35rem .6rem;border:1px solid var(--line);border-radius:3px;font-size:.75rem;color:var(--green-soft)}
 
-/* ---------- specimen mount ---------- */
-figure{margin:0}
-.plate{
-  background:var(--mount);border:1px solid var(--rule);border-radius:3px;
-  padding:clamp(.5rem,1.2vw,1rem);
-}
-.plate img{width:100%;height:auto;border:1px solid var(--rule-soft);border-radius:2px}
-figcaption{
-  margin-top:.85rem;font-size:var(--step--1);line-height:1.5;color:var(--ink-soft);
-  max-width:62ch;
-}
-.band-green figcaption{color:var(--on-green-soft)}
+/* Boundaries */
+.bounds-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(22rem,1.2fr);gap:clamp(3rem,8vw,8rem);align-items:start}.bounds-grid h2{max-width:10ch;margin-bottom:1.4rem;font-size:clamp(2.6rem,5vw,5rem)}.bounds-grid>div>p{max-width:30rem;color:var(--on-green-muted)}
+.bounds{margin:0;padding:0;list-style:none}.bounds li{display:grid;grid-template-columns:8rem minmax(0,1fr);gap:1.5rem;padding:1.3rem 0;border-top:1px solid var(--line-dark)}.bounds li:last-child{border-bottom:1px solid var(--line-dark)}.bounds strong{color:var(--lime);font-size:.78rem;letter-spacing:.05em;text-transform:uppercase}.bounds span{color:var(--on-green-muted);font-size:.9rem}
 
-/* ---------- exhibit switcher ---------- */
-.switch{list-style:none;margin:0;padding:0;display:grid;gap:0}
-.switch button{
-  display:block;width:100%;text-align:left;
-  background:none;border:0;border-top:1px solid var(--rule);
-  padding:.85rem 0;cursor:pointer;color:var(--ink-soft);
-  font:400 var(--step--1)/1.45 var(--sans);
-  transition:color 140ms var(--ease);
-}
-.switch button:hover{color:var(--ink)}
-.switch b{
-  display:block;font-weight:700;font-size:1rem;letter-spacing:-.015em;color:var(--ink);
-  margin-bottom:.2rem;
-}
-.switch b .n{color:var(--ink-soft);font-variant-numeric:tabular-nums;margin-right:.5rem}
-.switch [aria-current="true"]{color:var(--ink)}
-.switch [aria-current="true"] b{color:var(--green-mid)}
-.switch [aria-current="true"] b .n{color:var(--green-mid)}
-.panels{display:grid;gap:2.5rem}
+/* Install */
+.install-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(20rem,.95fr);gap:clamp(2rem,6vw,6rem);align-items:start}.install-grid>*{min-width:0}.install h2{max-width:11ch;margin-bottom:1rem;font-size:clamp(2.7rem,5vw,5rem)}.install .lede{max-width:36rem;margin-bottom:2rem;color:var(--muted)}
+pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-dark);border-radius:6px;background:var(--green-deep);color:var(--on-green);font:500 .84rem/1.8 var(--mono)}.install-note{max-width:39rem;color:var(--muted);font-size:.82rem}
+.install-options{margin:0;padding:0;list-style:none}.install-options li{padding:1.4rem 0;border-top:1px solid var(--line)}.install-options li:last-child{border-bottom:1px solid var(--line)}.install-options h3{margin-bottom:.55rem;font-size:1.25rem}.install-options p{margin-bottom:.8rem;color:var(--muted);font-size:.88rem}.install-options a{font-size:.84rem;font-weight:700;color:var(--green-soft)}
 
-/* ---------- measured table ---------- */
-.measured{
-  width:100%;border-collapse:collapse;font-size:var(--step--1);
-  font-variant-numeric:tabular-nums;max-width:32rem;
-}
-.measured th,.measured td{
-  text-align:left;padding:.55rem 0;border-bottom:1px solid var(--rule-soft);vertical-align:baseline;
-}
-.measured th{font-weight:400;color:var(--ink-soft);letter-spacing:.02em}
-.measured td{text-align:right;font-weight:500}
-.measured .unscored{color:var(--warn);font-weight:500}
-.band-green .measured th,.band-green .measured td{border-bottom-color:var(--on-green-rule)}
-.band-green .measured th{color:var(--on-green-soft)}
+/* Close and footer */
+.close{padding-block:clamp(4rem,8vw,7rem);background:var(--lime);color:var(--green-deep)}.close-grid{display:flex;align-items:end;justify-content:space-between;gap:2rem}.close h2{max-width:13ch;margin:0;font-size:clamp(2.5rem,5vw,5rem)}.close .actions{justify-content:flex-end}
+.footer{padding-block:2.5rem max(2.5rem,env(safe-area-inset-bottom));background:var(--green-deep);color:var(--on-green-muted);font-size:.76rem}.footer .wrap{display:flex;justify-content:space-between;gap:2rem}.footer p{margin:0}.footer nav{display:flex;flex-wrap:wrap;gap:1rem}
 
-/* ---------- finding excerpt ---------- */
-.findings{list-style:none;margin:0;padding:0;display:grid;gap:0}
-.findings li{
-  border-top:1px solid var(--rule);padding:1.15rem 0;
-  display:grid;grid-template-columns:4.5rem minmax(0,1fr);gap:.25rem 1.25rem;align-items:baseline;
+@media(max-width:900px){
+  .hero-grid,.section-head,.bounds-grid,.install-grid{grid-template-columns:1fr}.hero-grid{gap:4rem}.hero h1{max-width:11ch}.section-head{align-items:start}.section-head h2{max-width:15ch}
+  .video-layout{grid-template-columns:1fr}.video-stack{grid-template-columns:1fr 1fr}.flow{grid-template-columns:1fr 1fr}.flow li:nth-child(3){border-left:0}.evidence-grid{grid-template-columns:1fr}
 }
-.findings li:last-child{border-bottom:1px solid var(--rule)}
-.findings .ev{justify-self:start}
-.f-title{font-weight:500;letter-spacing:-.01em;line-height:1.4}
-.f-meta{
-  grid-column:2;font-size:var(--step--1);color:var(--ink-soft);
-  display:flex;flex-wrap:wrap;gap:.35rem .75rem;align-items:center;margin-top:.35rem;
+@media(max-width:640px){
+  .nav-links a:not(.github-link){display:none}.hero{padding-top:3.5rem}.hero-grid{grid-template-columns:minmax(0,1fr)}.hero h1{font-size:clamp(3.1rem,17vw,5rem)}
+  .actions{display:grid}.button{width:100%}.video-stack,.flow,.presets ul{grid-template-columns:1fr}.flow li+li{padding-left:0;border-left:0}.bounds li{grid-template-columns:1fr;gap:.45rem}
+  .close-grid,.footer .wrap{align-items:stretch;flex-direction:column}.close .actions{justify-content:flex-start}
 }
-.f-meta .ev{font-size:.75rem}
-
-.quote{
-  border-top:2px solid var(--green-mid);border-bottom:1px solid var(--rule);
-  padding:1.5rem 0;margin:0;max-width:60ch;
-}
-.quote p{font-size:var(--step-1);line-height:1.45;letter-spacing:-.012em}
-.quote footer{margin-top:.9rem;font-size:var(--step--1);color:var(--ink-soft)}
-
-.steps{list-style:none;margin:0;padding:0;counter-reset:s;display:grid;gap:1.5rem;max-width:60ch}
-.steps li{
-  counter-increment:s;position:relative;padding-left:2.75rem;
-  font-size:var(--step--1);line-height:1.6;color:var(--on-green-soft);
-}
-.steps li::before{
-  content:counter(s,decimal-leading-zero);position:absolute;left:0;top:.1em;
-  font-weight:700;font-size:.8125rem;letter-spacing:.02em;color:var(--on-green);
-  font-variant-numeric:tabular-nums;
-}
-.steps b{color:var(--on-green);font-weight:700;letter-spacing:-.01em}
-
-.basis{
-  font-size:.8125rem;line-height:1.6;color:var(--ink-soft);max-width:64ch;
-  border-top:1px solid var(--rule);padding-top:.85rem;
-}
-.band-green .basis{color:var(--on-green-soft);border-top-color:var(--on-green-rule)}
-
-/* ---------- inset ---------- */
-.evidence-pair{
-  margin-top:2.25rem;display:grid;align-items:end;
-  grid-template-columns:minmax(0,1fr) auto;gap:clamp(1rem,3vw,2.5rem);
-}
-.inset{
-  max-width:14rem;border:1px solid var(--rule);border-radius:3px;
-  background:var(--mount);padding:.4rem;
-}
-.inset img{width:100%;height:auto;border:1px solid var(--rule-soft);border-radius:2px}
-
-/* ---------- close + footer ---------- */
-.close h2{font-size:var(--step-3);max-width:16ch}
-.colophon{
-  border-top:1px solid var(--rule);padding-block:2.5rem;
-  padding-bottom:max(2.5rem,env(safe-area-inset-bottom));
-  font-size:var(--step--1);color:var(--ink-soft);
-}
-.colophon dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:.4rem 1.25rem;max-width:44rem}
-.colophon dt{font-weight:500;color:var(--ink)}
-.colophon dd{margin:0}
-
-/* ---------- reveal ---------- */
-.js .reveal{opacity:0;transform:translateY(14px)}
-.js .reveal.in{
-  opacity:1;transform:none;
-  transition:opacity 620ms var(--ease),transform 620ms var(--ease);
-  transition-delay:calc(var(--i,0) * 60ms);
-}
-
-/* ---------- responsive ---------- */
-@media (max-width:900px){
-  .ledger{grid-template-columns:minmax(0,1fr);row-gap:1.5rem}
-  .ledger > *{grid-column:1}
-  .marginal{grid-column:1}
-  .exhibit-no{display:inline-block;font-size:1.15rem;margin:0 .6rem 0 0}
-  .marginal{display:flex;flex-wrap:wrap;align-items:baseline;gap:.15rem .5rem}
-  .evidence-pair{grid-template-columns:minmax(0,1fr);align-items:start}
-  .findings li{grid-template-columns:minmax(0,1fr);gap:.5rem}
-  .findings .f-meta,.findings .f-title{grid-column:1}
-  .inset{max-width:9rem}
-}
-@media (max-width:560px){
-  .btn{width:100%;justify-content:space-between}
-  .hero-actions{display:block}
-  .hero-actions .btn{margin-bottom:1rem}
-  .measured{max-width:none}
-}
-@media (pointer:coarse){
-  .switch button{padding-block:1.1rem}
-}
-@media (prefers-reduced-motion:reduce){
-  .js .reveal{opacity:1;transform:none}
-  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
-}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition-duration:.01ms!important}.button:hover{transform:none}}
 </style>
-<noscript><style>.panels figure[hidden]{display:block!important}</style></noscript>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23235c40%22/%3E%3Cpath d=%22M11 24V8h6a5 5 0 0 1 0 10h-6%22 fill=%22none%22 stroke=%22%23fbfdfb%22 stroke-width=%223%22/%3E%3C/svg%3E"></head>
+</head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<!-- ===================== 1. HERO ===================== -->
-<header class="hero band-green">
-  <div class="ledger">
-    <p class="marginal">Version {{version}}<br>Tests run on your Mac<br>Results shared with your team</p>
-    <h1 class="wordmark">Product<em>Excellence</em></h1>
-
-    <p class="marginal">Definition</p>
-    <p class="hero-def">A local console that runs goal-driven browser journeys with a bounded AI worker and records evidence you can challenge.</p>
-
-    <p class="marginal">Boundaries</p>
-    <ul class="negatives">
-      <li>API keys. It drives the Claude or Codex client you already pay for.</li>
-      <li>Writes to the site under test. Mutating requests are blocked and counted.</li>
-      <li>Numbers it did not measure. An unavailable signal is reported as unavailable.</li>
-    </ul>
-
-    <p class="marginal">Start here</p>
-    <div class="hero-actions">
-      <a class="btn btn-primary" href="/console">Open the console</a>
-      <ul class="jump">
-        <li><a href="#sixty">Sixty seconds</a></li>
-        <li><a href="#evidence">Evidence</a></li>
-        <li><a href="#bounded">Bounded by design</a></li>
-        <li><a href="#again">Run it again</a></li>
-        <li><a href="#scored">Not scored</a></li>
-        <li><a href="#install">Install</a></li>
-        <li><a href="#missions">Missions</a></li>
-        <li><a href="#skills">Skills</a></li>
-        <li><a href="#benchmark">Benchmark</a></li>
-        <li><a href="#team">Team</a></li>
-      </ul>
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="/" aria-label="Product Excellence home"><span class="mark" aria-hidden="true">p<span>e</span></span>Product Excellence</a>
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a href="#demos">Demos</a><a href="#product">Product</a><a href="#install">Install</a><a href="/console">Team sign-in</a>
+      <a class="github-link" href="https://github.com/parhumm/product-excellence" rel="noopener">GitHub ↗</a>
+    </nav>
+  </div>
+  <div class="wrap hero">
+    <div class="hero-grid">
+      <div>
+        <p class="status">Open source · Version {{version}}</p>
+        <h1>Test like a user. <span>Keep the evidence.</span></h1>
+        <p class="hero-copy"><strong>Product Excellence</strong> sends a bounded AI worker through real browser journeys, records what happened, and turns the evidence into findings you can verify.</p>
+        <div class="actions">
+          <a class="button button-primary" href="https://github.com/parhumm/product-excellence" rel="noopener">Get it on GitHub</a>
+          <a class="button button-secondary" href="https://github.com/parhumm/product-excellence/releases" rel="noopener">View releases</a>
+        </div>
+        <ul class="microproof" aria-label="Product facts"><li>Apache 2.0</li><li>Runs locally on macOS</li><li>No API keys</li></ul>
+      </div>
+      <figure class="product-shot">
+        <img src="/static/intro/02-run.png" width="1440" height="1000" alt="A completed Product Excellence run with an executive summary, evidence-backed scores and next steps">
+        <figcaption>Actual run output. Every score leads back to recorded findings and browser evidence.</figcaption>
+      </figure>
     </div>
   </div>
 </header>
 
-<main>
-
-<!-- ===================== 2. SIXTY SECONDS ===================== -->
-<section id="sixty">
-  <div class="ledger">
-    <p class="marginal reveal">Worked example<br>public website<br>6 September 2026</p>
-    <div class="reveal">
-      <p class="eyebrow">Sixty seconds</p>
-      <h2 class="lede" style="margin-top:.7rem">Write a goal in a sentence. Watch a real browser go after it. Then argue with what it found.</h2>
-      <p class="prose" style="margin-top:1.25rem;color:var(--ink-soft)">Every capture below is the console itself, testing a live public site with right-to-left layout and Persian text. Nothing here is a mockup.</p>
+<main id="main">
+  <section id="demos">
+    <div class="wrap">
+      <div class="section-head">
+        <div><p class="eyebrow">Watch the product</p><h2>See the browser do the work.</h2></div>
+        <p>Three real demonstrations, from a first run to competitor benchmarking and a full autonomous product review.</p>
+      </div>
+      <div class="video-layout">
+        <figure>
+          <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/J3eB6ubtHlY" title="Product Excellence product walkthrough" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+          <figcaption><strong>Product walkthrough</strong><a href="https://www.youtube.com/watch?v=J3eB6ubtHlY" rel="noopener">Watch on YouTube</a></figcaption>
+        </figure>
+        <div class="video-stack">
+          <figure>
+            <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/hBI4OIh3i1k" title="Product Excellence benchmark example" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+            <figcaption><strong>Benchmark example</strong><a href="https://www.youtube.com/watch?v=hBI4OIh3i1k" rel="noopener">YouTube</a></figcaption>
+          </figure>
+          <figure>
+            <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/uo8Pz48uLsE" title="Autonomous UX, SEO, CRO and performance review" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+            <figcaption><strong>Autonomous product review</strong><a href="https://www.youtube.com/watch?v=uo8Pz48uLsE" rel="noopener">YouTube</a></figcaption>
+          </figure>
+        </div>
+      </div>
     </div>
+  </section>
 
-    <div class="marginal reveal" style="margin-top:clamp(2rem,4vw,3.5rem)">
-      <ul class="switch" role="list">
-        <li><button type="button" data-panel="p1" aria-current="true"><b><span class="n">01</span>Define a mission</b>A goal sentence, a domain allow list, a worker and a step budget.</button></li>
-        <li><button type="button" data-panel="p2" aria-current="false"><b><span class="n">02</span>Watch the run</b>Executive summary, pillar scores, every action with its stated reason.</button></li>
-        <li><button type="button" data-panel="p3" aria-current="false"><b><span class="n">03</span>Challenge the findings</b>Severity, pillar, evidence id, and a critic verdict on each one.</button></li>
+  <section id="product" class="proof">
+    <div class="wrap">
+      <div class="section-head">
+        <div><p class="eyebrow">From goal to proof</p><h2>A test you can argue with.</h2></div>
+        <p>Describe a task in plain language. Product Excellence runs it in Chromium, Firefox or WebKit, captures the journey, and shows exactly why each finding exists.</p>
+      </div>
+      <ol class="flow">
+        <li><h3>Define a mission</h3><p>Set the goal, allowed domains, viewport, network conditions and run budget.</p></li>
+        <li><h3>Watch the journey</h3><p>Follow each browser action beside the worker’s reason for taking it.</p></li>
+        <li><h3>Challenge findings</h3><p>Inspect screenshots, measurements, traces, video and critic verdicts.</p></li>
+        <li><h3>Replay and compare</h3><p>Separate new, persisting and not-seen-again issues across releases.</p></li>
+      </ol>
+      <details class="presets">
+        <summary>Every workspace starts with 10 editable missions</summary>
+        <ul>
+          <li>Home page · five-pillar audit</li><li>Register · reach the sign-up form</li>
+          <li>Sign in · account access</li><li>Search · find something specific</li>
+          <li>Core features · detect and use</li><li>Pricing and checkout · up to payment</li>
+          <li>Get the app · mobile app download</li><li>SEO and AEO · search and answer readiness</li>
+          <li>UX, UI and accessibility · keyboard and screen</li><li>Slow mobile · core task on a poor connection</li>
+        </ul>
+      </details>
+      <div class="evidence-grid">
+        <figure>
+          <img src="/static/intro/03-evidence.png" width="689" height="650" alt="Browser evidence beside measured performance signals and links to the raw observation">
+          <figcaption>Evidence from a real right-to-left journey, with measurements and raw artifacts attached.</figcaption>
+        </figure>
+        <div class="evidence-copy">
+          <p class="eyebrow">One console, five pillars</p><h3>AI judgment beside deterministic measurements.</h3>
+          <p>Use goal-driven journeys, deterministic audits, network profiles and competitor benchmarks without turning an unavailable signal into a reassuring zero.</p>
+          <ul class="pillars" aria-label="Evaluation pillars"><li>Functionality</li><li>CRO</li><li>SEO / AEO</li><li>UX / Accessibility</li><li>Performance / Video</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="on-dark">
+    <div class="wrap bounds-grid">
+      <div><p class="eyebrow">Bounded by default</p><h2>The AI has no hands.</h2><p>It proposes one schema-validated browser action at a time. The engine decides whether that action is allowed and records refusals as part of the result.</p></div>
+      <ul class="bounds">
+        <li><strong>Your subscription</strong><span>Uses the Claude Code or Codex client you already sign in to. No API key is stored or required.</span></li>
+        <li><strong>Read-only first</strong><span>Mutating network requests are blocked by default. Payments, deletion and publishing controls stay refused.</span></li>
+        <li><strong>Allowed domains</strong><span>The browser stays inside the mission’s explicit domain list.</span></li>
+        <li><strong>Honest evidence</strong><span>Unmeasured signals are unavailable, not zero. Findings retain their source evidence and critic verdict.</span></li>
       </ul>
     </div>
+  </section>
 
-    <div class="panels reveal" style="margin-top:clamp(2rem,4vw,3.5rem)">
-      <figure id="p1">
-        <div class="plate"><img src="/static/intro/01-mission.png" width="1440" height="1670" alt="Exhibit 1. The mission form showing the goal sentence, allowed domains, AI settings, a desktop browser and a budget of eight steps." loading="lazy" decoding="async"></div>
-        <figcaption><b>Exhibit 1.</b> The mission that produced everything below. Goal: find a book summary about habits using the site's search, open it, and confirm the summary page loads with its title and reading time. Eight steps, eight AI calls, ten minutes maximum, on the authorized site only.</figcaption>
-      </figure>
-      <figure id="p2" hidden>
-        <div class="plate"><img src="/static/intro/02-run.png" width="1440" height="1000" alt="Exhibit 2. The run page opening with an executive summary headline, six score tiles across the five pillars, and the next steps the run recorded." loading="lazy" decoding="async"></div>
-        <figcaption><b>Exhibit 2.</b> The run finished in 125.94 seconds across four page observations. Headline recorded by the run: "Search-to-summary journey works end to end; remaining issues are polish, metadata and known performance items."</figcaption>
-      </figure>
-      <figure id="p3" hidden>
-        <div class="plate"><img src="/static/intro/04-findings.png" width="1440" height="1000" alt="Exhibit 3. The findings list, each row carrying a severity badge, a pillar, an evidence id and an owner field." loading="lazy" decoding="async"></div>
-        <figcaption><b>Exhibit 3.</b> Eighteen open findings, eight at P2 and ten at P3. Every row points back at the observation that produced it, so a finding can be reopened, reassigned or rejected rather than taken on faith.</figcaption>
-      </figure>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 3. WHAT IT ACTUALLY DID ===================== -->
-<section class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">04</span>The action log. Each line is what the worker chose and why, recorded before the click happened.</p>
-    <div class="reveal">
-      <p class="eyebrow">What the worker actually did</p>
-      <h2 class="lede" style="margin-top:.7rem">Three clicks and a verdict, each with its reason on the record.</h2>
-      <ol class="findings" style="margin-top:2rem;counter-reset:none">
-        <li>
-          <span class="ev">step-000</span>
-          <span class="f-title">Click the search link in the header</span>
-          <span class="f-meta">"The mission requires using the site's search; open the search page from the header nav to query for a habits book summary."</span>
-        </li>
-        <li>
-          <span class="ev">step-001</span>
-          <span class="f-title">Type <bdi lang="fa">عادت</bdi> into the search box</span>
-          <span class="f-meta">"Enter a habits-related query into the site's search box to find a habit book summary."</span>
-        </li>
-        <li>
-          <span class="ev">step-002</span>
-          <span class="f-title">Open the summary <bdi lang="fa">عادت شجاعت</bdi> from the results</span>
-          <span class="f-meta">"Open the habits-related summary from the search results to verify its title and reading time on the summary page."</span>
-        </li>
-        <li>
-          <span class="ev">step-003</span>
-          <span class="f-title">Finish: goal reached</span>
-          <span class="f-meta">The page at /books/the-courage-habit visibly shows the reading time <bdi lang="fa">۲۱ دقیقه مطالعه</bdi> beside its title, so the goal text was met. Success basis recorded as "AI visual assessment; configured success text is enforced".</span>
-        </li>
-      </ol>
-      <p class="basis" style="margin-top:1.75rem">Seven calls to Claude Opus 5 at medium effort, 96,591 input and 5,105 output tokens, an estimated 1.09 US dollars at published list prices. The run used a subscription, so nothing was billed per call. The estimate exists to compare runs with each other.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 4. EXHIBIT: EVIDENCE PANE ===================== -->
-<section id="evidence" class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">05</span>Browser evidence for the fourth observation, captured beside the action that produced it.</p>
-    <div class="reveal">
-      <p class="eyebrow">Evidence</p>
-      <h2 class="lede" style="margin-top:.7rem">A screenshot is not evidence on its own. The measurements beside it are.</h2>
-    </div>
-
-    <div class="reveal evidence-pair">
-      <figure>
-        <div class="plate"><img src="/static/intro/03-evidence.png" width="689" height="650" alt="Exhibit 5. The browser evidence pane, showing the Persian right to left summary page beside four measured cells labelled LCP lab, CLS lab, interaction lab and time to first byte." loading="lazy" decoding="async"></div>
-        <figcaption><b>Exhibit 5.</b> The summary page as the run saw it, with its measured signals and the raw DOM snapshot, observation JSON and browser trace one click away. A journey also records video, attached before the run is published and played back at 2x by default, adjustable from 0.5x to 10x.</figcaption>
-      </figure>
-      <figure class="inset">
-        <img src="/static/intro/07-mobile.png" width="448" height="970" alt="Exhibit 6. The same run page rendered at 390 pixels wide, with the score tiles stacked into a single column." loading="lazy" decoding="async">
-      </figure>
-    </div>
-
-    <p class="marginal reveal" style="margin-top:clamp(2.5rem,5vw,4rem)">Recorded on the summary page, step-003.</p>
-    <div class="reveal" style="margin-top:clamp(2.5rem,5vw,4rem)">
-      <table class="measured">
-        <caption class="eyebrow" style="text-align:left;padding-bottom:.75rem">Measured under lab conditions</caption>
-        <tbody>
-          <tr><th scope="row">Largest contentful paint</th><td>3724 ms</td></tr>
-          <tr><th scope="row">Cumulative layout shift</th><td>0.707</td></tr>
-          <tr><th scope="row">Interaction</th><td>16 ms</td></tr>
-          <tr><th scope="row">Time to first byte</th><td>438 ms</td></tr>
-          <tr><th scope="row">Requests</th><td>250</td></tr>
-          <tr><th scope="row">Long tasks</th><td>0</td></tr>
-        </tbody>
-      </table>
-      <p class="basis" style="margin-top:1.5rem">The console labels the interaction figure itself: "Maximum observed interaction duration in this lab visit; not a field percentile." A measurement the browser did not expose is written as unavailable and never as zero, because a zero would quietly read as a perfect score.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 5. BOUNDED BY DESIGN ===================== -->
-<section id="bounded" class="band-green">
-  <div class="ledger">
-    <p class="marginal reveal">The worker is a language model with no hands. These are the reasons it stays that way.</p>
-    <div class="reveal">
-      <p class="eyebrow">Bounded by design</p>
-      <h2 class="lede" style="margin-top:.7rem">The AI chooses the next click. It cannot do anything else.</h2>
-    </div>
-
-    <div class="reveal" style="margin-top:clamp(2rem,4vw,3rem)">
-      <ol class="steps">
-        <li><b>Safe mode, empty tool set.</b> The Claude client starts with an empty tool set, an empty MCP configuration, no session persistence and a short task-only system prompt. Codex starts ephemeral, ignoring user config, in a read-only sandbox with its shell tool disabled.</li>
-        <li><b>Schema-validated actions.</b> The worker answers with one structured action or one evaluation. Anything else is refused, and two refused or malformed answers in a row end the run.</li>
-        <li><b>Restricted keyboard.</b> Only navigation keys, plus Enter inside a live search box. Any other key is refused rather than risking an unintended form submission.</li>
-        <li><b>Read-only network.</b> POST, PUT, PATCH and DELETE are blocked by default so no account or payment can change. This run had eight requests blocked, and the count is reported so a resulting failure is never blamed on the product.</li>
-        <li><b>Domain allow list.</b> The run is confined to the domains the mission names. Everything else is refused at the browser.</li>
-        <li><b>Credentials the worker never sees.</b> Public browsing by default. A mission may carry a sign-in, which relaxes the read-only rule for that mission's own domains and nothing else, or use a test session captured deliberately. The password is typed by the engine where the goal writes <code>{{password}}</code>, so it never reaches the worker, the goal, a finding or a report.</li>
-      </ol>
-      <p class="basis" style="margin-top:2rem">Evidence is written on the Mac that ran the test. The worker receives selected observations, not your filesystem. A finished run can be published to a team server your colleagues read; the browser traces stay behind on the machine that ran the mission. Runs are replayable, so a claim made in September can be re-measured in October under the same conditions.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 6. RUN IT AGAIN ===================== -->
-<section id="again" class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">07</span>The same mission, replayed, compared against the first run.</p>
-    <div class="reveal">
-      <p class="eyebrow">Run it again</p>
-      <h2 class="lede" style="margin-top:.7rem">One run is an anecdote. The second run is where the argument starts.</h2>
-      <p class="prose" style="margin-top:1.25rem;color:var(--ink-soft)">Replaying the mission took 134.62 seconds and produced two findings the first run had never seen, thirteen that persisted, and none that disappeared. The interesting one is a measurement, not an opinion.</p>
-    </div>
-
-    <figure class="reveal" style="margin-top:2.25rem">
-      <div class="plate"><img src="/static/intro/05-compare.png" width="1440" height="1171" alt="Exhibit 7. The compare releases view, reporting two new findings, none absent on the second run, thirteen persisting and the metric deltas between the two runs." loading="lazy" decoding="async"></div>
-      <figcaption><b>Exhibit 7.</b> Compare releases, baseline against replay. Two new, zero not seen again, thirteen persisting, five not assessed.</figcaption>
-    </figure>
-
-    <p class="marginal reveal" style="margin-top:clamp(2.5rem,5vw,4rem)">New in the replay. Severity P2, performance, evidence step-001.</p>
-    <div class="reveal" style="margin-top:clamp(2.5rem,5vw,4rem)">
-      <blockquote class="quote">
-        <p>Very slow server response measured when loading the search page.</p>
-        <footer>
-          Observed: the search page load at step-001 recorded a time to first byte of 9,868.6 ms and a DOM loaded time of 12,373.9 ms, compared with 625.9 ms on the homepage at step-000.<br><br>
-          Expected: time to first byte for a core navigation page stays in the same order of magnitude as the homepage rather than several seconds.
-        </footer>
-      </blockquote>
-      <p class="basis" style="margin-top:1.5rem">A second model reviewed this finding against the raw observation and marked it <b>probable</b>, not confirmed, for two stated reasons: the homepage comparison figure was not in the evidence it was given, and a single sample cannot rule out a cold start. A finding a critic has not confirmed costs half as many points. The console shows you the disagreement instead of resolving it silently.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 7. NOT SCORED ===================== -->
-<section id="scored" class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">08</span>A deterministic audit of the home page. No AI calls, 17.78 seconds.</p>
-    <div class="reveal">
-      <p class="eyebrow">Not scored is not zero</p>
-      <h2 class="lede" style="margin-top:.7rem">The gap in the report is the honest part.</h2>
-      <p class="prose" style="margin-top:1.25rem;color:var(--ink-soft)">The same site, audited without an AI worker. Four pillars have deterministic checks and get a number. Conversion has none, so the console writes the reason instead of inventing a figure.</p>
-    </div>
-
-    <div class="reveal" style="margin-top:2.25rem">
-      <table class="measured" style="max-width:38rem">
-        <thead>
-          <tr><th scope="col">Pillar</th><td>Audit</td><td>Journey</td></tr>
-        </thead>
-        <tbody>
-          <tr><th scope="row">Functionality</th><td>85</td><td>85</td></tr>
-          <tr><th scope="row">CRO</th><td class="unscored">Not scored</td><td>95</td></tr>
-          <tr><th scope="row">SEO / AEO</th><td>95</td><td>72</td></tr>
-          <tr><th scope="row">UX / Accessibility</th><td>100</td><td>95</td></tr>
-          <tr><th scope="row">Performance / Video</th><td>85</td><td>0</td></tr>
-          <tr><th scope="row">Overall</th><td>91 of 100 · 4 of 5</td><td>69 of 100 · 5 of 5</td></tr>
-        </tbody>
-      </table>
-      <p class="basis" style="margin-top:1.5rem">Reason recorded against the blank: "CRO needs an AI review; this run completed none." Performance scored a real zero in the journey run, from six confirmed P2 findings on slow paint and layout shift. The two look nothing alike in the console, and that is the point.</p>
-    </div>
-
-    <figure class="reveal" style="margin-top:clamp(2.5rem,5vw,4rem)">
-      <div class="plate"><img src="/static/intro/06-audit.png" width="1440" height="900" alt="Exhibit 8. The audit run page, where the conversion tile reads not scored with its reason while the four other pillars carry numbers." loading="lazy" decoding="async"></div>
-      <figcaption><b>Exhibit 8.</b> The audit run. Every tile lists the findings that cost it points, so a score can be traced back to the evidence that produced it and disputed there.</figcaption>
-    </figure>
-
-    <p class="marginal reveal" style="margin-top:clamp(2rem,4vw,3rem)">How a score is computed. Printed beside every score in the console.</p>
-    <p class="basis reveal" style="margin-top:clamp(2rem,4vw,3rem)">Each selected pillar starts at 100 and loses points for its open, non-rejected findings (P0 and P1 cost 40, P2 costs 15, P3 costs 5; a finding an AI critic has not confirmed costs half). A journey that did not reach its goal costs Functionality 30. A pillar that was not evaluated is not scored, which is different from scoring zero. This rates the findings recorded in this run. It is not a field measurement or an industry benchmark.</p>
-  </div>
-</section>
-
-<!-- ===================== 9. INSTALL ===================== -->
-<section id="install" class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">09</span>One command. The first start takes several minutes, mostly three browsers.</p>
-    <div class="reveal">
-      <p class="eyebrow">Install</p>
-      <h2 class="lede" style="margin-top:.7rem">One command, then the subscription you already pay for.</h2>
-      <pre class="plate" style="margin-top:1.75rem;overflow-x:auto"><code>git clone git@github.com:parhumm/product-excellence.git
+  <section id="install" class="install">
+    <div class="wrap install-grid">
+      <div>
+        <p class="eyebrow">Public source, local execution</p><h2>Clone it. Start it. Point it at your site.</h2>
+        <p class="lede">The supported local setup is macOS. The first start installs its own Python dependencies and three browsers, then opens the console at <strong>127.0.0.1:8741</strong>.</p>
+        <pre aria-label="Installation commands"><code>git clone https://github.com/parhumm/product-excellence.git
 cd product-excellence
 ./start.command</code></pre>
-      <p class="prose" style="margin-top:1.5rem;color:var(--ink-soft)">The first start installs its own Python, its dependencies and Chromium, Firefox and WebKit, then opens the console. There is no PostgreSQL to set up, no Node, no npm and no API key: a fresh installation records to a SQLite file at <code>data/records.db</code>. Later starts take a second.</p>
-      <p class="basis" style="margin-top:1.75rem">Sign in once with <code>claude auth login</code> or <code>codex login</code>, whichever subscription you hold. You need one of the two for an AI worker, and the deterministic checks below run without either.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 10. MISSIONS AND CONDITIONS ===================== -->
-<section id="missions" class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">10</span>Created in every new workspace. Delete one and it is not put back.</p>
-    <div class="reveal">
-      <p class="eyebrow">Missions</p>
-      <h2 class="lede" style="margin-top:.7rem">Ten missions are waiting the moment you add a website.</h2>
-      <p class="prose" style="margin-top:1.25rem;color:var(--ink-soft)">Each one is a goal sentence with a mode, a viewport, a network, a step budget and the pillars it judges. They are written for any business, and they are yours to edit.</p>
-      <ol class="findings" style="margin-top:2rem;counter-reset:none">
-        <li><span class="ev">audit</span><span class="f-title">Home page · five-pillar audit</span></li>
-        <li><span class="ev">journey</span><span class="f-title">Register · reach the sign-up form</span></li>
-        <li><span class="ev">journey</span><span class="f-title">Sign in · account access</span></li>
-        <li><span class="ev">journey</span><span class="f-title">Search · find something specific</span></li>
-        <li><span class="ev">explore</span><span class="f-title">Core features · detect and use</span></li>
-        <li><span class="ev">journey</span><span class="f-title">Pricing and checkout · up to payment</span></li>
-        <li><span class="ev">journey</span><span class="f-title">Get the app · mobile app download</span></li>
-        <li><span class="ev">audit</span><span class="f-title">SEO and AEO · search and answer readiness</span></li>
-        <li><span class="ev">journey</span><span class="f-title">UX, UI and accessibility · keyboard and screen</span></li>
-        <li><span class="ev">journey</span><span class="f-title">Slow mobile · core task on a poor connection</span></li>
-      </ol>
-      <p class="basis" style="margin-top:1.75rem">The ten starter missions are generic and can be adapted to any website you are authorized to test.</p>
-    </div>
-
-    <p class="marginal reveal" style="margin-top:clamp(2.5rem,5vw,4rem)">Any mission can be re-run under any of these. The same goal, a different connection.</p>
-    <div class="reveal" style="margin-top:clamp(2.5rem,5vw,4rem)">
-      <table class="measured" style="max-width:38rem">
-        <caption class="eyebrow" style="text-align:left;padding-bottom:.75rem">Network conditions</caption>
-        <thead>
-          <tr><th scope="col">Profile</th><td>Latency</td><td>Down</td><td>Up</td></tr>
-        </thead>
-        <tbody>
-          <tr><th scope="row">Baseline</th><td>—</td><td>—</td><td>—</td></tr>
-          <tr><th scope="row">Slow mobile</th><td>90 ms</td><td>5 Mbps</td><td>1 Mbps</td></tr>
-          <tr><th scope="row">Poor mobile</th><td>180 ms</td><td>1.5 Mbps</td><td>0.512 Mbps</td></tr>
-          <tr><th scope="row">High latency</th><td>300 ms</td><td>20 Mbps</td><td>5 Mbps</td></tr>
-          <tr><th scope="row">Constrained bandwidth</th><td>150 ms</td><td>0.75 Mbps</td><td>0.25 Mbps</td></tr>
-          <tr><th scope="row">Offline</th><td colspan="3">Connection removed</td></tr>
-        </tbody>
-      </table>
-      <p class="basis" style="margin-top:1.5rem">The worker is chosen per call, under a ceiling the mission sets. In run <span class="ev">8b6062e8</span> against a live site with a Claude Opus 5 ceiling, four actions were planned on Haiku 4.5, the outcome judged on Sonnet 5, the review written on Opus 5 and two findings verified back on Sonnet 5. Every call was answered by the model it asked for, and each one is listed with its tokens and its estimated cost.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 11. SKILLS ===================== -->
-<section id="skills" class="band-green">
-  <div class="ledger">
-    <p class="marginal reveal">Shipped with the app. Nothing to install, nothing to configure.</p>
-    <div class="reveal">
-      <p class="eyebrow">Skills</p>
-      <h2 class="lede" style="margin-top:.7rem">Or say what you want in a sentence, and let it write the mission.</h2>
-      <p class="prose" style="margin-top:1.25rem;color:var(--on-green-soft)">Open Claude Code in the project folder and type <code>/pex-</code>. Eight skills cover the work around a run: writing one, fixing one, and turning what it found into something a team can act on.</p>
-    </div>
-
-    <div class="reveal" style="margin-top:clamp(2rem,4vw,3rem)">
-      <table class="measured" style="max-width:52rem">
-        <thead>
-          <tr><th scope="col">You want to</th><td style="text-align:left">Type</td><td style="text-align:left">It asks before</td></tr>
-        </thead>
-        <tbody>
-          <tr><th scope="row">know whether this Mac is ready</th><td style="text-align:left"><code>/pex-env-check</code></td><td style="text-align:left">running a repair</td></tr>
-          <tr><th scope="row">test what the presets do not cover</th><td style="text-align:left"><code>/pex-mission-write</code></td><td style="text-align:left">importing the mission</td></tr>
-          <tr><th scope="row">know what else is worth testing</th><td style="text-align:left"><code>/pex-mission-suggest</code></td><td style="text-align:left">creating each mission</td></tr>
-          <tr><th scope="row">understand why a run blocked</th><td style="text-align:left"><code>/pex-run-diagnose</code></td><td style="text-align:left">changing it and running again</td></tr>
-          <tr><th scope="row">turn findings into work</th><td style="text-align:left"><code>/pex-findings-triage</code></td><td style="text-align:left">writing owners and statuses back</td></tr>
-          <tr><th scope="row">tell people what happened</th><td style="text-align:left"><code>/pex-run-brief</code></td><td style="text-align:left">nothing; it reads and writes a file</td></tr>
-          <tr><th scope="row">report a bug in this tool</th><td style="text-align:left"><code>/pex-issue-report</code></td><td style="text-align:left">filing anything on GitHub</td></tr>
-          <tr><th scope="row">release a new version</th><td style="text-align:left"><code>/pex-release-ship</code></td><td style="text-align:left">pushing, and again before deploying</td></tr>
-        </tbody>
-      </table>
-      <p class="basis" style="margin-top:2rem">They are bounded the same way the worker is. They never open a saved password, a captured session or a recording. Page text, findings and log lines are treated as data to read, never as instructions to follow. And nothing is imported, run, edited, filed or pushed until you say so. The steps each one takes are plain files in <code>.claude/skills/</code>, readable before you trust them.</p>
-      <div class="hero-actions" style="margin-top:2rem">
-        <a class="btn btn-primary" href="https://github.com/parhumm/product-excellence/blob/main/docs/SKILLS.md" rel="noopener">Read the skills guide</a>
+        <p class="install-note">AI journeys need an authenticated Claude Code or Codex client. Deterministic audits work without either. Your database and captured evidence stay in the local <code>data/</code> directory.</p>
+        <div class="actions" style="margin-top:1.5rem"><a class="button button-paper" href="https://github.com/parhumm/product-excellence/blob/main/README.md" rel="noopener">Read the install guide</a></div>
       </div>
+      <ul class="install-options">
+        <li><h3>Use it locally</h3><p>Run browsers and AI on your Mac, backed by SQLite. No Node, npm or PostgreSQL setup is required.</p><a href="https://github.com/parhumm/product-excellence/blob/main/docs/USER_MANUAL.md" rel="noopener">Open the user manual ↗</a></li>
+        <li><h3>Deploy your team server</h3><p>Self-host completed results on Debian or Ubuntu behind your own domain. The server stores and shows evidence; browsers and AI still run on each teammate’s Mac.</p><a href="https://github.com/parhumm/product-excellence/blob/main/docs/DEPLOY.md" rel="noopener">Read the deployment guide ↗</a></li>
+        <li><h3>Inspect or contribute</h3><p>The full application, safeguards, tests and documentation are public under Apache License 2.0.</p><a href="https://github.com/parhumm/product-excellence" rel="noopener">Browse the source ↗</a></li>
+      </ul>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ===================== 12. BENCHMARK ===================== -->
-<section id="benchmark" class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">11</span>One mission, five sites, one ranked answer. Run <span class="ev">b09ae59c</span>.</p>
-    <div class="reveal">
-      <p class="eyebrow">Benchmark</p>
-      <h2 class="lede" style="margin-top:.7rem">The same question, asked of the competition.</h2>
-      <p class="prose" style="margin-top:1.25rem;color:var(--ink-soft)">A benchmark mission runs its goal on your site and on each competitor you name, then ranks them against each other.</p>
-      <p class="prose" style="margin-top:1rem;color:var(--ink-soft)">Findings are recorded against the workspace's own site only. A competitor that cannot be observed is reported as blocked rather than as a zero.</p>
+  <section class="close">
+    <div class="wrap close-grid">
+      <h2>The source is public. Your evidence does not have to be.</h2>
+      <div class="actions"><a class="button button-paper" href="https://github.com/parhumm/product-excellence" rel="noopener">Get Product Excellence</a><a class="button button-ghost" href="/console">Team sign-in</a></div>
     </div>
-  </div>
-</section>
-
-<!-- ===================== 13. TEAM ===================== -->
-<section id="team" class="rule-top">
-  <div class="ledger">
-    <p class="marginal reveal"><span class="exhibit-no">12</span>The server you are reading this on, if someone deployed one.</p>
-    <div class="reveal">
-      <p class="eyebrow">Your team</p>
-      <h2 class="lede" style="margin-top:.7rem">Shared where everyone can read it, run on the machine that owns the subscription.</h2>
-      <p class="prose" style="margin-top:1.25rem;color:var(--ink-soft)">When a run finishes on your Mac it can publish itself, with its screenshots, its recording, its measurements and its findings, and everyone signed in to that website sees the same record. The console there is read only behind a workspace username and password.</p>
-      <p class="prose" style="margin-top:1rem;color:var(--ink-soft)">The server stores and shows. It never opens a browser and never calls an AI, so nothing is tested there and no subscription is shared. Tests keep running on each person's own machine.</p>
-      <p class="basis" style="margin-top:1.75rem">Two existing workspaces were moved onto a server over the public internet in a single attempt each, thirty-three runs for one site and seventy-five for the other. Every transferred file was read back and checksummed against the original: 944 MB, byte for byte.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== 8. CLOSE ===================== -->
-<section class="close band-paper rule-top">
-  <div class="ledger">
-    <p class="marginal reveal">Tests run on your Mac at 127.0.0.1:8741. Results can be shared on a team server.</p>
-    <div class="reveal">
-      <h2>Open it and point it at something you own.</h2>
-      <div class="hero-actions" style="margin-top:2rem">
-        <a class="btn btn-primary" href="/console">Open the console</a>
-        <a class="btn btn-ghost" href="https://github.com/parhumm/product-excellence/blob/main/README.md" rel="noopener">Install it on your Mac</a>
-          <a class="btn btn-ghost" href="https://github.com/parhumm/product-excellence/blob/main/docs/USER_MANUAL.md" rel="noopener">Read the manual</a>
-          <a class="btn btn-ghost" href="https://github.com/parhumm/product-excellence/blob/main/docs/SKILLS.md" rel="noopener">Skills guide</a>
-      </div>
-    </div>
-  </div>
-</section>
-
+  </section>
 </main>
 
-<footer class="colophon">
-  <div class="ledger">
-    <dl class="reveal">
-      <dt>Where it runs</dt><dd>Your Mac. The local console refuses any host but localhost, so a browser and an AI worker never run anywhere else. A team server stores and shows finished results only.</dd>
-      <dt>What it costs</dt><dd>Your existing Claude or Codex subscription. No API key is stored or required. Per call cost figures are estimates for comparing runs.</dd>
-      <dt>What it tests</dt><dd>Functionality, conversion, search and answer engines, user experience and accessibility, performance and video.</dd>
-      <dt>Worked example</dt><dd>A public Persian book-summary site, tested on 6 September 2026 with the site left unchanged.</dd>
-    </dl>
+<footer class="footer">
+  <div class="wrap">
+    <p>Product Excellence {{version}} · Created by <a href="https://www.linkedin.com/in/parhumm/" rel="noopener">Parhum Khoshbakht</a></p>
+    <nav aria-label="Footer navigation"><a href="https://github.com/parhumm/product-excellence/blob/main/LICENSE" rel="noopener">Apache 2.0</a><a href="https://github.com/parhumm/product-excellence/blob/main/docs/PRIVACY.md" rel="noopener">Privacy</a><a href="https://github.com/parhumm/product-excellence/blob/main/SECURITY.md" rel="noopener">Security</a><a href="https://github.com/parhumm/product-excellence" rel="noopener">GitHub</a></nav>
   </div>
 </footer>
-
-<script>
-document.documentElement.classList.add('js');
-(function(){
-  var buttons=[].slice.call(document.querySelectorAll('.switch button'));
-  function show(i){
-    buttons.forEach(function(b,j){
-      b.setAttribute('aria-current',j===i?'true':'false');
-      document.getElementById(b.dataset.panel).hidden=j!==i;
-    });
-  }
-  buttons.forEach(function(b,i){
-    b.addEventListener('click',function(){show(i)});
-    b.addEventListener('keydown',function(e){
-      var d=e.key==='ArrowDown'||e.key==='ArrowRight'?1:e.key==='ArrowUp'||e.key==='ArrowLeft'?-1:0;
-      if(!d)return;
-      e.preventDefault();
-      var n=(i+d+buttons.length)%buttons.length;
-      buttons[n].focus();show(n);
-    });
-  });
-  show(0);
-
-  var items=[].slice.call(document.querySelectorAll('.reveal'));
-  if(!('IntersectionObserver' in window)){items.forEach(function(el){el.classList.add('in')});return}
-  var io=new IntersectionObserver(function(entries){
-    entries.forEach(function(en){
-      if(!en.isIntersecting)return;
-      en.target.classList.add('in');
-      io.unobserve(en.target);
-    });
-  },{rootMargin:'0px 0px -8% 0px',threshold:.08});
-  items.forEach(function(el,i){el.style.setProperty('--i',i%4);io.observe(el)});
-})();
-</script>
 </body>
 </html>

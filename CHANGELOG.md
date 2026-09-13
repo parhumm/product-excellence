@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.5.1 — 2026-09-13
+
+- **Add an Android app in one step.** Settings → Websites and Android apps takes
+  the app name and its APK together, and the mission form points there.
+- **Every workspace website is a target.** Missions bound to the default web
+  target no longer fail when the workspace lists no allowed domains; the
+  seeded workspace gets its target on first start.
+- **Android journeys reach their goal.** Taps are no longer refused on API 34,
+  a control that moved inside a carousel or shares its bounds with a Compose
+  child is still tapped, the model is told how to read unlabeled native
+  controls and may not give up before trying one, and Android's full-screen
+  hint is confirmed before the run so video players are not hidden.
+- **Run pages update live.** Android runs log the launch, every screen and
+  every action as they happen, so the execution log and journey timeline fill
+  in during the run.
+- **APK inspection** accepts launchers declared as activity-alias and
+  minSdkVersion badging; the dynamic model is resolved before the AI CLI is
+  called; the designated AVD guard fails closed when none is set.
+
 ## 1.5.0 — 2026-09-13
 
 - Workspaces now contain explicit website and Android targets. APK builds are

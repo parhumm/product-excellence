@@ -23,3 +23,7 @@ abbr[title]{text-decoration:none;cursor:help;border-bottom:1px dotted var(--line
 .findmeta .compact{padding:3px 8px;font-size:11px;font-weight:400}
 .findmeta,.pillars{align-items:center}
 .assist{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.assist small{font-size:11px}.suggestions{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}.suggestion{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:16px 18px}.suggestion h3{margin:0}.suggestion p{margin:0;max-width:none}.suggestion .goaltext{overflow-wrap:anywhere}.suggestion .findmeta{margin:2px 0 0}.suggestion .caveat{color:var(--warn)}.suggestion .toolbar{margin:4px 0 0}.suggestion.applied{border-color:var(--accent);background:var(--wash)}.suggestfoot{grid-column:1/-1}.skeleton{min-height:170px;border-radius:7px;background:var(--side);animation:pulse 1.2s cubic-bezier(.22,1,.36,1) infinite alternate}@keyframes pulse{from{opacity:.55}to{opacity:1}}
+.workspaces{max-width:960px}
+.workspaces .toolbar{justify-content:space-between;margin:0;padding:12px 0;border-top:1px solid var(--line)}
+.workspaces small{display:block;margin-top:2px}
+.workspaces .field{min-width:260px}

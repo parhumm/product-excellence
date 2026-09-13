@@ -48,6 +48,9 @@ def load():
 
 def close():configure({})
 def enabled():return bool(CONFIG.get('url') and CONFIG.get('logins'))
+def shared(ws):
+    """One workspace at a time: its records live on the team server only when this console is signed in to it."""
+    return bool(ws) and enabled() and ws in CONFIG.get('logins',{})
 def persist_config(value):atomic(data()/'hub.json',value);configure(value)
 def origin():
     p=data()/'client-id'

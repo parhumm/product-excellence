@@ -56,7 +56,15 @@ def test_two_clients_modes_edits_import_and_recovery(cluster):
         writes=[pool.submit(c.put,'/api/missions/'+m['id'],headers={'X-PEX-Revision':str(edited.json()['_revision'])},json=edited.json()|{'name':name}) for c,name in ((a,'Concurrent A'),(b,'Concurrent B'))]
         assert sorted(f.result().status_code for f in writes)==[200,409]
     assert len(b.get('/api/missions/'+m['id']+'/versions').json())==2
-    assert a.post('/api/projects',json={'name':'Not local','url':'https://example.com'}).status_code==403
+    # A workspace made here stays here, next to the shared one, and the other machine never sees it.
+    local=a.post('/api/projects',json={'name':'Only on this machine','url':'https://example.com'})
+    assert local.status_code==200,local.text
+    local=local.json()['id']
+    assert {p['id'] for p in a.get('/api/state',params={'project':local}).json()['projects']}>={local,ws}
+    mine=a.post('/api/missions',json={'name':'Local audit','url':'https://example.com','goal':'Audit fixture page','mode':'audit','provider':'none','project_id':local})
+    assert mine.status_code==200,mine.text
+    assert mine.json()['id'] in {m['id'] for m in a.get('/api/state',params={'project':local}).json()['missions']}
+    assert local not in {p['id'] for p in b.get('/api/state',params={'project':ws}).json()['projects']}
     before=a.get('/api/hub/status').json()
     assert a.post('/api/hub/login',json={'url':str(server.base_url),'username':'team','password':'wrong'}).status_code==401
     assert a.get('/api/hub/status').json()==before

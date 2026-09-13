@@ -27,3 +27,4 @@ abbr[title]{text-decoration:none;cursor:help;border-bottom:1px dotted var(--line
 .workspaces .toolbar{justify-content:space-between;margin:0;padding:12px 0;border-top:1px solid var(--line)}
 .workspaces small{display:block;margin-top:2px}
 .workspaces .field{min-width:260px}
+[hidden]{display:none!important}fieldset{border:1px solid var(--line);border-radius:5px;padding:12px 14px;margin:0}legend{font-size:12px;font-weight:600;padding:0 5px}

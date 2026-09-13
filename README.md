@@ -156,9 +156,18 @@ and the username and password for the website you work on. Ask whoever
 administers the server for both. Use your own team server; no shared account
 or public hosted service is included.
 
-Missions, runs, findings and recordings then live on that server and everyone
-signed in to that website sees the same results. Tests still run on your own Mac
-with your own subscription. Signing out returns you to your own local records.
+Signing in shares that one workspace: its missions, runs, findings and
+recordings live on the server and everyone signed in to it sees the same
+results. Every other workspace stays on this Mac with all of its features, and
+the sidebar picker groups the two under **On this Mac** and **Shared on** the
+server. Each page says where the workspace you are looking at lives, and a run
+that finished while the server was unreachable reads **Awaiting upload** until
+its evidence arrives. Tests always run on your own Mac with your own
+subscription. Signing out of a workspace returns it to nobody: it stays on the
+server until you sign in again.
+
+**Settings → Add workspace** creates one on this Mac; signed in as the server's
+admin, the same form creates a shared one and signs you in to it.
 
 Setting up or updating that server is in the [deployment guide](docs/DEPLOY.md).
 

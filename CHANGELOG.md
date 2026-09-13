@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Local and shared workspaces side by side.** Signing in to the team server
+  now shares that one workspace. Every other workspace stays on this Mac with
+  all of its features, and the sidebar picker groups them under **On this Mac**
+  and **Shared on** the server.
+- **Every page says where its records live.** The sidebar, the Missions, Runs,
+  Findings and Benchmark headers, and each run row state whether a workspace is
+  on this Mac or shared, and whether a run is **Shared**, **Uploads when
+  finished** or **Awaiting upload**.
+- **Add workspace creates one in either place.** Settings offers **On this Mac**
+  by default and, when you are signed in as the server's admin, **Shared on**
+  the server, signing you in to the new shared workspace straight away.
+
 ## 1.2.0 — 2026-09-12
 
 - **The repository is brand-neutral.** New installations start with an example

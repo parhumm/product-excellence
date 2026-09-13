@@ -76,7 +76,8 @@ async def records(kind,workspace=''):return await hub.io(all_records,kind,worksp
 async def write(kind,value):
     snapshot=copy.deepcopy(value)
     def commit():
-        result=hub.publish(snapshot) if hub.enabled() and kind=='run' and snapshot.get('id') else save(kind,snapshot)
+        shared=kind=='run' and snapshot.get('id') and hub.shared(store.workspace_of('run',snapshot))
+        result=hub.publish(snapshot) if shared else save(kind,snapshot)
         # Keep the acknowledged revision even when cancellation arrives during HTTP I/O.
         for key in ('_revision','_artifacts'):
             if key in result:value[key]=result[key]
@@ -89,9 +90,17 @@ class Runner:
         self.task=asyncio.create_task(self.loop())
         self.recovery=asyncio.create_task(self.recover())
     async def recover(self,workspace=''):
+        # Runs of a workspace on this machine are recovered once; each signed-in server is recovered on its own.
+        if not workspace and '' not in self.recovered:
+            for r in await hub.io(all_records,'run',local=True):
+                # A local copy left behind by a workspace that has since moved to a server is not ours to finish.
+                if hub.shared(store.workspace_of('run',r)):continue
+                if r['id'] not in self.owned and r['status'] in ('running','queued'):
+                    r.update(status='interrupted',error='Service restarted. Replay this run to continue.',finished_at=now());await write('run',r)
+            self.recovered.add('')
         if hub.enabled():
             for ws in ([workspace] if workspace else list(hub.CONFIG['logins'])):
-                if ws in self.recovered:continue
+                if ws in self.recovered or not hub.shared(ws):continue
                 try:
                     published=await hub.io(hub.retry_pending,list(self.owned),workspace=ws)
                     self.pending_replays.update(r['id'] for r in published)
@@ -103,12 +112,7 @@ class Runner:
                 except hub.HubError:
                     if workspace:raise
                     logging.warning('Workspace recovery awaits connection: %s',ws)
-            self.ready=set(hub.CONFIG['logins'])<=self.recovered
-        else:
-            for r in await records('run'):
-                if r['id'] not in self.owned and r['status'] in ('running','queued'):
-                    r.update(status='interrupted',error='Service restarted. Replay this run to continue.',finished_at=now());await write('run',r)
-            self.ready=True
+        self.ready='' in self.recovered and set(hub.CONFIG.get('logins',{}))<=self.recovered
     async def retry_publication(self):
         published=await hub.io(hub.retry_pending,list(self.owned))
         self.pending_replays.update(r['id'] for r in published)
@@ -127,8 +131,9 @@ class Runner:
             return await self._submit(mission,baseline,replay,network_snapshot)
     async def _submit(self,mission,baseline='',replay='',network_snapshot=None):
         if self.recovery:await self.recovery
-        if hub.enabled():
-            if mission.get('project_id') not in self.recovered:await self.recover(mission.get('project_id',''))
+        ws=mission.get('project_id','')
+        if hub.shared(ws):
+            if ws not in self.recovered:await self.recover(ws)
         elif not self.ready:await self.recover()
         if self.queue.qsize()>=20:raise ValueError('Queue is full; wait for current runs')
         mission={**store.clean(mission),**Mission.model_validate(mission).model_dump(exclude={'login_password'})}
@@ -141,13 +146,13 @@ class Runner:
         if mission['browser']!='chromium' and (profile['down_mbps'] or (profile['backend']=='browser' and (profile['latency_ms'] or profile['up_mbps']))):raise ValueError('This network profile requires Chromium')
         for key,kind in [('persona_id','persona'),('egress_id','egress')]:
             if mission[key] and not await read(kind,mission[key]):raise ValueError(kind+' does not exist')
-        if hub.enabled():
+        if hub.shared(ws):
             for reference in (baseline,replay):
                 if reference and not await read('run',reference,mission['project_id']):raise ValueError('Baseline and replay must belong to this workspace')
             if mission.get('login_identifier') and not (store.DATA/'secrets'/f"{mission.get('id','')}.json").is_file():raise ValueError('Add this mission password on this machine before running')
             if mission.get('persona_id') and not (store.DATA/'personas'/f"{mission['persona_id']}.json").is_file():raise ValueError('Import the test persona on this machine before running')
             if mission.get('egress_id') and not (store.DATA/'secrets'/f"{mission['egress_id']}.json").is_file():raise ValueError('Configure proxy credentials on this machine before running')
-        run=await write('run',{'origin':hub.origin(),'project_id':mission['project_id'],'hub_url':hub.CONFIG.get('url','') if hub.enabled() else '', 'network_snapshot':profile,'mission':dict(mission),'mission_id':mission.get('id'),'status':'queued','observations':[],'actions':[],'events':[],'findings':[],'http':[],'console':[],'coverage':{},'ai_calls':0,'ai_usage':[],'ai_totals':{},'baseline_id':baseline,'replay_of':replay,'error':'','gate':'not_evaluated'})
+        run=await write('run',{'origin':hub.origin(),'project_id':mission['project_id'],'hub_url':hub.CONFIG.get('url','') if hub.shared(ws) else '', 'network_snapshot':profile,'mission':dict(mission),'mission_id':mission.get('id'),'status':'queued','observations':[],'actions':[],'events':[],'findings':[],'http':[],'console':[],'coverage':{},'ai_calls':0,'ai_usage':[],'ai_totals':{},'baseline_id':baseline,'replay_of':replay,'error':'','gate':'not_evaluated'})
         self.owned.add(run['id']);await self.queue.put(run['id']);return run
     async def after_run(self,id):
         if (store.DATA/'pending-publication'/f'{id}.json').exists():return
@@ -170,7 +175,7 @@ class Runner:
             if not self.active[id].cancelling():self.active[id].cancel()
         else:
             r=await read('run',id)
-            if r and hub.enabled():await hub.io(hub.transition,r,'cancel')
+            if r and hub.shared(store.workspace_of('run',r)):await hub.io(hub.transition,r,'cancel')
             elif r and r['status']=='queued':r.update(status='cancelled',finished_at=now());await write('run',r)
     async def loop(self):
         while True:
@@ -205,7 +210,7 @@ class Runner:
     async def execute(self,id):
         r=await read('run',id)
         if r['status']!='queued':return
-        if hub.enabled():r=await hub.io(hub.transition,r,'start')
+        if hub.shared(store.workspace_of('run',r)):r=await hub.io(hub.transition,r,'start')
         self.snapshots[id]=r
         m=r['mission'];folder=ARTIFACTS/id;folder.mkdir(exist_ok=True)
         r.update(status='running',started_at=now(),prompt_version='2026-09-06.7',network_applied=None)

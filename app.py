@@ -29,14 +29,16 @@ def seed():
         for id,name,lat,down,up,offline in [('baseline','Baseline',0,0,0,False),('slow-mobile','Slow mobile',90,5,1,False),('poor-mobile','Poor mobile',180,1.5,.512,False),('high-latency','High latency',300,20,5,False),('constrained','Constrained bandwidth',150,.75,.25,False),('offline','Offline',0,0,0,True)]:
             if store.get('network',id):continue
             store.save('network',{'id':id,**NetworkProfile(name=name,latency_ms=lat,down_mbps=down,up_mbps=up,offline=offline).model_dump()})
-    if hub.enabled():return
-    if not store.all_records('project'):store.save('project',{'id':'default','name':'Example','url':'https://example.com','allowed_domains':['example.com','www.example.com']})
-    for p in store.all_records('project'):presets.seed_project(p)
+    # Workspaces on this machine are seeded here; a shared one is seeded by the team server that created it.
+    projects=store.all_records('project',local=True)
+    if not projects and not hub.CONFIG.get('logins'):
+        projects=[store.save('project',{'id':'default','name':'Example','url':'https://example.com','allowed_domains':['example.com','www.example.com']},local=True)]
+    for p in projects:presets.seed_project(p)
 
 async def schedule_once():
     runs=await hub.io(store.all_records,'run')
     for s in await hub.io(store.all_records,'schedule'):
-        if hub.enabled() and s.get('origin')!=hub.origin():continue
+        if hub.shared(s['project_id']) and s.get('origin')!=hub.origin():continue
         if not s.get('enabled') or s['next_at']>store.now():continue
         m=await hub.io(store.get,'mission',s['mission_id'])
         if not m:
@@ -100,33 +102,37 @@ async def health():
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
         browsers={b:Path(getattr(p,b).executable_path).exists() for b in ('chromium','firefox','webkit')}
-    return {'ok':True,'version':app.version,'database':('Team server '+hub.CONFIG['url']) if hub.enabled() else 'PostgreSQL' if 'postgresql' in store.DATABASE_URL else 'SQLite','ai':await ai.health(),'browsers':browsers,'active':list(runner.active),'network':{'browser':True,'netem':bool((await netem.status()).get('ok')),'real_isp':'Requires a configured proxy endpoint'},'mode':'hybrid' if hub.enabled() else 'local','policy':'Read-only network methods; no payments or account changes'}
+    return {'ok':True,'version':app.version,'database':('PostgreSQL' if 'postgresql' in store.DATABASE_URL else 'SQLite')+(' · shared workspaces on '+hub.CONFIG['url'] if hub.enabled() else ''),'ai':await ai.health(),'browsers':browsers,'active':list(runner.active),'network':{'browser':True,'netem':bool((await netem.status()).get('ok')),'real_isp':'Requires a configured proxy endpoint'},'mode':'hybrid' if hub.enabled() else 'local','policy':'Read-only network methods; no payments or account changes'}
+
+def workspaces():
+    """Every workspace this console can open: the ones on this machine, then the shared ones signed in to."""
+    values=store.all_records('project',local=True)
+    known={p['id'] for p in values}
+    return values+[{'id':id,'name':v.get('name',id)} for id,v in hub.CONFIG.get('logins',{}).items() if id not in known]
 
 @app.get('/api/state')
 def state(project:str=''):
     """One workspace at a time when a project is given; the run list is capped, so it is filtered first."""
-    if hub.enabled():
-        h=hub.status(); project=project if project in h['logins'] else next(iter(h['logins']))
-        projects=[{'id':id,'name':v['name']} for id,v in h['logins'].items()]
-        selected=store.get('project',project,project)
-        # During an outage the workspace name from the sign-in stands in for its record.
-        if not selected and not hub.OUTAGE:raise HTTPException(404,'Workspace not found')
-        if selected:projects=[selected if p['id']==project else p for p in projects]
+    projects=workspaces();ids=[p['id'] for p in projects]
+    globals_={k:store.all_records(kind) for k,kind in [('networks','network'),('egresss','egress'),('personas','persona')]}
+    if ids and (project or hub.enabled()):
+        if project not in ids:project=ids[0]
+        shared=hub.shared(project)
+        if shared:
+            selected=store.get('project',project,project)
+            # During an outage the workspace name from the sign-in stands in for its record.
+            if not selected and not hub.OUTAGE:raise HTTPException(404,'Workspace not found')
+            if selected:projects=[selected if p['id']==project else p for p in projects]
+        runs=store.all_records('run',project,limit=200,summaries=shared)
         # The hub status is read last, so an outage these record reads just met is reported.
-        return {'projects':projects,'missions':store.all_records('mission',project),'runs':store.all_records('run',project,limit=200,summaries=True),'schedules':store.all_records('schedule',project),**{k:store.all_records(kind) for k,kind in [('networks','network'),('egresss','egress'),('personas','persona')]},'hub':hub.status()}
-    records={k:store.all_records(k[:-1]) for k in ('missions','networks','egresss','personas','schedules','projects')}
-    runs=store.all_records('run')
-    if project:
-        records['missions']=[m for m in records['missions'] if m['project_id']==project]
-        mission_ids={m['id'] for m in records['missions']}
-        records['schedules']=[s for s in records['schedules'] if s['mission_id'] in mission_ids]
-        runs=[r for r in runs if store.workspace_of('run',r)==project]
-    return {**records,'runs':[views.summary(r) for r in runs[:200]],'hub':hub.status()}
+        return {'projects':projects,'missions':store.all_records('mission',project),'runs':runs if shared else [views.summary(r) for r in runs],'schedules':store.all_records('schedule',project),**globals_,'hub':hub.status()}
+    # Nothing selected and nothing shared: the whole local database, as the command line and tests read it.
+    records={k:store.all_records(k[:-1],local=True) for k in ('missions','schedules')}
+    return {'projects':projects,**records,'runs':[views.summary(r) for r in store.all_records('run',local=True)[:200]],**globals_,'hub':hub.status()}
 
 @app.post('/api/projects')
 def project(p:Project):
-    if hub.enabled():raise HTTPException(403,'Create workspaces through the team server admin')
-    return presets.seed_project(store.save('project',p.model_dump()))
+    return presets.seed_project(store.save('project',p.model_dump(),local=True))
 @app.put('/api/projects/{id}')
 def update_project(id:str,p:Project,revision:int|None=Header(None,alias='X-PEX-Revision')):
     old=required('project',id);check_edit(old,revision)
@@ -150,13 +156,14 @@ def create_mission(m:Mission):
 def update_mission(id:str,m:Mission,revision:int|None=Header(None,alias='X-PEX-Revision')):
     required('project',m.project_id)
     old=required('mission',id);check_edit(old,revision)
-    if not hub.enabled():store.save('mission_version',{'mission_id':id,'project_id':old['project_id'],'snapshot':old})
+    if not hub.shared(old['project_id']):store.save('mission_version',{'mission_id':id,'project_id':old['project_id'],'snapshot':old})
     return stash_password(store.save('mission',{**old,**m.model_dump(exclude={'login_password'}),'version':old.get('version',1)+1}),m.login_password)
 @app.delete('/api/missions/{id}')
 def delete_mission(id:str,revision:int|None=Header(None,alias='X-PEX-Revision')):
-    check_edit(required('mission',id),revision);store.delete('mission',id,expected=revision);(store.DATA/'secrets'/f'{id}.json').unlink(missing_ok=True)
-    if hub.enabled():return {'ok':True}
-    for s in store.all_records('schedule'):
+    m=required('mission',id);check_edit(m,revision);store.delete('mission',id,expected=revision);(store.DATA/'secrets'/f'{id}.json').unlink(missing_ok=True)
+    # A team server removes the schedules of a mission it deletes; a workspace on this machine does it here.
+    if hub.shared(m['project_id']):return {'ok':True}
+    for s in store.all_records('schedule',m['project_id']):
         if s['mission_id']==id:store.delete('schedule',s['id'])
     return {'ok':True}
 @app.post('/api/missions/suggest')
@@ -238,7 +245,7 @@ async def finding_update(run_id:str,id:str,request:Request,revision:int|None=Hea
 @app.get('/api/runs/{id}/artifacts/{filename}')
 def artifact(id:str,filename:str):
     run=required('run',id)
-    if hub.enabled():
+    if hub.shared(store.workspace_of('run',run)):
         if filename=='run.json':return JSONResponse(store.clean(run))
         p=hub.cached_artifact(id,filename,store.workspace_of('run',run))
         if not p.is_file():p=hub.fetch_artifact(id,filename,store.workspace_of('run',run))
@@ -342,7 +349,8 @@ async def hub_failure(request,e):return JSONResponse({'detail':e.detail},e.statu
 async def edit_conflict(request,e):return JSONResponse({'detail':str(e)},409)
 
 def check_edit(record,revision):
-    if hub.enabled() and revision!=record.get('_revision'):
+    # Only a shared record carries a revision; a workspace on this machine has no concurrent writer.
+    if record.get('_revision') is not None and revision!=record['_revision']:
         raise HTTPException(409,'This record changed or its revision is missing. Reload before saving; your changes were not applied.')
 
 @app.get('/api/hub/status')

@@ -60,15 +60,18 @@ def init():
             else: logging.warning('Unresolved workspace: %s %s',r['kind'],r['id'])
         conn.execute(text('CREATE INDEX IF NOT EXISTS ix_records_workspace_kind ON records (workspace, kind)'))
 
-def routed(kind, local, session):
+def side(kind, workspace, local, session):
+    """Where this record lives: 'local', 'hub', or 'both' when the workspace is not known yet."""
     from . import hub
-    return not local and session is None and kind in hub.ROUTED and hub.enabled()
+    if local or session is not None or kind not in hub.ROUTED or not hub.enabled(): return 'local'
+    if workspace: return 'hub' if hub.shared(workspace) else 'local'
+    return 'both'
 
 def unpack(row, metadata=False):
     return dict(row.payload) | ({'_revision':row.revision} if metadata else {})
 
 def save(kind, value, *, session=None, local=False, expected=None, workspace='', preserve_times=False):
-    if routed(kind,local,session):
+    if side(kind,workspace or workspace_of(kind,value),local,session)=='hub':
         from . import hub
         return hub.save(kind,value)
     if session is None:
@@ -97,9 +100,12 @@ def save(kind, value, *, session=None, local=False, expected=None, workspace='',
     return value
 
 def get(kind,id,workspace='',*,local=False,session=None,metadata=False):
-    if routed(kind,local,session):
+    where=side(kind,workspace,local,session)
+    if where!='local':
         from . import hub
-        return hub.get(kind,id,workspace)
+        if where=='hub':return hub.get(kind,id,workspace)
+        # The workspace is unknown, so this machine answers first and the server only for what it does not hold.
+        return get(kind,id,local=True,metadata=metadata) or hub.get(kind,id)
     if session is None:
         with Session() as s:return get(kind,id,workspace,session=s,metadata=metadata)
     q=select(Record).where(Record.id==id,Record.kind==kind)
@@ -108,9 +114,14 @@ def get(kind,id,workspace='',*,local=False,session=None,metadata=False):
     return unpack(r,metadata) if r else None
 
 def all_records(kind,workspace='',*,local=False,session=None,metadata=False,limit=None,offset=0,summaries=False):
-    if routed(kind,local,session):
+    where=side(kind,workspace,local,session)
+    if where!='local':
         from . import hub
-        return hub.all_records(kind,workspace,limit=limit,summaries=summaries)
+        if where=='hub':return hub.all_records(kind,workspace,limit=limit,summaries=summaries)
+        # Every workspace this console can reach: the ones on this machine and the shared ones together.
+        values=all_records(kind,local=True,metadata=metadata,summaries=summaries)+hub.all_records(kind,limit=limit,summaries=summaries)
+        values.sort(key=lambda r:r.get('created_at',''),reverse=True)
+        return values[offset:None if limit is None else offset+limit]
     if session is None:
         with Session() as s:return all_records(kind,workspace,session=s,metadata=metadata,limit=limit,offset=offset,summaries=summaries)
     q=select(Record).where(Record.kind==kind)
@@ -124,7 +135,8 @@ def summary(r):
     return {k:v for k,v in r.items() if k not in ('observations','events','http','console','actions','findings','_artifacts')} | {'finding_count':len(r.get('findings',[])),'step_count':len(r.get('actions',[]))}
 
 def delete(kind,id,workspace='',*,local=False,session=None,expected=None):
-    if routed(kind,local,session):
+    where=side(kind,workspace,local,session)
+    if where=='hub' or (where=='both' and not get(kind,id,local=True)):
         from . import hub
         return hub.delete(kind,id,workspace,expected)
     if session is None:

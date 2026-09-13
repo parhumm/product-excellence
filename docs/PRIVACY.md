@@ -12,7 +12,7 @@ permission to send their contents to the configured services.
 | Mission passwords and proxy credentials | Local files under `data/secrets/`; not normal mission exports |
 | Saved browser sessions | Local persona files, containing cookies and browser storage |
 | Team server credentials | Local `data/hub.json`, with restricted file permissions |
-| Shared missions, runs and evidence | Your connected team server; published automatically when configured |
+| Missions, runs and evidence of a shared workspace | Your connected team server; published automatically. Workspaces you are not signed in to stay on this machine |
 | Playwright traces | Local artifacts; excluded from team-server publication |
 
 Provider subscription quotas and the provider’s own data handling settings apply.

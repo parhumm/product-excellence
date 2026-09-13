@@ -285,3 +285,23 @@ def test_traces_stay_on_the_machine_that_ran_the_mission(hub_client,tmp_path):
     shared=hub.shareable(r)
     assert 'trace' not in shared and shared['observations']==r['observations']
     assert hub.evidence_names(shared,folder)=={'s.png'}
+
+@pytest.mark.asyncio
+async def test_a_workspace_on_this_machine_keeps_its_runs_while_another_is_shared(hub_client,monkeypatch):
+    """Signing in to one workspace shares that one only; the rest stay on this machine with every feature."""
+    from engine.runner import Runner
+    c=hub_client;p=workspace(c)
+    hub.configure({'url':'http://testserver','logins':{p['id']:{'username':p['username'],'password':PASSWORD}}})
+    monkeypatch.setattr(hub,'_client',c)
+    assert hub.shared(p['id']) and not hub.shared('mine')
+    store.save('project',{'id':'mine','name':'On this machine','url':'https://example.com','allowed_domains':['example.com']},local=True)
+    local_mission=store.save('mission',{'id':'m-mine','project_id':'mine','name':'Local audit','goal':'Audit the page','url':'https://example.com','provider':'none','mode':'audit'})
+    assert store.get('mission','m-mine',local=True)
+    assert c.get('/hub/records/mission/m-mine',auth=(p['username'],PASSWORD)).status_code==404
+    profile={'id':'offline','name':'Offline','down_mbps':0,'up_mbps':0,'latency_ms':0,'backend':'browser'}
+    run=await Runner().submit(local_mission,network_snapshot=profile)
+    assert run['hub_url']=='' and run['project_id']=='mine'
+    assert store.get('run',run['id'],local=True)
+    assert not hub.pending()
+    assert c.get('/hub/records/run',auth=(p['username'],PASSWORD)).json()==[]
+    monkeypatch.setattr(hub,'_client',None)

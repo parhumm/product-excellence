@@ -49,9 +49,9 @@ Open **Settings** to check whether the browsers and your AI subscription are rea
 
 The **Workspace** selector chooses the product you are working on. A workspace can contain several website and Android targets. Missions, runs, findings, comparisons and scheduled checks stay inside it. Choose the target on each new mission.
 
-Add another website under **Settings → Workspaces (websites)**: a name, its address, and the domains a test is allowed to visit.
+Each workspace website is listed under **Settings → Websites and Android apps** as a target; its URL and allowed domains come from the workspace. Add another website there: a name, its address, and the domains a test may visit.
 
-For Android, open **Settings → Workspaces and targets**, create an Android target, and upload an installable APK. The first build fixes that target's package name. New runs can use the latest non-archived build or pin an exact SHA. The disposable AVD is cleared only for that package before each run; Android sign-in, benchmark, SEO/AEO, proxy and network matrices are unavailable.
+For an Android app, open **Settings → Websites and Android apps**, choose **Android app**, give it a name and pick the APK file in the same form. The first APK sets the package name; later builds are added with **Add APK build** on the app's row. New runs use the latest non-archived build or pin an exact SHA. The mission form's Target field links back here when the workspace has no app yet. The disposable AVD is cleared only for that package before each run; Android sign-in, benchmark, SEO/AEO, proxy and network matrices are unavailable.
 
 ### 3. Choose a mission
 

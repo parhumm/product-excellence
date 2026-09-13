@@ -205,13 +205,18 @@ class Device:
             except Exception as error:screenshot.unlink(missing_ok=True);self.warnings.append('Sensitive screenshot omitted: '+str(error));screenshot=None
         mem=await self.shell('dumpsys','meminfo',self.app['package'],check=False)
         pss=re.search(r'^\s*TOTAL\s+(\d+)',mem,re.M)
-        foreground=await self.shell('dumpsys','window','windows',check=False)
-        activity=(re.search(r'mCurrentFocus=.*? ([A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)',foreground) or [None,''])[1]
+        activity=await self.focused()
         locale=await self.shell('getprop','persist.sys.locale',check=False) or await self.shell('getprop','ro.product.locale',check=False)
         self.measurements.update(display=f'{width}x{height}',density_dpi=dpi,rotation=int(root.get('rotation','0')),locale=locale,pss_kb=int(pss[1]) if pss else None,jank_pct=None)
         observation={'id':id,'at':store.now(),'url':'android-app://'+self.app['package']+'/'+activity,'title':self.app['package'],'lang':locale,'dir':'ltr','text':'\n'.join(n.get('text','') for n in root.iter('node') if n.get('text')),'viewport':{'width':width,'height':height,'density_dpi':dpi,'rotation':int(root.get('rotation','0'))},'controls':controls,'metrics':{'jank_pct':None,'janky_frames':None,'total_frames':None,'pss_kb':int(pss[1]) if pss else None,'crashes':0},'checks':{'hierarchy':{'status':'supported'},'gfxinfo':{'status':'unavailable'},'meminfo':{'status':'supported' if pss else 'unavailable'},'logcat':{'status':'supported'}},'console_events':[],'hierarchy':xml,'screenshot':'/api/runs/'+self.run_id+'/artifacts/'+screenshot.name if screenshot else '' ,'part':1}
         (self.folder/(id+'.json')).write_text(json.dumps(observation,ensure_ascii=False,indent=2))
         return observation
+
+    async def focused(self):
+        """package/activity that owns the focus; `dumpsys window windows` stopped printing it on API 34, so read the full dump."""
+        dump=await self.shell('dumpsys','window',check=False)
+        found=re.search(r'm(?:FocusedApp|CurrentFocus)=\S+ u\d+ ([A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)',dump)
+        return found[1] if found else ''
 
     async def act(self,action):
         kind=action.get('type');target=action.get('target') or ''
@@ -221,9 +226,7 @@ class Device:
         if kind=='scroll':
             width,height=self.display;start,end=(str(height*3//4),str(height//4)) if action.get('value','down')=='down' else (str(height//4),str(height*3//4))
             await self.shell('input','swipe',str(width//2),start,str(width//2),end,'400');return
-        foreground=await self.shell('dumpsys','window','windows',check=False)
-        focus=(re.search(r'mCurrentFocus=.*? ([A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)',foreground) or [None,''])[1]
-        if not focus.startswith(self.app['package']+'/'):raise AndroidError('Target app is not in the foreground; action refused')
+        if not (await self.focused()).startswith(self.app['package']+'/'):raise AndroidError('Target app is not in the foreground; action refused')
         xml,root,_=await self._hierarchy();identity=self.controls.get(target)
         matches=[]
         for node in root.iter('node'):

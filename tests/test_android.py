@@ -60,3 +60,16 @@ async def test_stop_signals_only_the_owned_device_recorder(monkeypatch,tmp_path)
     device.serial='emulator-1';device.recorder=Recorder();device.recorder_pid='42';device.shell=shell
     await device.stop()
     assert ('kill','-2','42') in calls and not any(call[:1] in (('pidof',),('pkill',)) for call in calls)
+
+async def test_focused_app_is_read_from_the_full_window_dump(monkeypatch,tmp_path):
+    """API 34 prints the focus only in `dumpsys window`, as mFocusedApp/mCurrentFocus lines."""
+    calls=[]
+    async def fake(*args,**kw):
+        calls.append(args)
+        return '  mCurrentFocus=Window{af57e58 u0 com.aparat.filimo/com.bluevod.app.features.vitrine.NewVitrineActivity}\n  mFocusedApp=ActivityRecord{cc4ba81 u0 com.aparat.filimo/com.bluevod.app.features.vitrine.NewVitrineActivity t30}\n' if args[-1]=='dumpsys window' else ''
+    monkeypatch.setattr(android.targets,'tool',lambda name:Path('/bin/true'))
+    monkeypatch.setattr(android,'run',fake);monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'com.aparat.filimo'},tmp_path,'run')
+    device.serial='emulator-1'
+    assert await device.focused()=='com.aparat.filimo/com.bluevod.app.features.vitrine.NewVitrineActivity'
+    assert calls[0][-1]=='dumpsys window'

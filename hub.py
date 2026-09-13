@@ -85,7 +85,7 @@ def admin(who=Depends(authenticate)):
 async def lifespan(app):
     store.init()
     yield
-app=FastAPI(title='Product Excellence team server',version='1.3.0',lifespan=lifespan)
+app=FastAPI(title='Product Excellence team server',version='1.4.0',lifespan=lifespan)
 
 @app.exception_handler(HubError)
 async def hub_error(request,e):return JSONResponse({'detail':e.detail},e.status)

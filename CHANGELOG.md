@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.4.0 — 2026-09-13
+
+- **Continue a run where its budget ended.** A journey that ran out of AI calls
+  or steps no longer has to be replayed from the start. **Continue** carries the
+  same run on under its own id: it reopens the last page with the cookies that
+  visit saved, numbers the next actions from where they stopped, and adds to the
+  findings already on record. A run that only lacked its evaluation runs the
+  evaluation alone. Continuing is refused, with a reason, for a run that is
+  queued or running, shared on a team server, a benchmark, one that captured no
+  page, or one already at the highest limits its mission allows.
+- **A run that stops at its budget still gets its review.** The pillar review is
+  now worth one AI call past the budget, so the summary, the scores and the AI
+  findings are there to read instead of waiting for a continuation. Findings no
+  critic could challenge stay marked unconfirmed and count half.
+- **A continued run shows every visit.** The timeline marks where the browser
+  reopened, the run header says how many visits there were, and the recording
+  and browser trace of every part stay on the run page and in the Markdown
+  export, which now lists them and says the report covers each visit.
+- **A slow page gets time to load.** Every page in a journey now has the same
+  45-second navigation budget the first one had, so an origin that takes tens of
+  seconds to paint no longer ends the run. A screenshot that does not finish is
+  recorded on that observation and the page text, metrics and accessibility pass
+  are kept.
+- **Goal suggestions answer faster.** The mission form's suggestion call gives up
+  after a minute instead of leaving the button waiting on a stuck worker.
+
 ## 1.3.0 — 2026-09-13
 
 - **Local and shared workspaces side by side.** Signing in to the team server

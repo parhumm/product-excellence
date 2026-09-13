@@ -1,4 +1,4 @@
-"""One version, three files, one changelog entry: a half-done bump fails here."""
+"""One version source and one changelog entry: a half-done bump fails here."""
 import pathlib,re
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -8,10 +8,12 @@ def declared(path,pattern):
     assert found,f'no version found in {path}'
     return found.group(1)
 
-def test_the_three_version_strings_agree():
+def test_both_apps_use_the_project_version_source():
     project=declared('pyproject.toml',r'(?m)^version\s*=\s*"([^"]+)"')
-    assert declared('app.py',r"FastAPI\(title='Product Excellence',version='([^']+)'")==project
-    assert declared('hub.py',r"FastAPI\(title='Product Excellence team server',version='([^']+)'")==project
+    from engine import VERSION
+    assert VERSION==project
+    assert "FastAPI(title='Product Excellence',version=VERSION" in (ROOT/'app.py').read_text()
+    assert "FastAPI(title='Product Excellence team server',version=VERSION" in (ROOT/'hub.py').read_text()
 
 def test_the_changelog_leads_with_that_version():
     project=declared('pyproject.toml',r'(?m)^version\s*=\s*"([^"]+)"')

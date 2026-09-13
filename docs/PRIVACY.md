@@ -7,12 +7,14 @@ permission to send their contents to the configured services.
 | Data | Where it goes |
 | --- | --- |
 | Website requests and sign-in | The target website; through your proxy if configured |
+| Android app requests | The installed app's own endpoints; Android traffic is not intercepted or made read-only |
 | Selected page observations, goals and screenshots | The selected AI provider through its signed-in CLI, when AI is enabled |
 | Local records and evidence | `data/` by default, or your configured `PEX_DATA` directory |
 | Mission passwords and proxy credentials | Local files under `data/secrets/`; not normal mission exports |
 | Saved browser sessions | Local persona files, containing cookies and browser storage |
 | Team server credentials | Local `data/hub.json`, with restricted file permissions |
-| Missions, runs and evidence of a shared workspace | Your connected team server; published automatically. Workspaces you are not signed in to stay on this machine |
+| Team-visible targets, missions, runs and evidence | Your connected team server; explicitly local items stay on this Mac until shared. APK bytes never upload |
+| Android raw MP4 and attributed logs | Local evidence, the selected AI worker when used, and the team server only for a team/shared run |
 | Playwright traces | Local artifacts; excluded from team-server publication |
 
 Provider subscription quotas and the provider’s own data handling settings apply.
@@ -27,6 +29,10 @@ text captures, and masks selected password, email, phone and one-time-code input
 in screenshots. This does not recognize every encoded secret or every kind of
 personal information. Page text, URLs, images, video and traces may contain
 credentials, signed-in content or personal data. Video is not comprehensively masked.
+Android screenshots mask recognized sensitive input boxes when possible, but raw
+MP4 cannot be masked. Attributed app logs use bounded best-effort credential
+redaction; it is not a guarantee that arbitrary secrets are absent. Android
+missions therefore stop before sign-in, password or OTP entry.
 
 Raw evidence is intentionally retained for debugging. Shared workspace members
 can read its shared evidence; a shared login does not identify individual people.

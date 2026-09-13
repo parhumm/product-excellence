@@ -32,6 +32,16 @@ def coverage(run):
     observations=run.get('observations',[])
     axe_ok=bool(observations) and all('error' not in o.get('axe',{'error':'not run'}) for o in observations)
     result={}
+    if (run.get('platform') or run.get('mission',{}).get('platform'))=='android':
+        checks=(observations[-1].get('checks',{}) if observations else {})
+        for pillar in run['mission']['pillars']:
+            if pillar=='cro':done=ai_done
+            elif pillar=='ux_ui':done=bool(observations) and all(o.get('checks',{}).get('hierarchy',{}).get('status')=='supported' for o in observations)
+            elif pillar=='functionality':done=bool(observations) and checks.get('logcat',{}).get('status')=='supported' and run.get('measurements',{}).get('launch_status')=='ok'
+            else:done=bool(observations) and any((checks.get(k) or {}).get('status')=='supported' for k in ('gfxinfo','meminfo'))
+            unavailable=[k for k,v in checks.items() if v.get('status')!='supported']
+            result[pillar]={'status':'evaluated' if done else 'not_evaluated','method':'deterministic + AI' if ai_done else 'deterministic','note':'Android lab checks; unavailable: '+(', '.join(unavailable) if unavailable else 'none')}
+        return result
     for pillar in run['mission']['pillars']:
         done=bool(observations)
         if pillar=='cro':done=ai_done

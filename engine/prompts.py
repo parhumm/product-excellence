@@ -48,7 +48,7 @@ def evidence_json(packet):
 # rule below is disclosed to the model once, through prompt_note().
 
 CONTROL_NOTE = ('Control fields that are empty, false or an empty list are omitted; '
-                'box is the on-screen rectangle in whole CSS pixels.')
+                'box is the on-screen rectangle in whole CSS pixels for web and screen pixels for Android.')
 HTTP_NOTE = ('http lists every response that failed or used a non-GET method; '
              'http.ok counts the remaining successful responses by resource type.')
 ACTION_NOTE = ('Each observation carries the page state and its controls. problems lists console '

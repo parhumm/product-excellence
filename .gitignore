@@ -17,6 +17,7 @@ data/
 *.sqlite3-*
 *.log
 /tmp/
+tests/fixtures/crashapp/out/
 node_modules/
 
 linux/.env

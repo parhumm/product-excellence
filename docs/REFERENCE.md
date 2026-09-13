@@ -4,7 +4,7 @@ Everything Product Excellence can do, in detail. Start at the
 [README](../README.md) to install it and the
 [user manual](USER_MANUAL.md) to use it.
 
-A local web testing console for goal-driven browser journeys, five-pillar reviews, network experiments, replay and evidence-backed findings. Each website is its own workspace, with separate missions, runs and findings. Uses a signed-in Codex or Claude CLI, without API keys.
+A local web and Android testing console for goal-driven journeys, five-pillar reviews, replay and evidence-backed findings. A workspace contains targets with separate missions, runs and findings. Uses a signed-in Codex or Claude CLI, without API keys.
 
 New here? Read the [short, plain-language user manual](USER_MANUAL.md).
 
@@ -40,9 +40,19 @@ The app keeps its database, screenshots, traces, video and account sessions unde
 
 The **5 networks** button queues the same mission under five browser profiles. For a targeted audit, select **Page / pillar audit** and choose the evaluation pillars. **No AI** runs deterministic checks only; CRO and visual judgment require an AI worker.
 
-## Workspaces
+## Workspaces and targets
 
-A workspace is one website. Create and edit them under **Settings → Workspaces (websites)** with a name, a URL and the domains a run may visit. A new workspace is created with the ten built-in missions. A preset that is deleted is not recreated on the next start. The sidebar selector switches between them, remembers the choice, and filters missions, runs, findings, comparisons and schedules to that site; a mission created inside a workspace is pre-filled from it. Networks, egress routes and test personas stay shared.
+A workspace is one product and may hold multiple website and Android targets. Existing workspace URLs become deterministic default web targets; migration adds JSON records only, writes `data/backups/records-before-targets-*.json` before its first change, and does not rewrite missions, runs, schedules, secrets or evidence. An app-only workspace may have a blank URL.
+
+Android build metadata contains SHA-256, version name/code, SDK requirements, launcher, ABIs and size. APK bytes remain mode `0600` under `data/apps` on each execution console and are never sent to the hub. Queueing resolves "latest" once and pins the SHA. Archiving removes a build from new latest selection; removing local bytes preserves history and requires that exact SHA before replay.
+
+`PEX_ANDROID_SDK`, then `ANDROID_HOME`, `ANDROID_SDK_ROOT`, Homebrew's command-line tools root and `~/Library/Android/sdk` are checked in order. `PEX_ANDROID_AVD` names the only disposable AVD allowed for execution; `PEX_ANDROID_WINDOW=1` shows its window. `PEX_ANDROID_PROBE_URL` is an operator-supplied HTTPS endpoint used only to verify offline restoration. APK runs need platform-tools, emulator, build-tools, a system image and an AVD. AVD creation additionally needs command-line tools and a JDK; fixture compilation needs platform android-34, javac, d8, zipalign, apksigner and keytool.
+
+The measured fixture ran on API 34 arm64 with usable hierarchy, safe text input, sensitive-field recognition, seekable MP4, PSS and attributable Java crash/ANR logs. Gfx/jank was unavailable. Without an operator probe URL, Android is baseline-only; shaping and periodic disconnects are rejected. Launch is `am start -W TotalTime`, PSS is KiB, touch targets use 48 dp, and unavailable measurements remain null. This is not full mobile accessibility, playback QoE, physical-device coverage or field performance.
+
+Mission fields `target_id`, `build`, `device`, `visibility` and resolved `platform` bind these facts. Android permits an optional HTTPS deep link only on the target's hosts and rejects benchmark, competitors, SEO/AEO, personas, proxy and sign-in. Raw MP4 cannot be masked; logs are attributable, bounded and best-effort redacted. Continue is web-only; Android replay requires the same SHA.
+
+In a connected workspace, `visibility=local` keeps a target, mission or run on one Mac. Sharing is explicit and ordered: target, mission, terminal run. Run sharing uploads finalized ordinary evidence but not browser traces; local records remain authoritative until acknowledgement. Published items cannot be made local.
 
 ## Scores and the executive summary
 
@@ -347,7 +357,9 @@ sudo systemctl start product-excellence-hub
 
 Store a separate protected backup of the environment file. For PostgreSQL, stop the hub, use `pg_dump --format=custom` against its database and archive `PEX_DATA/artifacts` in the same stopped interval; restart after both complete. Back up local data with the local app stopped, including local secrets/personas if those must be recoverable.
 
-Before upgrading an existing database, keep a full database backup. The schema migration additionally writes the old record data into a protected `data/backups/records-before-hub-*.json` file before adding columns, backfills legacy workspace ownership and reports unresolved history without deleting it. That record export is supplementary, not a replacement for the database/artifact backup.
+Before upgrading, stop submissions, drain queued/running runs and every console's `data/pending-publication`, then checkpoint database and artifacts together. Version 1.5 adds no database schema: it creates default target JSON records and writes `records-before-targets-*.json` before the first such write. This export is supplementary, not the restore source. Upgrade the hub first, then every console in a workspace before using targets, Android or private items. The first such shared mutation stamps server-owned `min_console=1.5.0`; older, missing or malformed `X-PEX-Console` headers then receive HTTP 426, while health, auth and the read-only team page remain reachable.
+
+For rollback after new-format writes, stop all processes, preserve the current database/artifacts/APKs, quarantine all pending-publication JSON, new share journals and affected hub read caches, then restore the coordinated checkpoint databases including `min_console`. Do not copy the old outbox back blindly; retain it for explicit reconciliation after a later upgrade and record which machines were restored. A code-only rollback is safe only if no target, Android or visibility-stamped record was written.
 
 Test restoration into a separate directory/database and loopback hub: extract the archive there, set `PEX_DATA`/`DATABASE_URL` to the restored paths and launch `uvicorn hub:app` on a spare port. Verify workspace authentication, record counts, historical versions, one artifact checksum and a video range request before replacing a live installation. Restore PostgreSQL dumps into an empty disposable database using `pg_restore`, with matching artifacts. Integration tests exercise a source-record backup restore into a fresh SQLite database; operational archive/production restoration still needs the deployment's own rehearsal.
 

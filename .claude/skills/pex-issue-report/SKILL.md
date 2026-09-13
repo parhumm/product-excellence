@@ -25,6 +25,10 @@ error and last events, and the matching log lines. It redacts anything shaped
 like an email address, a token, a cookie or a password, and it
 never reads `data/secrets`, a saved persona or a recording.
 
+For an Android engine failure, include only the relevant sanitized SDK/AVD,
+package/build, API/ABI and collector diagnostics. Never include arbitrary device
+identifiers, the full feasibility-spike output, raw system logs or APK bytes.
+
 Read the file before using it. If anything sensitive survived, remove it by hand
 and say that you did.
 

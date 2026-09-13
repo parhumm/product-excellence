@@ -1,4 +1,4 @@
-import asyncio,os
+import asyncio,os,re,httpx
 from pathlib import Path
 from playwright.async_api import async_playwright
 from tests.browser_helpers import open_view
@@ -8,6 +8,10 @@ async def main():
  async with async_playwright() as p:
   b=await p.chromium.launch();page=await b.new_page(viewport={'width':1440,'height':1000});errors=[]
   page.on('pageerror',lambda e:errors.append(str(e)))
+  if os.environ.get('PEX_ANDROID_AVD'):
+   snapshot=httpx.get(base+'/api/state',timeout=10).json();native=next((t for t in snapshot.get('targets',[]) if t.get('type')=='android'),None)
+   assert native,'Android smoke data is missing before the UI check'
+   await page.goto(base);await page.evaluate("id => localStorage.setItem('pex.workspace', id)",native['project_id'])
   for route in ['overview','missions','new','runs','findings','benchmark','compare','network','settings']:
    await open_view(page,route,base)
    # Every view belongs to one website, so the workspace picker is always usable.
@@ -32,6 +36,13 @@ async def main():
     assert await extras.count()==1,'Extra settings section missing'
     assert not await extras.first.get_attribute('open'),'Extra settings open on a new mission'
     assert await page.locator('select[name=mode] option[value=benchmark]').count()==1,'Benchmark mode missing'
+    native_option=page.locator('select[name=target_id] option').filter(has_text='Android app').first
+    if await native_option.count():
+     await page.select_option('select[name=target_id]',await native_option.get_attribute('value'))
+     assert await page.locator('select[name=build]').is_visible(),'Android build selector is hidden'
+     assert await page.locator('input[name=device]').is_visible(),'Android device selector is hidden'
+     assert await page.locator('select[name=browser]').is_disabled(),'Browser remains enabled for an Android mission'
+     assert await page.locator('input[name=pillars][value=seo_aeo]').is_disabled(),'SEO/AEO remains enabled for Android'
    if route=='findings':
     assert await page.locator('#finding-sort').count()==1,'Findings sort control is missing'
     assert await page.locator('#finding-owner').count()==1,'Assignment filter is missing'
@@ -46,10 +57,22 @@ async def main():
     first=page.locator('table tbody tr td a').first
     if await first.count():
      await first.click();await page.wait_for_selector('h1')
+     if 'Android' in await page.locator('.pagehead').inner_text():
+      assert await page.get_by_role('heading',name='App evidence').count()==1,'Android run is labeled as browser evidence'
+      for label in ['Launch time','Jank','Memory (PSS)','Crashes and errors']:
+       assert await page.get_by_text(label,exact=True).count()>0,f'{label} is missing from Android evidence'
+      assert await page.get_by_role('link',name=re.compile('App log')).count()>0,'Android log evidence is missing'
      if await page.locator('video').count():
       assert await page.locator('#video-speed').input_value()=='2','Playback speed does not default to 2x'
       assert await page.evaluate('document.querySelector("video").playbackRate')==2,'Video is not playing at the selected speed'
      await open_view(page,'runs',base)
+   if route=='settings' and os.environ.get('PEX_ANDROID_AVD'):
+    assert await page.locator('input[data-apk]').count()>0,'APK upload control is missing'
+    assert await page.locator('[data-archive-build]').count()>0,'Build archive control is missing'
+    assert await page.locator('[data-remove-build]').count()>0,'Local APK removal control is missing'
+   if route=='compare' and os.environ.get('PEX_ANDROID_AVD'):
+    await page.locator('#compare-form button').click();await page.wait_for_selector('#comparison-result .notice')
+    assert 'App build changed' in await page.locator('#comparison-result').inner_text(),'Android build change is not labeled'
    if route in ['overview','missions','settings']:await page.screenshot(path=str(output/f'ui-{route}.png'),full_page=True)
   await page.set_viewport_size({'width':390,'height':844});await open_view(page,'missions',base)
   assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'Mobile overflow'

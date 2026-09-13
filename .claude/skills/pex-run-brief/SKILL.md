@@ -36,6 +36,12 @@ export; nothing is estimated.
   profile, one moment. A completed run means the test finished, not that the
   website is fine. AI findings a critic has not confirmed are risks, not defects.
 
+For Android, replace browser/network prose with target, package, app version/SHA,
+API/ABI/display/locale, reset policy and applied network. Report launch time,
+jank and PSS only when measured, and list crash/ANR log evidence and unavailable
+checks. This is a disposable-emulator lab result, not full accessibility,
+playback QoE, device-fleet or field-performance certification.
+
 Match the audience: for executives, the effect on customers and the decision to
 take. For a web team, the pillar, the page and the evidence path.
 

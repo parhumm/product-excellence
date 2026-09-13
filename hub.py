@@ -10,8 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from sqlalchemy import Column, String
 from sqlalchemy.exc import IntegrityError
-from engine import store, presets, views
-from engine.contracts import Project, Mission, Schedule
+from engine import store, presets, views, targets, VERSION
+from engine.contracts import Project, Mission, Schedule, Target
 from engine.hub import HubError, file_path, digest, artifact_names, TERMINAL, ROUTED
 
 class WorkspaceLogin(store.Base):
@@ -77,6 +77,17 @@ def workspace(who=Depends(authenticate)):
     if who=='admin':raise HTTPException(403,'Use a workspace login for workspace data')
     return who
 
+def version_tuple(value):
+    if not isinstance(value,str) or not re.fullmatch(r'\d+\.\d+\.\d+',value):return None
+    return tuple(map(int,value.split('.')))
+
+def protocol_workspace(request:Request,ws=Depends(workspace)):
+    required_version=(store.get('project',ws,ws,local=True) or {}).get('min_console')
+    actual=version_tuple(request.headers.get('x-pex-console'))
+    if required_version and (actual is None or actual<version_tuple(required_version)):
+        raise HTTPException(426,f'Upgrade this console to {required_version} or newer')
+    return ws
+
 def admin(who=Depends(authenticate)):
     if who!='admin':raise HTTPException(403,'Admin access required')
     return who
@@ -85,7 +96,7 @@ def admin(who=Depends(authenticate)):
 async def lifespan(app):
     store.init()
     yield
-app=FastAPI(title='Product Excellence team server',version='1.4.0',lifespan=lifespan)
+app=FastAPI(title='Product Excellence team server',version=VERSION,lifespan=lifespan)
 
 @app.exception_handler(HubError)
 async def hub_error(request,e):return JSONResponse({'detail':e.detail},e.status)
@@ -143,7 +154,7 @@ def api_health(ws=Depends(workspace)):
 @app.get('/api/state')
 def api_state(ws=Depends(workspace)):
     return {'projects':[required('project',ws,ws)],'networks':[],'egresss':[],'personas':[],'hub':connection(ws),
-            **{k:store.all_records(kind,ws,local=True,metadata=True) for k,kind in [('missions','mission'),('schedules','schedule')]},
+            **{k:store.all_records(kind,ws,local=True,metadata=True) for k,kind in [('targets','target'),('missions','mission'),('schedules','schedule')]},
             'runs':store.all_records('run',ws,local=True,metadata=True,limit=200,summaries=True)}
 @app.get('/api/missions')
 def api_missions(ws=Depends(workspace)):return store.all_records('mission',ws,local=True,metadata=True)
@@ -199,7 +210,8 @@ def validate(kind,id,body,ws,old,s):
             for item in v:secrets_check(item)
     secrets_check(body)
     if kind=='project':Project.model_validate(body)
-    elif kind=='mission':Mission.model_validate(body)
+    elif kind=='target':Target.model_validate(body)
+    elif kind=='mission':body.update(targets.resolve_mission(body,session=s))
     elif kind=='schedule':Schedule.model_validate(body)
     elif kind=='mission_version':
         if old:raise HTTPException(409,'Historical versions are immutable')
@@ -226,6 +238,9 @@ def validate(kind,id,body,ws,old,s):
         if old and body['origin']!=old.get('origin'):raise HTTPException(409,'Execution origin cannot change')
     refs=[]
     if kind in ('run','schedule','mission_version') and body.get('mission_id'):refs.append(('mission',body['mission_id']))
+    if kind in ('mission','run','mission_version'):
+        snapshot=body.get('mission') or body.get('snapshot') or body
+        if snapshot.get('target_id'):refs.append(('target',snapshot['target_id']))
     if kind=='run':refs.extend(('run',body[k]) for k in ('baseline_id','replay_of') if body.get(k))
     for refkind,refid in refs:
         if not isinstance(refid,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,120}',refid):raise HTTPException(422,'Invalid referenced ID')
@@ -235,27 +250,42 @@ def validate(kind,id,body,ws,old,s):
     if kind!='project':required('project',ws,ws,s)
 
 @app.get('/hub/records/{kind}')
-def records(kind:str,ws=Depends(workspace),limit:int=Query(200,ge=1,le=200),offset:int=Query(0,ge=0),summaries:bool=False):
+def records(kind:str,ws=Depends(protocol_workspace),limit:int=Query(200,ge=1,le=200),offset:int=Query(0,ge=0),summaries:bool=False):
     check_kind(kind)
     return store.all_records(kind,ws,local=True,metadata=True,limit=limit,offset=offset,summaries=summaries and kind=='run')
 @app.get('/hub/records/{kind}/{id}')
-def record(kind:str,id:str,ws=Depends(workspace)):return required(kind,id,ws)
+def record(kind:str,id:str,ws=Depends(protocol_workspace)):return required(kind,id,ws)
 @app.put('/hub/records/{kind}/{id}')
-def put(kind:str,id:str,body:dict,ws=Depends(workspace)):
+def put(kind:str,id:str,body:dict,request:Request,ws=Depends(protocol_workspace)):
     check_kind(kind,id);expected=check_revision(body)
     with store.Session.begin() as s:
         collision=s.get(store.Record,id)
         if collision and (collision.workspace!=ws or collision.kind!=kind):raise HTTPException(404,'Not found')
         old=store.get(kind,id,ws,session=s,metadata=True)
         if kind=='project' and not old:raise HTTPException(403,'Only admins create workspaces')
+        if body.get('visibility')=='local':raise HTTPException(422,'Local records stay on their execution console')
+        if kind=='project' and old:
+            if 'min_console' in body and body.get('min_console')!=old.get('min_console'):raise HTTPException(403,'Minimum console version is server-owned')
+            if old.get('min_console'):body['min_console']=old['min_console']
+        uses_new_format=kind=='target' or bool(body.get('target_id')) or body.get('platform')=='android'
+        if uses_new_format:
+            actual=version_tuple(request.headers.get('x-pex-console'))
+            if actual is None or actual<version_tuple(VERSION):raise HTTPException(426,f'Upgrade this console to {VERSION} or newer')
+            project=required('project',ws,ws,s)
+            if not project.get('min_console'):
+                active=[r for r in store.all_records('run',ws,local=True,session=s) if r.get('status') in ('queued','running','importing')]
+                if active:raise HTTPException(409,'Finish queued/active runs and publish pending results first')
+                store.save('project',{**project,'min_console':VERSION},session=s,workspace=ws)
         validate(kind,id,body,ws,old,s)
         if kind=='mission' and old:
             if expected!=old['_revision']:raise store.Conflict('This mission changed. Reload before saving.')
             store.save('mission_version',{'mission_id':id,'project_id':ws,'snapshot':store.clean(old)},session=s)
             body={**body,'version':old.get('version',1)+1}
-        return store.save(kind,body,session=s,workspace=ws,expected=expected,preserve_times=True)
+        saved=store.save(kind,body,session=s,workspace=ws,expected=expected,preserve_times=True)
+        if kind=='project':targets.default_web(saved,session=s)
+        return saved
 @app.delete('/hub/records/{kind}/{id}')
-def remove(kind:str,id:str,revision:int,ws=Depends(workspace)):
+def remove(kind:str,id:str,revision:int,ws=Depends(protocol_workspace)):
     if kind in ('project','run','mission_version'):raise HTTPException(403,'This record cannot be deleted')
     with store.Session.begin() as s:
         required(kind,id,ws,s)
@@ -265,7 +295,7 @@ def remove(kind:str,id:str,revision:int,ws=Depends(workspace)):
                 if r.get('mission_id')==id:store.delete('schedule',r['id'],ws,session=s)
     return {'ok':True}
 @app.post('/hub/runs/{id}/{action}')
-def transition(id:str,action:str,body:dict,ws=Depends(workspace)):
+def transition(id:str,action:str,body:dict,ws=Depends(protocol_workspace)):
     if action not in ('start','cancel'):raise HTTPException(404,'Unknown operation')
     with store.Session.begin() as s:
         r=required('run',id,ws,s)
@@ -276,7 +306,7 @@ def transition(id:str,action:str,body:dict,ws=Depends(workspace)):
         return store.save('run',r,session=s,workspace=ws,expected=body.get('revision',-1))
 
 @app.put('/hub/artifacts/{id}/{name}')
-async def upload(id:str,name:str,request:Request,ws=Depends(workspace)):
+async def upload(id:str,name:str,request:Request,ws=Depends(protocol_workspace)):
     r=required('run',id,ws);p=file_path(store.ARTIFACTS,id,name)
     if name=='run.json':raise HTTPException(409,'run.json is generated from the canonical record')
     p.parent.mkdir(parents=True,exist_ok=True)
@@ -297,12 +327,12 @@ async def upload(id:str,name:str,request:Request,ws=Depends(workspace)):
         return result
     finally:Path(tmp).unlink(missing_ok=True)
 @app.get('/hub/artifacts/{id}/{name}')
-def artifact(id:str,name:str,ws=Depends(workspace)):
+def artifact(id:str,name:str,ws=Depends(protocol_workspace)):
     r=required('run',id,ws)
     p=file_path(store.ARTIFACTS,id,name)
     if name=='run.json':return JSONResponse(store.clean(r),headers={'Content-Disposition':'attachment; filename="run.json"'})
     if not p.is_file():raise HTTPException(404,'Artifact not ready')
-    return FileResponse(p,filename=name,media_type='image/png' if p.suffix=='.png' else 'video/webm' if p.suffix=='.webm' else 'application/octet-stream')
+    return FileResponse(p,filename=name,media_type={'.png':'image/png','.webm':'video/webm','.mp4':'video/mp4','.txt':'text/plain'}.get(p.suffix,'application/octet-stream'))
 
 def credentials(body,optional=False):
     username=body.get('username','');password=body.get('password','')
@@ -319,6 +349,7 @@ def create_workspace(body:dict,who=Depends(admin)):
     project['id']=uuid.uuid4().hex
     with store.Session.begin() as s:
         p=store.save('project',project,session=s)
+        targets.default_web(p,s)
         s.add(WorkspaceLogin(workspace_id=p['id'],username=username,password_hash=hash_password(password)));s.flush()
         if body.get('seed',True):p=presets.seed_project(p,session=s)
         return p|{'username':username}

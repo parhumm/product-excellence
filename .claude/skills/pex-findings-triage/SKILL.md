@@ -68,6 +68,11 @@ Report four groups: `new`, `resolved`, `not_assessed` and `uncertain`. If
 a like-for-like release delta, because the two runs did not ask the same
 question under the same conditions.
 
+For Android, require the comparison to report the same target/package and
+compatible device/network provenance. A changed APK SHA is a release comparison,
+not an incompatible replay; label both versions. Keep review state scoped to the
+target and SHA so a newer build does not mark an older-build issue fixed.
+
 ## 5. Write decisions back
 
 Only if the user asks, and after one confirmation for the whole batch:

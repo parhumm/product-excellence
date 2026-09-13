@@ -1,4 +1,4 @@
-import asyncio,json,os,re,secrets,uuid,fcntl
+import asyncio,json,os,re,secrets,uuid,fcntl,hashlib,tempfile
 from datetime import datetime,timedelta,timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -7,11 +7,12 @@ import yaml
 from fastapi import FastAPI,HTTPException,Request,UploadFile,File,Header
 from fastapi.responses import HTMLResponse,FileResponse,Response,JSONResponse
 from fastapi.staticfiles import StaticFiles
-from engine import store,ai,netem,presets,pricing,hub,views,suggest
-from engine.contracts import Mission,GoalRequest,RunRequest,ContinueRequest,NetworkProfile,Egress,Schedule,Project
+from engine import store,ai,netem,presets,pricing,hub,views,suggest,targets,android
+from engine.contracts import Mission,GoalRequest,RunRequest,ContinueRequest,NetworkProfile,Egress,Schedule,Project,Target
 from engine.runner import runner
 from engine.evaluate import finding_identity
 from engine.outcomes import gate,scores,executive_summary,sync_findings
+from engine import VERSION
 
 ROOT=store.ROOT
 
@@ -38,7 +39,7 @@ def seed():
 async def schedule_once():
     runs=await hub.io(store.all_records,'run')
     for s in await hub.io(store.all_records,'schedule'):
-        if hub.shared(s['project_id']) and s.get('origin')!=hub.origin():continue
+        if store.remote('schedule',s) and s.get('origin')!=hub.origin():continue
         if not s.get('enabled') or s['next_at']>store.now():continue
         m=await hub.io(store.get,'mission',s['mission_id'])
         if not m:
@@ -67,12 +68,12 @@ async def lifespan(app):
     with (store.DATA/'runtime.lock').open('a') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:raise RuntimeError('Another local app or import is using this data directory')
-        hub.load();store.init();seed();runner.start();task=asyncio.create_task(scheduler())
+        hub.load();store.init(skip=hub.shared);seed();runner.start();task=asyncio.create_task(scheduler())
         try:yield
         finally:
             task.cancel();await asyncio.gather(task,return_exceptions=True);await runner.close();hub.close()
 
-app=FastAPI(title='Product Excellence',version='1.4.0',lifespan=lifespan)
+app=FastAPI(title='Product Excellence',version=VERSION,lifespan=lifespan)
 @app.middleware('http')
 async def local_boundary(request,call_next):
     if request.url.hostname not in ('127.0.0.1','localhost','::1','testserver'):return JSONResponse({'detail':'Local access only. Use an SSH tunnel for a VPS.'},403)
@@ -102,7 +103,7 @@ async def health():
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
         browsers={b:Path(getattr(p,b).executable_path).exists() for b in ('chromium','firefox','webkit')}
-    return {'ok':True,'version':app.version,'database':('PostgreSQL' if 'postgresql' in store.DATABASE_URL else 'SQLite')+(' · shared workspaces on '+hub.CONFIG['url'] if hub.enabled() else ''),'ai':await ai.health(),'browsers':browsers,'active':list(runner.active),'network':{'browser':True,'netem':bool((await netem.status()).get('ok')),'real_isp':'Requires a configured proxy endpoint'},'mode':'hybrid' if hub.enabled() else 'local','policy':'Read-only network methods; no payments or account changes'}
+    return {'ok':True,'version':app.version,'database':('PostgreSQL' if 'postgresql' in store.DATABASE_URL else 'SQLite')+(' · shared workspaces on '+hub.CONFIG['url'] if hub.enabled() else ''),'ai':await ai.health(),'browsers':browsers,'android':android.health(),'active':list(runner.active),'network':{'browser':True,'netem':bool((await netem.status()).get('ok')),'real_isp':'Requires a configured proxy endpoint'},'mode':'hybrid' if hub.enabled() else 'local','policy':'Web requests are read-only; Android runs do not intercept app network writes'}
 
 def workspaces():
     """Every workspace this console can open: the ones on this machine, then the shared ones signed in to."""
@@ -125,18 +126,141 @@ def state(project:str=''):
             if selected:projects=[selected if p['id']==project else p for p in projects]
         runs=store.all_records('run',project,limit=200,summaries=shared)
         # The hub status is read last, so an outage these record reads just met is reported.
-        return {'projects':projects,'missions':store.all_records('mission',project),'runs':runs if shared else [views.summary(r) for r in runs],'schedules':store.all_records('schedule',project),**globals_,'hub':hub.status()}
+        return {'projects':projects,'targets':store.all_records('target',project),'missions':store.all_records('mission',project),'runs':runs if shared else [views.summary(r) for r in runs],'schedules':store.all_records('schedule',project),**globals_,'hub':hub.status()}
     # Nothing selected and nothing shared: the whole local database, as the command line and tests read it.
     records={k:store.all_records(k[:-1],local=True) for k in ('missions','schedules')}
-    return {'projects':projects,**records,'runs':[views.summary(r) for r in store.all_records('run',local=True)[:200]],**globals_,'hub':hub.status()}
+    return {'projects':projects,'targets':store.all_records('target',local=True),**records,'runs':[views.summary(r) for r in store.all_records('run',local=True)[:200]],**globals_,'hub':hub.status()}
 
 @app.post('/api/projects')
 def project(p:Project):
-    return presets.seed_project(store.save('project',p.model_dump(),local=True))
+    with store.Session.begin() as session:
+        value=store.save('project',p.model_dump(),session=session)
+        targets.default_web(value,session)
+        return presets.seed_project(value,session=session)
 @app.put('/api/projects/{id}')
 def update_project(id:str,p:Project,revision:int|None=Header(None,alias='X-PEX-Revision')):
     old=required('project',id);check_edit(old,revision)
-    return store.save('project',{**old,**p.model_dump()})
+    if old.get('url') and not p.url and store.get('target',targets.default_id(id),id):raise HTTPException(409,'Remove the default website target first')
+    if hub.shared(id):return store.save('project',{**old,**p.model_dump()})
+    with store.Session.begin() as session:
+        value=store.save('project',{**old,**p.model_dump()},session=session)
+        targets.default_web(value,session)
+        return value
+
+@app.get('/api/targets')
+def target_list():return store.all_records('target')
+@app.get('/api/targets/{id}')
+def target_get(id:str):return required('target',id)
+@app.post('/api/targets')
+def target_create(target:Target):
+    required('project',target.project_id)
+    return store.save('target',target.model_dump())
+@app.put('/api/targets/{id}')
+def target_update(id:str,target:Target,revision:int|None=Header(None,alias='X-PEX-Revision')):
+    old=required('target',id);check_edit(old,revision)
+    if hub.shared(old['project_id']) and target.visibility!=old.get('visibility','team'):raise HTTPException(409,'Use Share to publish a local target; published targets cannot be made local')
+    if target.project_id!=old['project_id'] or target.type!=old['type'] or (old.get('package') and target.package!=old['package']):raise HTTPException(409,'Target workspace, type and bound package cannot change')
+    if id==targets.default_id(old['project_id']) and (target.url!=old.get('url') or target.allowed_domains!=old.get('allowed_domains',[])):raise HTTPException(409,'Edit the default website through workspace settings')
+    return store.save('target',{**old,**target.model_dump()})
+@app.delete('/api/targets/{id}')
+def target_delete(id:str,revision:int|None=Header(None,alias='X-PEX-Revision')):
+    target=required('target',id);check_edit(target,revision);ws=target['project_id']
+    missions=store.all_records('mission',ws);runs=store.all_records('run',ws)
+    if any(m.get('target_id')==id for m in missions) or any(r.get('status') in ('queued','running') and r.get('mission',{}).get('target_id')==id for r in runs):raise HTTPException(409,'Remove dependent missions and active runs first')
+    if hub.shared(ws):store.delete('target',id,expected=revision)
+    else:
+        with store.Session.begin() as session:
+            store.delete('target',id,ws,session=session,expected=revision)
+            if id==targets.default_id(ws):
+                project=store.get('project',ws,ws,session=session)
+                store.save('project',{**project,'url':'','allowed_domains':[]},session=session)
+    return {'ok':True}
+
+@app.post('/api/targets/{id}/builds')
+async def target_upload(id:str,file:UploadFile=File(...),revision:int|None=Header(None,alias='X-PEX-Revision')):
+    async with runner.connection_lock:
+        target=await hub.io(required,'target',id);check_edit(target,revision)
+        if target['type']!='android':raise HTTPException(422,'Builds belong to Android targets')
+        apps=store.DATA/'apps';apps.mkdir(exist_ok=True,mode=0o700)
+        fd,name=tempfile.mkstemp(dir=apps,prefix='.upload-')
+        path=Path(name);size=0
+        try:
+            with os.fdopen(fd,'wb') as output:
+                while chunk:=await file.read(1024*1024):
+                    size+=len(chunk)
+                    if size>300*1024*1024:raise HTTPException(413,'APK exceeds 300 MiB limit')
+                    output.write(chunk)
+                output.flush();os.fsync(output.fileno())
+            path.chmod(0o600)
+            try:build=await hub.io(targets.inspect_apk,path)
+            except ValueError as error:raise HTTPException(422,str(error))
+            package=build.pop('package')
+            if target.get('package') and target['package']!=package:raise HTTPException(422,'APK package does not match this target')
+            destination=apps/(build['sha256']+'.apk')
+            try:os.link(path,destination);destination.chmod(0o600)
+            except FileExistsError:
+                with destination.open('rb') as source:
+                    if hashlib.file_digest(source,'sha256').hexdigest()!=build['sha256']:raise HTTPException(409,'Stored APK bytes conflict')
+            if not any(item['sha256']==build['sha256'] for item in target.get('builds',[])):
+                build.update(uploaded_at=store.now(),archived=False)
+                target={**target,'package':target.get('package') or package,'builds':target.get('builds',[])+[build]}
+                target=await hub.io(store.save,'target',target)
+            return target
+        finally:path.unlink(missing_ok=True)
+
+@app.delete('/api/targets/{id}/builds/{sha256}')
+def archive_build(id:str,sha256:str,revision:int|None=Header(None,alias='X-PEX-Revision')):
+    target=required('target',id);check_edit(target,revision);found=False
+    for build in target.get('builds',[]):
+        if build['sha256']==sha256:build['archived']=True;found=True
+    if not found:raise HTTPException(404,'Build not found')
+    return store.save('target',target)
+@app.delete('/api/targets/{id}/builds/{sha256}/local')
+async def remove_local_build(id:str,sha256:str):
+    async with runner.connection_lock:
+        target=await hub.io(required,'target',id)
+        if not any(b['sha256']==sha256 for b in target.get('builds',[])):raise HTTPException(404,'Build not found')
+        for mission in await hub.io(store.all_records,'mission',target['project_id']):
+            if mission.get('build')==sha256:raise HTTPException(409,'A pinned mission still uses this build')
+        for run in await hub.io(store.all_records,'run',target['project_id']):
+            if run.get('status') in ('queued','running') and run.get('mission',{}).get('build')==sha256:raise HTTPException(409,'An active run still uses this build')
+        for other in await hub.io(store.all_records,'target'):
+            if other['id']!=id and any(b['sha256']==sha256 for b in other.get('builds',[])):raise HTTPException(409,'Another target still uses this local APK')
+        (store.DATA/'apps'/(sha256+'.apk')).unlink(missing_ok=True)
+        return {'ok':True}
+
+@app.post('/api/{collection}/{id}/share')
+async def share_item(collection:str,id:str):
+    kinds={'targets':'target','missions':'mission','runs':'run'};kind=kinds.get(collection)
+    if not kind:raise HTTPException(404,'Unknown share operation')
+    value=await hub.io(store.get,kind,id,local=True,metadata=True)
+    if not value:raise HTTPException(404,'Not found')
+    ws=store.workspace_of(kind,value)
+    if not hub.shared(ws):raise HTTPException(409,'Connect this workspace to its team server first')
+    if value.get('visibility')!='local':raise HTTPException(409,'This item is already shared')
+    if kind=='mission' and value.get('target_id') and not await hub.io(hub.get,'target',value['target_id'],ws):raise HTTPException(409,'Share the target first: '+value['target_id'])
+    if kind=='run':
+        if value.get('status') not in hub.TERMINAL:raise HTTPException(409,'Only finished runs can be shared')
+        for field,label in [('mission_id','mission'),('baseline_id','baseline run'),('replay_of','replay source')]:
+            if value.get(field) and not await hub.io(hub.get,'mission' if field=='mission_id' else 'run',value[field],ws):raise HTTPException(409,f'Share the {label} first: {value[field]}')
+    local_revision=value.pop('_revision',None);team={**store.clean(value),'visibility':'team','_revision':0}
+    try:
+        if kind!='run':ack=await hub.io(hub.save,kind,team,preserve_times=True)
+        else:
+            terminal=team['status'];team['status']='importing'
+            current=await hub.io(hub.get,'run',id,ws)
+            if current:
+                if current.get('status')!='importing':raise HTTPException(409,'A different team run already uses this ID')
+                team={**team,'_revision':current['_revision']}
+            staged=await hub.io(hub.save,'run',team,preserve_times=True);manifest=staged.setdefault('_artifacts',{})
+            folder=store.ARTIFACTS/id
+            for name in hub.evidence_names(value,folder):
+                path=hub.file_path(folder.parent,id,name);digest=hub.digest(path)
+                if manifest.get(name)!=digest:manifest[name]=await hub.io(hub.put_artifact,id,path,ws,digest)
+            staged['status']=terminal;ack=await hub.io(hub.save,'run',staged,preserve_times=True)
+    except hub.HubError as error:raise HTTPException(error.status,error.detail)
+    await hub.io(store.delete,kind,id,ws,local=True,expected=local_revision)
+    return ack
 
 @app.get('/api/missions')
 def missions():return store.all_records('mission')
@@ -151,18 +275,23 @@ def stash_password(record,password):
 @app.post('/api/missions')
 def create_mission(m:Mission):
     required('project',m.project_id)
-    return stash_password(store.save('mission',{'version':1,**m.model_dump(exclude={'login_password'})}),m.login_password)
+    try:value=targets.resolve_mission(m.model_dump())
+    except ValueError as error:raise HTTPException(422,str(error))
+    return stash_password(store.save('mission',{'version':1,**value}),m.login_password)
 @app.put('/api/missions/{id}')
 def update_mission(id:str,m:Mission,revision:int|None=Header(None,alias='X-PEX-Revision')):
     required('project',m.project_id)
     old=required('mission',id);check_edit(old,revision)
-    if not hub.shared(old['project_id']):store.save('mission_version',{'mission_id':id,'project_id':old['project_id'],'snapshot':old})
-    return stash_password(store.save('mission',{**old,**m.model_dump(exclude={'login_password'}),'version':old.get('version',1)+1}),m.login_password)
+    if hub.shared(old['project_id']) and m.visibility!=old.get('visibility','team'):raise HTTPException(409,'Use Share to publish a local mission; published missions cannot be made local')
+    if not store.remote('mission',old):store.save('mission_version',{'mission_id':id,'project_id':old['project_id'],'visibility':old.get('visibility','team'),'snapshot':old})
+    try:value=targets.resolve_mission(m.model_dump())
+    except ValueError as error:raise HTTPException(422,str(error))
+    return stash_password(store.save('mission',{**old,**value,'version':old.get('version',1)+1}),m.login_password)
 @app.delete('/api/missions/{id}')
 def delete_mission(id:str,revision:int|None=Header(None,alias='X-PEX-Revision')):
     m=required('mission',id);check_edit(m,revision);store.delete('mission',id,expected=revision);(store.DATA/'secrets'/f'{id}.json').unlink(missing_ok=True)
     # A team server removes the schedules of a mission it deletes; a workspace on this machine does it here.
-    if hub.shared(m['project_id']):return {'ok':True}
+    if store.remote('mission',m):return {'ok':True}
     for s in store.all_records('schedule',m['project_id']):
         if s['mission_id']==id:store.delete('schedule',s['id'])
     return {'ok':True}
@@ -170,6 +299,12 @@ def delete_mission(id:str,revision:int|None=Header(None,alias='X-PEX-Revision'))
 async def suggest_goal(req:GoalRequest):
     """Two goals for the mission form. Nothing is saved; the user applies one and saves the mission."""
     project=await hub.io(required,'project',req.project_id)
+    target=await hub.io(store.get,'target',req.target_id,req.project_id) if req.target_id else None
+    if req.target_id and not target:raise HTTPException(404,'Target not found in this workspace')
+    if target and target['type']=='android':
+        builds=target.get('builds',[]);build=next((b for b in builds if b['sha256']==req.build),None) if req.build else max((b for b in builds if not b.get('archived')),key=lambda b:(b['version_code'],b['uploaded_at'],b['sha256']),default=None)
+        if not build:raise HTTPException(422,'Upload or select an Android build')
+        project={**project,'_target':target,'_build':build}
     try:return await suggest.suggest(req,project)
     except ValueError as e:raise HTTPException(422,str(e))
     except Exception as e:raise HTTPException(502,'The AI worker could not suggest a goal: '+str(e)[:300])
@@ -188,6 +323,8 @@ async def import_mission(file:UploadFile=File(...)):
 @app.post('/api/runs')
 async def start_run(req:RunRequest):
     m=await hub.io(required,'mission',req.mission_id)
+    if req.visibility:m={**m,'visibility':req.visibility}
+    if req.build:m={**m,'build':req.build}
     if req.network:m['network']=(await hub.io(required,'network',req.network))['id']
     if req.baseline_id:await hub.io(required,'run',req.baseline_id)
     try:return await runner.submit(m,req.baseline_id)
@@ -195,6 +332,7 @@ async def start_run(req:RunRequest):
 @app.post('/api/missions/{id}/matrix')
 async def matrix(id:str):
     m=await hub.io(required,'mission',id)
+    if m.get('platform')=='android':raise HTTPException(422,'Android network matrices are not supported')
     if runner.queue.qsize()>15:raise HTTPException(429,'Queue is full')
     if m['browser']!='chromium':raise HTTPException(422,'Standard browser network matrix requires Chromium')
     return [await runner.submit({**m,'network':profile}) for profile in ('baseline','slow-mobile','poor-mobile','high-latency','constrained')]
@@ -251,15 +389,17 @@ async def finding_update(run_id:str,id:str,request:Request,revision:int|None=Hea
 @app.get('/api/runs/{id}/artifacts/{filename}')
 def artifact(id:str,filename:str):
     run=required('run',id)
-    if hub.shared(store.workspace_of('run',run)):
+    if store.remote('run',run):
         if filename=='run.json':return JSONResponse(store.clean(run))
         p=hub.cached_artifact(id,filename,store.workspace_of('run',run))
         if not p.is_file():p=hub.fetch_artifact(id,filename,store.workspace_of('run',run))
-        return FileResponse(p,media_type='image/png' if p.suffix=='.png' else 'video/webm' if p.suffix=='.webm' else 'application/octet-stream')
+        return FileResponse(p,media_type={'.png':'image/png','.webm':'video/webm','.mp4':'video/mp4','.txt':'text/plain'}.get(p.suffix,'application/octet-stream'))
     p=hub.file_path(store.ARTIFACTS,id,filename)
     if not p.is_file():raise HTTPException(404,'Artifact not ready')
     if p.suffix=='.png':return FileResponse(p,media_type='image/png')
     if p.suffix=='.webm':return FileResponse(p,media_type='video/webm')
+    if p.suffix=='.mp4':return FileResponse(p,media_type='video/mp4')
+    if p.suffix=='.txt':return FileResponse(p,media_type='text/plain')
     return FileResponse(p,filename=filename,media_type='application/octet-stream')
 
 @app.get('/api/runs/{id}/export')
@@ -292,7 +432,7 @@ async def persona(file:UploadFile=File(...)):
 @app.post('/api/schedules')
 def schedule(s:Schedule):
     mission=required('mission',s.mission_id)
-    return store.save('schedule',{'project_id':mission['project_id'],'origin':hub.origin(),**s.model_dump(),'next_at':(datetime.now(timezone.utc)+timedelta(minutes=s.every_minutes)).isoformat()})
+    return store.save('schedule',{'project_id':mission['project_id'],'visibility':mission.get('visibility','team'),'origin':hub.origin(),**s.model_dump(),'next_at':(datetime.now(timezone.utc)+timedelta(minutes=s.every_minutes)).isoformat()})
 @app.delete('/api/schedules/{id}')
 def delete_schedule(id:str,revision:int|None=Header(None,alias='X-PEX-Revision')):
     check_edit(required('schedule',id),revision);store.delete('schedule',id,expected=revision);return {'ok':True}

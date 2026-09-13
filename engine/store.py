@@ -34,7 +34,7 @@ def clean(value):
     if isinstance(value, list): return [clean(v) for v in value]
     return value
 
-def init():
+def init(skip=lambda workspace:False):
     with engine.begin() as conn:
         if engine.dialect.name=='sqlite' and not conn.connection.driver_connection.in_transaction:conn.exec_driver_sql('BEGIN IMMEDIATE')
         if inspect(conn).has_table('records'):
@@ -59,11 +59,28 @@ def init():
                 conn.execute(update(Record).where(Record.id==r['id']).values(workspace=ws,payload=v))
             else: logging.warning('Unresolved workspace: %s %s',r['kind'],r['id'])
         conn.execute(text('CREATE INDEX IF NOT EXISTS ix_records_workspace_kind ON records (workspace, kind)'))
+        projects=[r for r in conn.execute(select(Record.id,Record.payload).where(Record.kind=='project')).mappings() if r['payload'].get('url') and not skip(r['id'])]
+        from .targets import default_id,default_web
+        existing=set(conn.execute(select(Record.id).where(Record.kind=='target')).scalars())
+        missing=[r for r in projects if default_id(r['id']) not in existing]
+        if missing:
+            from .hub import atomic
+            backup=[dict(r) for r in conn.execute(select(Record.id,Record.kind,Record.payload,Record.workspace,Record.revision)).mappings()]
+            atomic(DATA/'backups'/('records-before-targets-'+uuid.uuid4().hex+'.json'),backup)
+            migration=Session(bind=conn)
+            for row in missing:default_web(dict(row['payload'])|{'id':row['id']},migration,sync=False)
+            migration.flush()
 
-def side(kind, workspace, local, session):
+def remote(kind,value):
+    """Whether this record is authoritative on the connected workspace hub."""
+    from . import hub
+    return kind in hub.ROUTED and hub.shared(workspace_of(kind,value)) and value.get('visibility')!='local'
+
+def side(kind, workspace, local, session, value=None):
     """Where this record lives: 'local', 'hub', or 'both' when the workspace is not known yet."""
     from . import hub
     if local or session is not None or kind not in hub.ROUTED or not hub.enabled(): return 'local'
+    if value is not None and value.get('visibility')=='local':return 'local'
     if workspace: return 'hub' if hub.shared(workspace) else 'local'
     return 'both'
 
@@ -71,7 +88,7 @@ def unpack(row, metadata=False):
     return dict(row.payload) | ({'_revision':row.revision} if metadata else {})
 
 def save(kind, value, *, session=None, local=False, expected=None, workspace='', preserve_times=False):
-    if side(kind,workspace or workspace_of(kind,value),local,session)=='hub':
+    if side(kind,workspace or workspace_of(kind,value),local,session,value)=='hub':
         from . import hub
         return hub.save(kind,value)
     if session is None:
@@ -103,7 +120,9 @@ def get(kind,id,workspace='',*,local=False,session=None,metadata=False):
     where=side(kind,workspace,local,session)
     if where!='local':
         from . import hub
-        if where=='hub':return hub.get(kind,id,workspace)
+        if where=='hub':
+            private=get(kind,id,workspace,local=True,metadata=metadata)
+            return private if private and private.get('visibility')=='local' else hub.get(kind,id,workspace)
         # The workspace is unknown, so this machine answers first and the server only for what it does not hold.
         return get(kind,id,local=True,metadata=metadata) or hub.get(kind,id)
     if session is None:
@@ -117,7 +136,12 @@ def all_records(kind,workspace='',*,local=False,session=None,metadata=False,limi
     where=side(kind,workspace,local,session)
     if where!='local':
         from . import hub
-        if where=='hub':return hub.all_records(kind,workspace,limit=limit,summaries=summaries)
+        if where=='hub':
+            private=[v for v in all_records(kind,workspace,local=True,metadata=metadata,summaries=summaries) if v.get('visibility')=='local']
+            remote=hub.all_records(kind,workspace,limit=None if limit is None else offset+limit,summaries=summaries)
+            values={v['id']:v for v in remote};values.update({v['id']:v for v in private})
+            merged=sorted(values.values(),key=lambda r:(r.get('created_at',''),r['id']),reverse=True)
+            return merged[offset:None if limit is None else offset+limit]
         # Every workspace this console can reach: the ones on this machine and the shared ones together.
         values=all_records(kind,local=True,metadata=metadata,summaries=summaries)+hub.all_records(kind,limit=limit,summaries=summaries)
         values.sort(key=lambda r:r.get('created_at',''),reverse=True)
@@ -136,6 +160,9 @@ def summary(r):
 
 def delete(kind,id,workspace='',*,local=False,session=None,expected=None):
     where=side(kind,workspace,local,session)
+    if where=='hub':
+        private=get(kind,id,workspace,local=True,metadata=True)
+        if private and private.get('visibility')=='local':where='local'
     if where=='hub' or (where=='both' and not get(kind,id,local=True)):
         from . import hub
         return hub.delete(kind,id,workspace,expected)

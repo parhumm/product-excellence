@@ -23,7 +23,13 @@ Note for the chosen workspace: which templates already exist, which missions hav
 never run, which pillars carry open findings, and which recent runs ended
 anything other than completed.
 
-## 2. Look at the website once
+## 2. Learn the selected target
+
+For Android, use target/build metadata and existing findings only. Do not fetch
+the workspace website or inherit its domains. Suggestions must use baseline,
+exclude benchmark and SEO/AEO, and stop before sign-in/password/OTP.
+
+For a website, look at it once:
 
 Fetch the workspace's own home page a single time to learn its navigation, main
 features, sign-in method, prices and app links.
@@ -44,8 +50,8 @@ Prefer, in this order:
 2. A feature the home page advertises that no preset touches.
 3. A journey a real customer completes that the presets stop short of.
 4. A benchmark against named competitors, when the workspace has them.
-5. A repeat of a preset under a harder condition: mobile, slow network,
-   another browser, another locale.
+5. For websites only, a repeat under a harder mobile/network/browser condition;
+   for Android, a release-build comparison under the same device conditions.
 
 Skip anything a preset already covers. Say plainly when a suggestion needs an
 account, a persona or a competitor list the workspace does not have.

@@ -4,8 +4,9 @@ import asyncio, copy, hashlib, json, os, re, tempfile, uuid, threading
 from pathlib import Path
 from urllib.parse import urlsplit
 import httpx
+from . import VERSION
 
-ROUTED={'project','mission','mission_version','run','schedule'}
+ROUTED={'project','target','mission','mission_version','run','schedule'}
 TERMINAL={'completed','blocked','failed','cancelled','interrupted'}
 # Playwright traces are large and only replayable next to the browser that wrote them.
 # A continued run writes one per visit: trace.zip, trace-2.zip, and so on.
@@ -18,6 +19,7 @@ WORKSPACE=ContextVar("workspace",default="")
 PAGE_READ=ContextVar("page_read",default=None)
 OUTAGE={}
 _client=None
+_server_version={}
 PUBLICATION_LOCK=threading.RLock()
 
 class HubError(Exception):
@@ -42,7 +44,7 @@ def configure(value):
     if CONFIG.get('url')!=value.get('url'):
         if _client:_client.close()
         _client=None
-    OUTAGE.clear();CONFIG.clear();CONFIG.update(value)
+    OUTAGE.clear();_server_version.clear();CONFIG.clear();CONFIG.update(value)
 
 def load():
     p=data()/'hub.json';configure(json.loads(p.read_text()) if p.exists() else {})
@@ -73,7 +75,7 @@ def client():
     global _client
     # A team server is reached over the internet, not over loopback: a slow link, a VPN or a
     # mobile connection needs seconds to connect and minutes to send a run's evidence.
-    if _client is None:_client=httpx.Client(timeout=httpx.Timeout(60,connect=15),follow_redirects=False,trust_env=False)
+    if _client is None:_client=httpx.Client(timeout=httpx.Timeout(60,connect=15),follow_redirects=False,trust_env=False,headers={'X-PEX-Console':VERSION})
     return _client
 
 UNREACHABLE='Team server unreachable. Check the connection and retry.'
@@ -108,7 +110,7 @@ def request(method,path,login,*,url=None,**kw):
     if page:return degraded(path,login,kw)
     # ponytail: a browser read gives up in 20 s; publication keeps the 60 s client default.
     if page is not None:kw.setdefault('timeout',httpx.Timeout(20,connect=10))
-    try:r=client().request(method,(url or CONFIG['url'])+path,auth=(login['username'],login['password']),headers={'X-PEX-Request':'1'},**kw)
+    try:r=client().request(method,(url or CONFIG['url'])+path,auth=(login['username'],login['password']),headers={'X-PEX-Request':'1','X-PEX-Console':VERSION},**kw)
     except httpx.TransportError as e:
         if page is None:raise HubError(502,UNREACHABLE) from e
         page.append(path);return degraded(path,login,kw)
@@ -123,6 +125,21 @@ def request(method,path,login,*,url=None,**kw):
         try:atomic(cached_read(path,login,kw),{'at':store_now(),'body':body})
         except OSError:pass
     return body
+
+def supports_15(workspace,*,required=False):
+    """Probe the public legacy health route before using the 1.5 protocol."""
+    base=CONFIG.get('url','')
+    if base not in _server_version:
+        try:r=client().request('GET',base+'/hub/health')
+        except httpx.TransportError as e:
+            if required:raise HubError(502,UNREACHABLE) from e
+            record_outage();return False
+        try:value=r.json().get('version','') if r.status_code==200 else ''
+        except ValueError:value=''
+        _server_version[base]=tuple(map(int,value.split('.'))) if re.fullmatch(r'\d+\.\d+\.\d+',value) else ()
+    ok=_server_version[base]>=(1,5,0)
+    if required and not ok:raise HubError(426,'Upgrade the team server to 1.5.0 before using targets, Android or private-item sharing')
+    return ok
 
 def login_for(ws):
     v=CONFIG.get('logins',{}).get(ws)
@@ -148,6 +165,7 @@ def get(kind,id,workspace=''):
 def all_records(kind,workspace='',limit=None,summaries=False):
     values=[]
     for ws in ([workspace] if workspace else CONFIG.get('logins',{})):
+        if kind=='target' and not supports_15(ws):continue
         offset=0
         while True:
             count=min(200,limit-len(values)) if limit is not None else 200
@@ -162,6 +180,7 @@ def save(kind,value,*,preserve_times=False):
     value=copy.deepcopy(value);value.setdefault('id',uuid.uuid4().hex);value.setdefault('created_at',store.now())
     if not preserve_times:value['updated_at']=store.now()
     ws=store.workspace_of(kind,value);login=login_for(ws)
+    if kind=='target' or value.get('target_id') or value.get('platform')=='android':supports_15(ws,required=True)
     value.setdefault('_revision',0)
     path=f'/hub/records/{kind}/{value["id"]}'
     try:return request('PUT',path,login,json=value)
@@ -238,7 +257,7 @@ def fetch_artifact(run_id,name,workspace):
     try:
         with os.fdopen(fd,'wb') as out:
             login=login_for(workspace)
-            with client().stream('GET',CONFIG['url']+f'/hub/artifacts/{run_id}/{name}',auth=(login['username'],login['password'])) as r:
+            with client().stream('GET',CONFIG['url']+f'/hub/artifacts/{run_id}/{name}',auth=(login['username'],login['password']),headers={'X-PEX-Console':VERSION}) as r:
                 if r.status_code!=200:raise HubError(r.status_code,'Artifact unavailable on the team server')
                 total=0
                 for chunk in r.iter_bytes():

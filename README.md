@@ -1,15 +1,28 @@
 # Product Excellence
 
-Product Excellence is a website testing assistant that runs on your own Mac. You
-give it a page to review or a task to try, such as "find a movie and open its
-details", and it opens a real browser, does the work, and saves screenshots, a
-recording, measurements and findings for you to read.
+Product Excellence is a website and Android app testing assistant that runs on
+your own Mac. Give it a page or installed-app task and it saves screenshots,
+actions, recording, available measurements and findings for review.
 
-Each website is its own workspace, so different sites keep separate missions,
-runs and findings. It signs in with your Claude or ChatGPT subscription through
+Each workspace can contain multiple website and Android targets while keeping
+missions, runs and findings separate. It signs in with your Claude or ChatGPT subscription through
 their command line tools, so there are no API keys to manage.
 
-Version 1.2.0. New here? Read the [user manual](docs/USER_MANUAL.md).
+Version 1.5.0. New here? Read the [user manual](docs/USER_MANUAL.md).
+
+## First Android run
+
+Android is optional. Install its tools and create the disposable `pex-test` AVD:
+
+```bash
+scripts/setup.sh --android
+PEX_ANDROID_AVD=pex-test ./start.command
+```
+
+In **Settings → Targets and app builds**, add an Android target and upload a
+universal or Java-only APK. Create a mission for that target, choose the build
+and `pex-test`, then run it. The APK's package data is cleared for each mission;
+the AVD is never wiped. APK bytes stay on this Mac even when metadata is shared.
 
 ## Video demo
 

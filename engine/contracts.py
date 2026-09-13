@@ -5,8 +5,13 @@ from urllib.parse import urlsplit
 
 class Mission(BaseModel):
     project_id: str = 'default'
+    target_id: str = ''
+    build: str = ''
+    device: str = ''
+    visibility: Literal['team','local'] = 'team'
+    platform: Literal['web','android'] = 'web'
     name: str = Field(min_length=1, max_length=200)
-    url: str
+    url: str = ''
     goal: str = Field(min_length=5, max_length=4000)
     success_text: str = Field(default='', max_length=300)
     allowed_domains: list[str] = Field(default_factory=list, max_length=30)
@@ -40,6 +45,7 @@ class Mission(BaseModel):
     @field_validator('url')
     @classmethod
     def valid_url(cls,v):
+        if not v:return v
         u=urlsplit(v)
         if u.scheme not in ('http','https') or not u.hostname or u.username or u.password: raise ValueError('Use an HTTP(S) URL without credentials')
         return v
@@ -67,6 +73,13 @@ class Mission(BaseModel):
         return [v.lower() for v in values]
     @model_validator(mode='after')
     def coherent(self):
+        # An explicit target owns the platform; the request is validated again after
+        # target resolution. Legacy web missions still need their own URL here.
+        if self.platform=='web' and not self.url and not self.target_id:raise ValueError('Website missions require a URL')
+        if self.platform=='android':
+            if self.mode=='benchmark' or self.competitors or self.persona_id or self.egress_id or self.login_identifier or self.login_password:raise ValueError('Android missions do not support benchmark, competitors, personas, egress or sign-in')
+            if 'seo_aeo' in self.pillars:raise ValueError('Android missions do not support SEO/AEO')
+            if self.url and urlsplit(self.url).scheme!='https':raise ValueError('Android deep links require HTTPS')
         if self.mode!='audit' and (self.provider=='none' or self.ai_budget==0):
             raise ValueError('Journeys require an AI worker and a positive AI-call budget')
         if self.observe_seconds>=self.max_seconds:raise ValueError('Observation duration must be shorter than the run time limit')
@@ -77,6 +90,8 @@ class Mission(BaseModel):
 class GoalRequest(BaseModel):
     """One ask for goal suggestions on the mission form. Nothing here is stored."""
     project_id: str
+    target_id: str = ''
+    build: str = ''
     goal: str = Field(min_length=3, max_length=4000)
     url: str = ''
     mode: Literal['journey','explore','audit','benchmark'] = 'journey'
@@ -94,6 +109,8 @@ class RunRequest(BaseModel):
     mission_id: str
     network: str | None = None
     baseline_id: str = ''
+    build: str = ''
+    visibility: Literal['team','local'] | None = None
 class ContinueRequest(BaseModel):
     """How much more work a finished run may do. Zero means the same amount its mission asked for."""
     ai_calls: int = Field(default=0, ge=0, le=60)
@@ -141,7 +158,40 @@ class Project(BaseModel):
     codex_account: str = Field(default='', max_length=80)
     @field_validator('url')
     @classmethod
-    def valid_url(cls,v):return Mission.valid_url(v)
+    def valid_url(cls,v):return Mission.valid_url(v) if v else v
     @field_validator('codex_account')
     @classmethod
     def account_alias(cls,v):return Mission.account_alias(v)
+
+class Build(BaseModel):
+    sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    version_name: str = Field(max_length=100)
+    version_code: int = Field(ge=0)
+    min_sdk: int = Field(ge=1)
+    target_sdk: int = Field(ge=1)
+    launch_activity: str = Field(max_length=300)
+    abis: list[str] = Field(default_factory=list, max_length=20)
+    size: int = Field(ge=1, le=300 * 1024 * 1024)
+    uploaded_at: str
+    archived: bool = False
+
+class Target(BaseModel):
+    project_id: str
+    type: Literal['web','android']
+    name: str = Field(min_length=1,max_length=100)
+    visibility: Literal['team','local'] = 'team'
+    url: str = ''
+    allowed_domains: list[str] = Field(default_factory=list,max_length=30)
+    package: str = Field(default='',pattern=r'^$|^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$')
+    builds: list[Build] = Field(default_factory=list,max_length=200)
+    @field_validator('url')
+    @classmethod
+    def target_url(cls,v):return Mission.valid_url(v) if v else v
+    @field_validator('allowed_domains')
+    @classmethod
+    def domains(cls,v):return Mission.domains(v)
+    @model_validator(mode='after')
+    def coherent(self):
+        if self.type=='web' and (not self.url or self.package or self.builds):raise ValueError('Website targets need a URL and cannot contain app builds')
+        if self.type=='android' and self.url:raise ValueError('Android target URLs belong to mission deep links')
+        return self

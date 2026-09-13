@@ -12,7 +12,7 @@ def front_matter(path):
     return yaml.safe_load(text.split('---\n',2)[1]),text.split('---\n',2)[2]
 
 def test_every_skill_is_present():
-    assert {p.parent.name for p in SKILLS}=={'pex-mission-write','pex-mission-suggest','pex-env-check','pex-run-diagnose',
+    assert {p.parent.name for p in SKILLS}=={'pex-mission-write','pex-mission-suggest','pex-env-check','pex-run-diagnose','pex-app-crash','pex-app-compare',
                                              'pex-findings-triage','pex-run-brief','pex-issue-report','pex-release-ship'}
 
 @pytest.mark.parametrize('path',SKILLS,ids=lambda p:p.parent.name)

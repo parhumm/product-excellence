@@ -38,8 +38,10 @@ uploads are pending.
 | --- | --- | --- |
 
 One row each for: the app, the version, an AI worker (Claude or Codex), the
-Playwright browsers, the data directory lock, the team server connection, and
-pending uploads. Say "ready" or the exact problem, never a guess.
+Playwright browsers, Android SDK/designated AVD status from `health.android`,
+the data directory lock, the team server connection, and pending uploads. An
+Android failure does not make a web-only console unready. Say "ready" or the
+exact problem, never a guess.
 
 `references/fixes.md` maps each failure to the fix the README gives. Use its
 wording so the user sees the same advice twice.
@@ -49,6 +51,8 @@ wording so the user sees the same advice twice.
 Only these, and only after the user agrees:
 
 - `./scripts/setup.sh` for missing or broken browsers. Safe to repeat.
+- `./scripts/setup.sh --android` for missing Android tooling. It may prompt for
+  SDK licences; never accept those licences on the user's behalf.
 - Retry pending uploads: `curl -s -X POST -H 'X-PEX-Request: 1' http://127.0.0.1:8741/api/hub/retry`
 
 Never delete or move anything under `data/`. Never sign anyone in or out. If the

@@ -17,6 +17,11 @@ suits an audit that only measures.
 | Field | Notes |
 | --- | --- |
 | `project_id` | the workspace id from `cli.py missions` |
+| `target_id` | explicit website or Android target from `cli.py targets`; empty means legacy web only |
+| `build` | Android APK SHA, or empty to resolve the latest non-archived build once at queue time |
+| `device` | Android's operator-designated disposable AVD; empty uses `PEX_ANDROID_AVD` |
+| `visibility` | `team` or `local`; local items stay authoritative on this Mac until explicitly shared |
+| `platform` | server-resolved from the target; do not invent it |
 | `name` | short; "Subject · what it does" reads well |
 | `url` | http or https, no credentials inside it |
 | `goal` | 5 to 4000 characters, the voice below |
@@ -36,6 +41,11 @@ suits an audit that only measures.
 | `login_identifier`, `login_password` | credentials; the goal uses the placeholder |
 | `persona_id` | a saved test session from `scripts/capture-persona.py` |
 | `pillars` | functionality, cro, seo_aeo, ux_ui, performance |
+
+Android missions use baseline networking, no benchmark, competitors, SEO/AEO,
+persona, proxy or credentials, and an optional HTTPS deep link only on the app
+target's allowed hosts. They stop before sign-in, passwords and OTPs. Browser and
+viewport fields do not describe the emulator; reports use its actual locale and display.
 
 ## Three goals to imitate
 

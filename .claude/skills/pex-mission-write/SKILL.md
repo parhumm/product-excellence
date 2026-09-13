@@ -26,10 +26,11 @@ nowhere else.
 `health` shows which AI workers are signed in. `missions` shows what already
 exists, with each mission's `project_id`.
 
-Pick the workspace the user named, or the one whose `url` matches the website in
-their sentence. The mission's `allowed_domains` come from that workspace. Never
-add a domain the workspace does not own; a competitor URL belongs in
-`competitors` on a benchmark mission instead.
+List `.venv/bin/python scripts/cli.py targets` and bind a new mission to the
+named target. For a website, its `allowed_domains` come from that target. Never
+add a domain it does not own; a competitor URL belongs in `competitors` on a
+benchmark mission instead. For Android, use its package/build, baseline network,
+no benchmark/SEO/sign-in/persona/proxy, and stop before password or OTP entry.
 
 If the user gave a website with no matching workspace, say so and offer to create
 one before going further.

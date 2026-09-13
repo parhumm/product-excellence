@@ -3,7 +3,7 @@
 ## What they are
 
 Product Excellence runs on your Claude or ChatGPT subscription, so you already
-have Claude Code on this Mac. This folder ships eight skills for it: short
+have Claude Code on this Mac. This folder ships ten skills for it: short
 instruction sheets that teach Claude Code how to do the fiddly parts of this
 tool for you.
 
@@ -25,6 +25,8 @@ app, and they update when the app updates.
 | tell people what happened | `/pex-run-brief` | nothing; it only reads and writes a file | a one-page brief with scores, the top three findings and what the run does not prove |
 | report a bug in this tool | `/pex-issue-report` | filing anything on GitHub | a complete, redacted bug report, checked against the open issues first |
 | release a new version | `/pex-release-ship` | pushing, and again before deploying | tests, a version bump, a changelog entry, a tag, the deploy, and proof it is live |
+| turn an Android crash or ANR into a local bug report | `/pex-app-crash` | nothing; it only reads and writes a file | a sanitized attributable stack and timeline report |
+| compare two Android builds | `/pex-app-compare` | nothing; it only reads and writes a file | compatibility, findings and valid measurement deltas |
 
 A run page offers the matching command where it helps: the diagnose skill on a blocked or failed run,
 the triage skill above a list of open findings, and the brief skill under the executive summary.

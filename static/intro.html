@@ -162,7 +162,7 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
         <p>Describe a task in plain language. Product Excellence runs it in Chromium, Firefox or WebKit, captures the journey, and shows exactly why each finding exists.</p>
       </div>
       <ol class="flow">
-        <li><h3>Define a mission</h3><p>Set the goal, allowed domains, viewport, network conditions and run budget.</p></li>
+        <li><h3>Define a mission</h3><p>Choose a website or Android target, then set the goal, safe boundaries and run budget.</p></li>
         <li><h3>Watch the journey</h3><p>Follow each browser action beside the worker’s reason for taking it.</p></li>
         <li><h3>Challenge findings</h3><p>Inspect screenshots, measurements, traces, video and critic verdicts.</p></li>
         <li><h3>Replay and compare</h3><p>Separate new, persisting and not-seen-again issues across releases.</p></li>
@@ -197,7 +197,7 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
       <ul class="bounds">
         <li><strong>Your subscription</strong><span>Uses the Claude Code or Codex client you already sign in to. No API key is stored or required.</span></li>
         <li><strong>Read-only first</strong><span>Mutating network requests are blocked by default. Payments, deletion and publishing controls stay refused.</span></li>
-        <li><strong>Allowed domains</strong><span>The browser stays inside the mission’s explicit domain list.</span></li>
+        <li><strong>Bounded targets</strong><span>The browser stays on explicit domains; Android runs use one designated disposable AVD and a pinned APK.</span></li>
         <li><strong>Honest evidence</strong><span>Unmeasured signals are unavailable, not zero. Findings retain their source evidence and critic verdict.</span></li>
       </ul>
     </div>
@@ -216,7 +216,7 @@ cd product-excellence
       </div>
       <ul class="install-options">
         <li><h3>Use it locally</h3><p>Run browsers and AI on your Mac, backed by SQLite. No Node, npm or PostgreSQL setup is required.</p><a href="https://github.com/parhumm/product-excellence/blob/main/docs/USER_MANUAL.md" rel="noopener">Open the user manual ↗</a></li>
-        <li><h3>Deploy your team server</h3><p>Self-host completed results on Debian or Ubuntu behind your own domain. The server stores and shows evidence; browsers and AI still run on each teammate’s Mac.</p><a href="https://github.com/parhumm/product-excellence/blob/main/docs/DEPLOY.md" rel="noopener">Read the deployment guide ↗</a></li>
+        <li><h3>Deploy your team server</h3><p>Self-host shared metadata and results behind your own domain. Browsers, emulators, APK bytes and AI stay on each teammate’s Mac.</p><a href="https://github.com/parhumm/product-excellence/blob/main/docs/DEPLOY.md" rel="noopener">Read the deployment guide ↗</a></li>
         <li><h3>Inspect or contribute</h3><p>The full application, safeguards, tests and documentation are public under Apache License 2.0.</p><a href="https://github.com/parhumm/product-excellence" rel="noopener">Browse the source ↗</a></li>
       </ul>
     </div>

@@ -50,6 +50,7 @@ GENERIC = [
 
 def seed_project(project, session=None):
     """Create the presets this workspace is missing, then stamp it."""
+    if not project.get('url'): return project
     if project.get('presets') == PRESET_VERSION: return project
     known = {m.get('template') or m['name'] for m in store.all_records('mission', project['id'], session=session)}
     domains = project.get('allowed_domains') or [urlsplit(project['url']).hostname.lower()]

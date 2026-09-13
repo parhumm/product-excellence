@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 — 2026-09-13
+
+- Workspaces now contain explicit website and Android targets. APK builds are
+  validated, content-addressed on each execution Mac, pinned into queued runs,
+  and compared without rewriting historical web records.
+- Missions and finished runs can remain local inside a shared workspace, then
+  be shared explicitly with dependency and artifact verification.
+- A designated disposable AVD can run bounded native audits and journeys with
+  screenshots, MP4 recording, package-attributed crash/ANR logs, launch and
+  memory measurements, and explicit missing-capability coverage.
+- Team workspaces that use 1.5 features require a compatible console through a
+  numeric protocol-version gate. The read-only team UI remains available.
+
 ## 1.4.0 — 2026-09-13
 
 - **Continue a run where its budget ended.** A journey that ran out of AI calls

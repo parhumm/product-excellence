@@ -3,7 +3,7 @@
 
 ## What is it?
 
-Product Excellence is a private website testing assistant that runs on your computer.
+Product Excellence is a private website and Android app testing assistant that runs on your computer.
 
 Give it a page to review or a task to try, such as “find a movie and open its details.” It opens a browser, checks what happens, and saves screenshots, a recording, and findings for you to review.
 
@@ -45,11 +45,13 @@ If it is stopped, double-click **start.command** in the project folder. Leave it
 
 Open **Settings** to check whether the browsers and your AI subscription are ready.
 
-### 2. Choose the website
+### 2. Choose the workspace and target
 
-The **Workspace** selector at the top of the sidebar chooses the website you are working on. Missions, runs, findings, comparisons and scheduled checks all belong to one website, so switching hides everything belonging to the others. A mission created inside a workspace begins with that website's address already filled in.
+The **Workspace** selector chooses the product you are working on. A workspace can contain several website and Android targets. Missions, runs, findings, comparisons and scheduled checks stay inside it. Choose the target on each new mission.
 
 Add another website under **Settings → Workspaces (websites)**: a name, its address, and the domains a test is allowed to visit.
+
+For Android, open **Settings → Workspaces and targets**, create an Android target, and upload an installable APK. The first build fixes that target's package name. New runs can use the latest non-archived build or pin an exact SHA. The disposable AVD is cleared only for that package before each run; Android sign-in, benchmark, SEO/AEO, proxy and network matrices are unavailable.
 
 ### 3. Choose a mission
 
@@ -265,9 +267,11 @@ Optional automatic replay repeats a run once when it finds a potentially signifi
 
 Use **Compare releases** after a change. Matching test conditions make comparisons more useful.
 
+Android release comparison allows a changed APK build when the target, package, goal, applied network and measured device conditions match. It labels new, persisting and not-seen findings without editing either report. **Continue this run** remains web-only; replay uses the Android run's exact pinned APK.
+
 Download the readable Markdown report to share with your team. In Claude Code, `/pex-findings-triage` turns the findings into one ticket each and can compare a run with a baseline, and `/pex-run-brief` writes a one-page summary for people who did not watch the run. The [skills guide](SKILLS.md) lists them all.
 
-**Working with a team.** If your team runs a server, sign in under **Settings** with the username and password for the website you work on. Signing in shares that one workspace: its missions, runs, findings, schedules and recordings live on the server and everyone signed in sees the same results. Every other workspace stays on this Mac with all of its features, and you switch between them in the sidebar picker, which groups them under **On this Mac** and **Shared on** the server. The sidebar and every page say where the workspace you are looking at lives, and a run that finished while the server was unreachable is marked **Awaiting upload** until its evidence reaches the server; **Retry uploads** under Settings sends it again. Tests always run on your own computer with your own Claude or ChatGPT subscription. Your connection settings, test personas and mission passwords stay on your machine, so a teammate has to set up anything local a mission needs before starting it. To add a workspace, open **Settings**, **Add workspace**, and choose where it lives: on this Mac, or, when you are signed in as the server's admin, shared on the server. Ask whoever administers the server for the address and the password.
+**Working with a team.** Sign in under **Settings** with the workspace credentials. New targets, missions and runs may be **Team** or **Only on this Mac**. A local item stays private and authoritative on that console until you explicitly share it; share its target first, then mission, then finished run. APK bytes never upload to the hub, so each execution Mac must upload the exact SHA locally. Shared raw video and logs are visible to every workspace member. Tests and AI still run on the initiating Mac.
 
 ## What are the gaps?
 
@@ -280,6 +284,7 @@ Download the readable Markdown report to share with your team. In Claude Code, `
 - **The assistant types and clicks, but barely uses the keyboard.** It may press Enter in a search box and the navigation keys; any other key is refused and stops the test.
 - **Payments and account changes are blocked.** Some otherwise harmless website features may also be affected.
 - **Mobile screen sizes are simulated.** This is not testing on physical phones or TVs.
+- **Android is a disposable-emulator lab check.** Baseline networking is supported; offline was not verified without an operator probe, and jank/rendering statistics were unavailable on the measured API 34 arm64 fixture. Missing means not measured.
 - **The app is for local, internal use.** It runs one test at a time; schedules work while the service is running. A schedule runs only on the computer that created it, and only while that app is open.
 - **Everyone with the website's password sees the same results.** The password says which website you may open, not who you are, so results and comments cannot be traced back to a person. A test can be cancelled from another computer only while it is still queued; once it starts, cancel it where it is running.
 - **Recordings may contain private information.** Keep account sessions and evidence private. Anything captured during a test, including pages seen after signing in, is visible to everyone who has that website's password, so use test accounts.

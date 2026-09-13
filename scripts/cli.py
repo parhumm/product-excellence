@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 import argparse,json,time,sys
+from pathlib import Path
+if '__file__' in globals():sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from engine import targets as android_targets
 import httpx,yaml
 p=argparse.ArgumentParser(description='Product Excellence CLI')
 p.add_argument('--url',default='http://127.0.0.1:8741')
 sp=p.add_subparsers(dest='command',required=True)
-sp.add_parser('health');sp.add_parser('missions')
+sp.add_parser('health');sp.add_parser('missions');sp.add_parser('targets')
 sp.add_parser('models',help='List selectable AI models with their estimated prices')
-r=sp.add_parser('run');r.add_argument('mission_id');r.add_argument('--wait',action='store_true');r.add_argument('--network')
+r=sp.add_parser('run');r.add_argument('mission_id');r.add_argument('--wait',action='store_true');r.add_argument('--network');r.add_argument('--build',default='');r.add_argument('--visibility',choices=['team','local'])
+apps=sp.add_parser('apps');apps_sub=apps.add_subparsers(dest='apps_command',required=True);upload=apps_sub.add_parser('upload');upload.add_argument('file');upload.add_argument('--project',required=True);upload.add_argument('--target')
+share=sp.add_parser('share');share.add_argument('kind',choices=['target','mission','run']);share.add_argument('id')
 k=sp.add_parser('continue',help='Carry on a finished run from the page it stopped on')
 k.add_argument('run_id');k.add_argument('--ai-calls',type=int,default=0,help='Extra AI calls; 0 repeats the mission budget')
 k.add_argument('--steps',type=int,default=0,help='Extra steps; 0 repeats the mission limit');k.add_argument('--wait',action='store_true')
@@ -54,7 +59,18 @@ if args.command=='models':
    print(f"  {entry['value'] or '(CLI default)':<20} {entry['label']:<26} {entry.get('price_hint') or 'no published price'}")
  print('Estimate at published API list prices. Runs use your Codex/Claude subscription; nothing is billed per call.')
  sys.exit(0)
-if args.command in ('health','missions'):r=c.get('/'+args.command)
+if args.command in ('health','missions','targets'):r=c.get('/'+args.command)
+elif args.command=='apps':
+ metadata=android_targets.inspect_apk(Path(args.file));items=c.get('/targets',headers={'X-PEX-Workspace':args.project});items.raise_for_status()
+ choices=[t for t in items.json() if t['project_id']==args.project and t['type']=='android' and (not t.get('package') or t['package']==metadata['package'])]
+ target_id=args.target
+ if not target_id:
+  if len(choices)>1:raise SystemExit('More than one Android target can accept this package; pass --target')
+  if choices:target_id=choices[0]['id']
+  else:
+   created=c.post('/targets',headers={'X-PEX-Workspace':args.project},json={'project_id':args.project,'type':'android','name':Path(args.file).stem,'visibility':'team','url':'','allowed_domains':[],'package':'','builds':[]});created.raise_for_status();target_id=created.json()['id']
+ with open(args.file,'rb') as file:r=c.post(f'/targets/{target_id}/builds',headers={'X-PEX-Workspace':args.project},files={'file':file})
+elif args.command=='share':r=c.post(f'/{args.kind}s/{args.id}/share')
 elif args.command=='import':
  with open(args.file,'rb') as f:r=c.post('/import',files={'file':f})
 elif args.command=='export':r=c.get(f'/runs/{args.run_id}/export',params={'format':args.format})
@@ -74,7 +90,7 @@ elif args.command=='review':
  r=c.patch(f'/findings/{args.run_id}/{args.finding_id}',json=body,
            headers={'X-PEX-Revision':str(revision)} if revision is not None else {})
 else:
- r=c.post('/runs',json={'mission_id':args.mission_id,'network':args.network});r.raise_for_status();id=r.json()['id']
+ r=c.post('/runs',json={'mission_id':args.mission_id,'network':args.network,'build':args.build,'visibility':args.visibility});r.raise_for_status();id=r.json()['id']
  if args.wait:
   while r.json()['status'] in ('queued','running'):
    time.sleep(3);r=c.get('/runs/'+id);r.raise_for_status()

@@ -1,6 +1,6 @@
 # Architecture
 
-The local FastAPI service serves the console and JSON API. PostgreSQL stores versioned mission snapshots and run records. A single asynchronous worker launches a Playwright browser, installs deterministic collectors, applies the network profile, observes a page, asks a subscription CLI for a schema-validated action, checks that action and executes it. Every run owns an independent browser context.
+The local FastAPI service serves the console and JSON API. SQLite or PostgreSQL stores versioned JSON records. A workspace contains web and Android targets. A single asynchronous worker selects the existing Playwright path or a concrete adb-backed `Device`, applies supported conditions, observes, asks a subscription CLI for a schema-validated action when enabled, checks it and executes it. Web runs own independent browser contexts; Android runs exclusively lock the operator-designated disposable AVD and reset only the target package.
 
 Browser input is untrusted. The AI receives bounded observations and screenshots, cannot submit arbitrary browser scripts, and does not control the local service. CLI subprocesses receive structured schemas, restricted tool configuration, separate temporary directories and deadlines. Explicit policy rejects unsafe controls and browser requests before execution. Source files are never exposed as web routes.
 

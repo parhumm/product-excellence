@@ -1,13 +1,21 @@
 # Deploying the team server
 
-The team server holds shared results. When someone finishes a run on their own
+The team server holds shared metadata and results. When someone finishes a team run on their own
 Mac, the run publishes itself to the server with its screenshots, recording,
 measurements and findings, and everyone signed in to that website sees it.
 
-The server only stores and shows results. It never opens a browser and never
+The server stores target/build metadata but never APK bytes. It never opens a browser or emulator and never
 calls an AI, so Run, Replay and the mission forms are switched off there and
 read "Coming soon". Everyone keeps running tests on their own machine with their
 own Claude or ChatGPT subscription.
+
+## Upgrade to 1.5.0
+
+Upgrade the hub first, then every execution console in a workspace before anyone uses targets, Android or local/private items. Stop new submissions, let active runs finish, and drain `data/pending-publication` on every console before taking coordinated database and artifact checkpoints. Default web targets add records to the existing JSON store; there is no schema change and historical payloads or evidence are not rewritten. The supplementary pre-write export is `data/backups/records-before-targets-*.json`.
+
+The first new-format shared write atomically sets server-owned `min_console=1.5.0`. Protocol calls from older/missing/malformed console versions then receive HTTP 426; `/hub/health`, authentication, admin diagnostics and the headerless read-only team console remain available. Each execution Mac needs its own Android SDK, designated disposable AVD and exact APK SHA; the hub needs none.
+
+To roll back after a new-format write, stop affected services, preserve the post-upgrade database and artifacts, quarantine every current pending-publication file, share journal and affected hub cache, and restore all coordinated checkpoint databases including `min_console`. Retain APKs and quarantined work. Publish it only after a later upgrade and explicit revision/identity reconciliation; never put the old outbox back blindly. Record every restored machine. A code-only rollback is safe only before any target, Android or visibility-stamped write.
 
 Use a domain you control. The landing page is public; `/console` asks for a
 website’s username and password and is read only. Publishing this GitHub

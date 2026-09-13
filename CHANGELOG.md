@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — 2026-09-13
 
 - **Local and shared workspaces side by side.** Signing in to the team server
   now shares that one workspace. Every other workspace stays on this Mac with

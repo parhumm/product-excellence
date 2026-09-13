@@ -72,7 +72,7 @@ async def lifespan(app):
         finally:
             task.cancel();await asyncio.gather(task,return_exceptions=True);await runner.close();hub.close()
 
-app=FastAPI(title='Product Excellence',version='1.2.0',lifespan=lifespan)
+app=FastAPI(title='Product Excellence',version='1.3.0',lifespan=lifespan)
 @app.middleware('http')
 async def local_boundary(request,call_next):
     if request.url.hostname not in ('127.0.0.1','localhost','::1','testserver'):return JSONResponse({'detail':'Local access only. Use an SSH tunnel for a VPS.'},403)

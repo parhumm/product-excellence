@@ -62,6 +62,9 @@ def describe(action,target=None):
     return 'Malformed AI response'
 
 
+# One budget for opening a page and for capturing it. A real origin can take tens of
+# seconds to paint; that is a finding to measure, not a reason to fail the run.
+SLOW_PAGE_MS=45000
 VIEWPORTS={'desktop':{'width':1440,'height':900},'mobile':{'width':390,'height':844},'tablet':{'width':820,'height':1180}}
 class StopRun(Exception): pass
 def first_frame(stack):
@@ -334,7 +337,9 @@ class Runner:
                     return await route.abort('blockedbyclient')
                 return await route.continue_()
             await context.route('**/*',route_guard)
-            page=await context.new_page();page.set_default_timeout(10000)
+            # Actions stay at 10s: an unactionable control is a finding. Navigation and
+            # screenshots need the slow-origin budget, or a slow paint ends the run.
+            page=await context.new_page();page.set_default_timeout(10000);page.set_default_navigation_timeout(SLOW_PAGE_MS)
             page.on('dialog',lambda dialog:asyncio.create_task(dialog.dismiss()))
             page.on('download',lambda download:asyncio.create_task(download.cancel()))
             context.on('page',lambda p:asyncio.create_task(p.close()) if p!=page else None)
@@ -368,7 +373,7 @@ class Runner:
                 disconnect_task=asyncio.create_task(disconnect_loop())
             await event('Opening '+m['url'])
             try:
-                resp=await page.goto(m['url'],wait_until='domcontentloaded',timeout=45000)
+                resp=await page.goto(m['url'],wait_until='domcontentloaded')
                 r['initial_status']=resp.status if resp else None
                 if resp:
                     html=await resp.text();r['initial_html_summary']={'length':len(html),'has_title':'<title' in html.lower(),'has_h1':'<h1' in html.lower()}
@@ -400,14 +405,19 @@ class Runner:
                 obs['url']=safe_url(obs['url'])
                 for c in obs['controls']:c['href']=safe_url(c['href']) if c['href'] else ''
                 image=folder/f'{oid}.png'
-                # Screenshot and DOM are independent reads; the accessibility pass injects a
-                # script, so it still runs after the DOM has been captured.
-                _,html=await asyncio.gather(
-                    page.screenshot(path=str(image),mask=[page.locator('input[type=password],input[autocomplete="one-time-code"],input[type=email],input[type=tel]')]),
-                    page.content())
-                image_hash=hashlib.sha256(image.read_bytes()).hexdigest()
+                # The DOM is the evidence that must survive; a screenshot that never finishes
+                # degrades this one observation instead of ending the run.
+                html=await page.content()
+                try:
+                    await page.screenshot(path=str(image),timeout=SLOW_PAGE_MS,mask=[page.locator('input[type=password],input[autocomplete="one-time-code"],input[type=email],input[type=tel]')])
+                except Exception as e:
+                    image=None;obs['screenshot_error']=hide(str(e))[:300]
+                    await event(oid+': screenshot did not finish; page text and metrics are still recorded','warning')
+                # With no image there is nothing to compare, so treat the page as changed
+                # rather than telling the AI a page it cannot see stood still.
+                image_hash=hashlib.sha256(image.read_bytes()).hexdigest() if image else oid
                 obs['visual_changed']=last_image_hash!=image_hash;last_image_hash=image_hash
-                obs['screenshot']=f'/api/runs/{id}/artifacts/{oid}.png'
+                if image:obs['screenshot']=f'/api/runs/{id}/artifacts/{oid}.png'
                 obs['dom']=f'/api/runs/{id}/artifacts/{oid}.dom.txt'
                 (folder/f'{oid}.dom.txt').write_text(hide(html))
                 (folder/f'{oid}.json').write_text(json.dumps(obs,ensure_ascii=False,indent=2))
@@ -455,7 +465,7 @@ class Runner:
                     if index:
                         await event('Opening '+site)
                         try:
-                            await page.goto(site,wait_until='domcontentloaded',timeout=45000)
+                            await page.goto(site,wait_until='domcontentloaded')
                             try:await page.wait_for_load_state('networkidle',timeout=12000)
                             except Exception:pass
                             await page.wait_for_timeout(1000)

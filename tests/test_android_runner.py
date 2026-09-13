@@ -95,4 +95,5 @@ async def test_native_journey_refuses_a_blocked_finish_before_any_tap(monkeypatc
     run=native_run(tmp_path);run['mission'].update(mode='journey',provider='codex',max_steps=5,ai_budget=5)
     await runner_module.Runner().execute_android('run',run)
     assert [a['status'] for a in run['actions']]==['failed','executed','executed'] and run['mission_outcome']=='success'
+    assert [e['message'][:8] for e in run['events'] if e['message'].startswith('Action')]==['Action 1','Action 2','Action 3']  # each action is logged as it happens
     assert 'Refused: no control has been tried yet' in prompts[1]  # the second prompt carries the refusal as action history

@@ -40,6 +40,18 @@ def tool(name):
     if not matches:raise ValueError(f'Android SDK tool not found: {name}')
     return matches[-1]
 
+def manifest_launcher(path,package):
+    """Badging omits a launcher declared as an enabled activity-alias; read the manifest tree for one."""
+    try:tree=subprocess.run([tool('aapt2'),'dump','xmltree','--file','AndroidManifest.xml',path],capture_output=True,text=True,timeout=15).stdout
+    except subprocess.TimeoutExpired as error:raise ValueError('APK inspection timed out') from error
+    for m in re.finditer(r'^( +)E: activity(?:-alias)? .*\n((?:\1 .*\n)*)',tree,re.M):
+        own,_,filters=m.group(2).partition('E: intent-filter')
+        name=re.search(r'android:name\(0x01010003\)="([^"]+)"',own)
+        if not name or 'android:enabled(0x0101000e)=false' in own or 'android.intent.action.MAIN' not in filters or 'android.intent.category.LAUNCHER' not in filters:continue
+        value=name[1]
+        return package+value if value.startswith('.') else value if '.' in value else package+'.'+value
+    return ''
+
 def inspect_apk(path):
     try:result=subprocess.run([tool('aapt2'),'dump','badging',path],capture_output=True,text=True,timeout=15)
     except subprocess.TimeoutExpired as error:raise ValueError('APK inspection timed out') from error
@@ -47,14 +59,15 @@ def inspect_apk(path):
     text=result.stdout
     package=re.search(r"^package: name='([^']+)' versionCode='(\d+)' versionName='([^']*)'",text,re.M)
     launch=re.search(r"^launchable-activity: name='([^']+)'",text,re.M)
-    min_sdk=re.search(r"^sdkVersion:'(\d+)'",text,re.M);target_sdk=re.search(r"^targetSdkVersion:'(\d+)'",text,re.M)
+    min_sdk=re.search(r"^(?:min)?[sS]dkVersion:'(\d+)'",text,re.M);target_sdk=re.search(r"^targetSdkVersion:'(\d+)'",text,re.M)
     native=re.search(r"^native-code: (.+)$",text,re.M)
     if not package or not PACKAGE.fullmatch(package[1]):raise ValueError('APK has no valid package metadata')
     if " split='" in (text.splitlines()[0] if text else ''):raise ValueError('Split APKs are not supported; upload a universal/base installable APK')
-    if not launch:raise ValueError('APK has no launcher activity')
+    launcher=launch[1] if launch else manifest_launcher(path,package[1])
+    if not launcher:raise ValueError('APK has no launcher activity')
     size=Path(path).stat().st_size
     with Path(path).open('rb') as source:sha=hashlib.file_digest(source,'sha256').hexdigest()
-    return {'package':package[1],'sha256':sha,'version_name':package[3],'version_code':int(package[2]),'min_sdk':int(min_sdk[1]) if min_sdk else 1,'target_sdk':int(target_sdk[1]) if target_sdk else 1,'launch_activity':launch[1],'abis':re.findall(r"'([^']+)'",native[1]) if native else [],'size':size}
+    return {'package':package[1],'sha256':sha,'version_name':package[3],'version_code':int(package[2]),'min_sdk':int(min_sdk[1]) if min_sdk else 1,'target_sdk':int(target_sdk[1]) if target_sdk else 1,'launch_activity':launcher,'abis':re.findall(r"'([^']+)'",native[1]) if native else [],'size':size}
 
 def resolve_mission(value, *, session=None):
     """Resolve an explicit target once; absent target_id remains legacy web."""

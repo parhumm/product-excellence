@@ -59,6 +59,40 @@ def test_apk_metadata_and_split_rejection(monkeypatch,tmp_path):
     Result.stdout="package: name='dev.app' versionCode='7' versionName='1.7' split='config.arm64'\nlaunchable-activity: name='dev.app.Main'\n"
     with pytest.raises(ValueError,match='Split'):targets.inspect_apk(apk)
 
+def test_apk_launcher_declared_as_activity_alias(monkeypatch,tmp_path):
+    apk=tmp_path/'app.apk';apk.write_bytes(b'apk')
+    monkeypatch.setattr(targets,'tool',lambda name:Path('/bin/true'))
+    badging="package: name='dev.app' versionCode='7' versionName='1.7'\n"
+    tree='''N: android=http://schemas.android.com/apk/res/android
+  E: manifest (line=2)
+    E: application (line=10)
+      E: activity (line=12)
+        A: android:name(0x01010003)="dev.app.Splash" (Raw: "dev.app.Splash")
+      E: activity-alias (line=20)
+        A: android:name(0x01010003)="dev.app.OldAlias" (Raw: "dev.app.OldAlias")
+        A: android:enabled(0x0101000e)=false
+        E: intent-filter (line=22)
+          E: action (line=23)
+            A: android:name(0x01010003)="android.intent.action.MAIN" (Raw: "android.intent.action.MAIN")
+          E: category (line=24)
+            A: android:name(0x01010003)="android.intent.category.LAUNCHER" (Raw: "android.intent.category.LAUNCHER")
+      E: activity-alias (line=30)
+        A: android:name(0x01010003)=".Launcher" (Raw: ".Launcher")
+        A: android:enabled(0x0101000e)=true
+        E: intent-filter (line=32)
+          E: action (line=33)
+            A: android:name(0x01010003)="android.intent.action.MAIN" (Raw: "android.intent.action.MAIN")
+          E: category (line=34)
+            A: android:name(0x01010003)="android.intent.category.LAUNCHER" (Raw: "android.intent.category.LAUNCHER")
+'''
+    class Result:returncode=0;stderr=''
+    def run(args,**kw):
+        Result.stdout=tree if 'xmltree' in args else badging;return Result
+    monkeypatch.setattr(targets.subprocess,'run',run)
+    assert targets.inspect_apk(apk)['launch_activity']=='dev.app.Launcher'
+    monkeypatch.setattr(targets.subprocess,'run',lambda args,**kw:(setattr(Result,'stdout',badging),Result)[1])
+    with pytest.raises(ValueError,match='launcher'):targets.inspect_apk(apk)
+
 def test_default_web_target_allows_its_own_host_without_project_domains(records):
     with store.Session.begin() as s:
         project=store.save('project',{'id':'site','name':'Site','url':'https://example.org','allowed_domains':[]},session=s)

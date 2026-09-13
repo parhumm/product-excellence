@@ -85,6 +85,11 @@ def scores(run):
     result['basis']=BASIS
     return result
 
+def visits(run):
+    """How many times the browser ran for this run: one, plus each continuation."""
+    n=run.get('continuations') or 0
+    return 'Continued '+('once' if n==1 else str(n)+' times')+', in '+str(n+1)+' visits'
+
 def _severity_rank(f):
     severity=f.get('severity')
     return SEVERITY_ORDER.index(severity) if severity in SEVERITY_ORDER else len(SEVERITY_ORDER)
@@ -101,6 +106,8 @@ def executive_summary(run):
     release=str(run.get('gate','not_evaluated'))
     facts=['Run '+str(run.get('status','unknown'))+'. Release check: '+GATE_WORDS.get(release,release)+'.']
     if run.get('mission_outcome'):facts.append('Journey outcome: '+str(run['mission_outcome'])+'.')
+    # A continued run is one report over several visits; say so before any count is read as a single sitting.
+    if run.get('continuations'):facts.append(visits(run)+': the report covers every visit.')
     facts.append('Overall score '+str(overall['score'])+' of 100 across '+str(overall.get('scored',0))+' of '+str(overall.get('of',0))+' selected pillars.' if overall.get('score') is not None else 'No pillar could be scored in this run.')
     facts.append('Open findings: '+', '.join(str(v)+' '+k for k,v in counts.items())+'.' if counts else 'No open findings were recorded.')
     if gaps:facts.append('Not evaluated: '+', '.join(gaps)+'.')

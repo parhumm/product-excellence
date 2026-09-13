@@ -278,13 +278,17 @@ def test_the_console_page_opens_when_its_team_server_is_down(hub_client,monkeypa
 def test_traces_stay_on_the_machine_that_ran_the_mission(hub_client,tmp_path):
     """A published run keeps its screenshots and drops its Playwright trace."""
     r=run_record({'id':'p'},{'id':'m','name':'m'})
-    r['trace']=f'/api/runs/{r["id"]}/artifacts/trace.zip'
+    r['trace']=f'/api/runs/{r["id"]}/artifacts/trace-2.zip'
+    # A continued run carries one trace per visit, and every part stays behind.
+    r['traces']=[f'/api/runs/{r["id"]}/artifacts/trace.zip',f'/api/runs/{r["id"]}/artifacts/trace-2.zip']
+    r['videos']=[f'/api/runs/{r["id"]}/artifacts/journey.webm']
     r['observations']=[{'screenshot':f'/api/runs/{r["id"]}/artifacts/s.png'}]
     folder=store.ARTIFACTS/r['id'];folder.mkdir()
-    (folder/'trace.zip').write_bytes(b'trace');(folder/'s.png').write_bytes(b'png');(folder/'run.json').write_bytes(b'{}')
+    for name in ('trace.zip','trace-2.zip','s.png','journey.webm','run.json'):(folder/name).write_bytes(b'x')
     shared=hub.shareable(r)
-    assert 'trace' not in shared and shared['observations']==r['observations']
-    assert hub.evidence_names(shared,folder)=={'s.png'}
+    assert 'trace' not in shared and shared['traces']==[] and shared['observations']==r['observations']
+    assert shared['videos']==r['videos']
+    assert hub.evidence_names(shared,folder)=={'s.png','journey.webm'}
 
 @pytest.mark.asyncio
 async def test_a_workspace_on_this_machine_keeps_its_runs_while_another_is_shared(hub_client,monkeypatch):

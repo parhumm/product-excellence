@@ -209,9 +209,11 @@ def artifact_names(run):
 def shareable(run):
     """The copy a server receives: links to evidence that never leaves this machine are dropped."""
     prefix=f'/api/runs/{run["id"]}/artifacts/'
+    def local(x):return isinstance(x,str) and x.startswith(prefix) and local_only(x[len(prefix):])
     def strip(v):
-        if isinstance(v,dict):return {k:strip(x) for k,x in v.items() if not (isinstance(x,str) and x.startswith(prefix) and local_only(x[len(prefix):]))}
-        if isinstance(v,list):return [strip(x) for x in v]
+        if isinstance(v,dict):return {k:strip(x) for k,x in v.items() if not local(x)}
+        # A run's trace parts travel as a list, and each one still stays on the machine that recorded it.
+        if isinstance(v,list):return [strip(x) for x in v if not local(x)]
         return v
     return strip(run)
 

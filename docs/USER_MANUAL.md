@@ -259,6 +259,8 @@ Use **Replay** to check whether a finding appears again. When a replay under the
 
 Use **Continue this run** when a run stopped because it ran out of AI calls or steps. It appears under the status message on the run page. The browser reopens the last page in the same session, so every step, screenshot and finding already recorded is kept, and the run carries on under the same id. Add the AI calls and steps you want, up to the 60 calls and 40 steps a mission allows in total. If only the AI review was missing, continuing runs the review without repeating the journey. The recording and the browser trace continue in a new part, because parts cannot be joined into one file. Continue works for workspaces on this Mac; a run shared on a team server can only be replayed, and a benchmark visits several sites in order, so it is replayed instead.
 
+When a run ends at its AI-call or step budget, it still spends one more AI call on the review, so the summary, the scores and the findings are complete rather than waiting for a continuation. A continued run shows each visit as a part: the timeline marks where the browser reopened, and the recording and browser trace of every part stay on the run page and in the report.
+
 Optional automatic replay repeats a run once when it finds a potentially significant issue. It uses a separate test budget.
 
 Use **Compare releases** after a change. Matching test conditions make comparisons more useful.

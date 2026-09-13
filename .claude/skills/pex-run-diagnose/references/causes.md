@@ -13,7 +13,7 @@ engine itself broke.
 | Payment or destructive control | an action with `status: policy_blocked` and "Payment, publication or destructive control blocked" | working as designed; end the goal before that step and report where it stopped |
 | Off-domain navigation | refusal "Navigation to HOST refused; allowed hosts: ..." | add the host to `allowed_domains` only if the workspace owns it; a competitor belongs in `competitors` on a benchmark |
 | Mutating request blocked | `blocked_request_log` entries with "Mutating method blocked", `policy_blocked_requests` above zero, `coverage_note` set | expected on forms; the flow is incomplete, say which part |
-| AI-call budget | `error` "AI-call budget exhausted" | continue the run with `cli.py continue <run id> --ai-calls N --wait`, or narrow the goal to one task |
+| AI-call budget | `mission_outcome: budget_stop` with `ai_calls` at the mission `ai_budget` | the review still ran, so the report is complete; continue the run with `cli.py continue <run id> --ai-calls N --wait` to finish the journey, or narrow the goal to one task |
 | Time budget | `error` "Time budget exhausted" or "Wall-clock time budget exhausted" | raise `max_seconds`, or use a faster network profile |
 | Site refused the visit | `error` "Target returned HTTP ..." | an access or regional restriction; try another egress route or check the URL |
 | Page never loaded | `error` "Target could not be loaded under this network/route", `navigation_error` set | test on `baseline` first, then the impaired profile |
@@ -39,9 +39,11 @@ engine itself broke.
 
 ## Completed but thin
 
-- `evaluation_error` "AI budget ended before pillar evaluation": findings exist
-  but pillar scores are missing. Continue the run to finish the review without
-  repeating the journey; it does not walk the site again.
+- `evaluation_error` set: the pillar review itself failed, usually because the
+  time budget ended or the AI worker errored. Deterministic findings stand;
+  pillar scores from AI findings are missing. A run that merely spent its
+  AI-call budget is not this case: the review is given one call past the budget,
+  so it completes. Continue the run to carry the journey on without repeating it.
 - `coverage_note` set: some flows were incomplete because mutating requests were
   blocked. The scores stand, the coverage does not.
 - A benchmark where one entry in `sites` has an `outcome` other than success:

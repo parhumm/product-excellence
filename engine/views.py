@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from . import ai, pricing, store
 from .pricing import tokens as count
 from .evaluate import compare_runs, finding_identity
-from .outcomes import BASIS, gate, scores, executive_summary
+from .outcomes import BASIS, gate, scores, executive_summary, visits
 
 def rated(r):
     """A finished run is rated from its stored findings when it carries no score, or when its score
@@ -140,10 +140,21 @@ def console_lines(r):
             (f"```\n{e['stack']}\n```" if e.get('stack') else '')]).strip())
     return lines
 
+def recording_lines(r):
+    """Where the recordings and browser traces of each visit are, so nothing a run kept is left out of the report."""
+    videos=r.get('videos') or ([r['video']] if r.get('video') else [])
+    traces=r.get('traces') or ([r['trace']] if r.get('trace') else [])
+    if not (videos or traces):return []
+    lines=['## Recordings']
+    for label,paths in (('Recording',videos),('Browser trace',traces)):
+        for i,path in enumerate(paths):lines.append(f"{label}{f' part {i+1}' if len(paths)>1 else ''}: {path}")
+    if traces:lines.append('A browser trace opens in Playwright Trace Viewer on the machine that recorded it.')
+    return ['\n'.join(lines)]
+
 def export_markdown(r):
     """One run as a self-contained report a stakeholder can read without the console."""
     id=r['id']
-    lines=[f"# {r['mission']['name']}",f"Status: {r['status']} | Release gate: {r['gate']}",f"URL: {r['mission']['url']}",f"Run: {id}",f"Browser: {r['mission']['browser']} | Viewport: {r['mission']['viewport']}",f"Network: {json.dumps(r.get('network_applied'),ensure_ascii=False)}",f"Egress: {json.dumps(r.get('egress'),ensure_ascii=False)}",f"Error: {r.get('error') or 'None'}"]+summary_lines(r)+benchmark_lines(r)+score_lines(r)+action_lines(r)+ai_usage_lines(r)+['## Findings']
+    lines=[f"# {r['mission']['name']}",f"Status: {r['status']} | Release gate: {r['gate']}",f"URL: {r['mission']['url']}",f"Run: {id}",f"Browser: {r['mission']['browser']} | Viewport: {r['mission']['viewport']}",f"Network: {json.dumps(r.get('network_applied'),ensure_ascii=False)}",f"Egress: {json.dumps(r.get('egress'),ensure_ascii=False)}",f"Error: {r.get('error') or 'None'}"]+([visits(r)+'.'] if r.get('continuations') else [])+summary_lines(r)+benchmark_lines(r)+score_lines(r)+action_lines(r)+recording_lines(r)+ai_usage_lines(r)+['## Findings']
     for f in r['findings']:
         lines.extend([f"### {f['severity']} · {f['title']}",f"{f['pillar']} · {f['classification']} · {f['verifier_status']}",f"Observed: {f['observed']}",f"Expected: {f['expected']}",f"Recommendation: {f['recommendation']}",f"Evidence: {f['evidence_id']} | Source: {f['source']}",f"Screenshot: /api/runs/{id}/artifacts/{f['evidence_id']}.png",f"Review status: {f.get('status','open')} | Owner: {f.get('owner') or 'Unassigned'}"])
     lines+=console_lines(r)+['## Coverage',json.dumps(r.get('coverage',{}),ensure_ascii=False,indent=2),'## Limitations','Lab observations do not establish field Core Web Vitals or causal conversion impact. AI findings require review. An unconfigured or blocked capability is not a pass. Raw browser traces and page snapshots may contain account data; keep evidence local.']

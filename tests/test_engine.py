@@ -176,6 +176,28 @@ def test_scores_deduct_by_severity_and_never_invent_an_unevaluated_pillar():
  unevaluated=scores(run_fixture(coverage={},status='failed'))
  assert unevaluated['overall']=={'score':None,'scored':0,'of':3}
 
+def test_a_continued_run_reports_every_visit():
+ """One report over several visits: the summary says so, and the export lists each part's evidence."""
+ from engine.outcomes import executive_summary
+ from engine.views import export_markdown
+ r=run_fixture(continuations=1,findings=[],mission={'pillars':['functionality'],'name':'Aparat journey','url':'https://example.com',
+                                        'browser':'chromium','viewport':'desktop'},
+   coverage={'functionality':{'status':'evaluated'}},status='blocked',error='Mission did not reach success: budget_stop',
+   videos=['/api/runs/r/artifacts/journey.webm','/api/runs/r/artifacts/journey-2.webm'],
+   traces=['/api/runs/r/artifacts/trace.zip','/api/runs/r/artifacts/trace-2.zip'],
+   trace='/api/runs/r/artifacts/trace-2.zip')
+ assert 'Continued once, in 2 visits: the report covers every visit.' in executive_summary(r)['facts']
+ report=export_markdown(r)
+ assert 'Continued once, in 2 visits.' in report
+ assert 'Recording part 1: /api/runs/r/artifacts/journey.webm' in report
+ assert 'Recording part 2: /api/runs/r/artifacts/journey-2.webm' in report
+ assert 'Browser trace part 1: /api/runs/r/artifacts/trace.zip' in report
+ assert 'Browser trace part 2: /api/runs/r/artifacts/trace-2.zip' in report
+ # A single-visit run keeps the old wording and says nothing about parts or continuations.
+ once=export_markdown(run_fixture(mission=r['mission'],coverage=r['coverage'],findings=[],video='/api/runs/r/artifacts/journey.webm'))
+ assert 'Recording: /api/runs/r/artifacts/journey.webm' in once and 'part' not in once.split('## Recordings')[1].split('##')[0]
+ assert 'visits' not in once
+
 def test_executive_summary_states_facts_and_marks_its_source():
  from engine.outcomes import executive_summary
  deterministic=executive_summary(run_fixture())

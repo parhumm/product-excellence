@@ -71,3 +71,28 @@ async def test_native_journey_resolves_dynamic_model_before_the_cli_call(monkeyp
     await runner_module.Runner().execute_android('run',run)
     assert run['status']=='completed' and calls==[('codex','gpt-5.6-luna','low')]  # the sentinel never reaches the CLI
     assert (run['ai_model'],run['ai_model_max'])==('dynamic','gpt-5.6-sol')
+
+
+async def test_native_journey_refuses_a_blocked_finish_before_any_tap(monkeypatch,tmp_path):
+    monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
+    async def write(kind,value):return value
+    monkeypatch.setattr(runner_module,'write',write)
+    class FakeDevice:
+        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.taps=[]
+        async def start(self):pass
+        async def launch(self,url):pass
+        async def observe(self,id):
+            (self.folder/(id+'.png')).write_bytes(b'png')
+            return {'id':id,'url':'android-app://dev.pex.app/Main','title':'App','lang':'en-US','dir':'ltr','text':'','viewport':{'width':1080,'height':2400,'density_dpi':420,'rotation':0},'controls':[{'id':'pex-1','tag':'android.view.View','role':'button','text':'','label':'','labeled':False,'box':{'x':220,'y':2127,'width':199,'height':210},'identity':'x'}],'metrics':{},'checks':{},'console_events':[],'screenshot':'','part':1}
+        async def act(self,action):self.taps.append(action['target'])
+        async def stop(self):pass
+    monkeypatch.setattr(runner_module.android,'Device',FakeDevice)
+    answers=[{'type':'finish','target':'','value':'','reason':'no actionable controls','outcome':'blocked'},{'type':'click','target':'pex-1','value':'','reason':'search tab'},{'type':'finish','target':'','value':'','reason':'done','outcome':'success'}]
+    prompts=[]
+    async def call(provider,prompt,schema,image=None,timeout=100,model='',effort='low',codex_account=''):
+        prompts.append(prompt);return answers.pop(0),runner_module.ai.usage_record(provider,model,model,effort)
+    monkeypatch.setattr(runner_module.ai,'call',call)
+    run=native_run(tmp_path);run['mission'].update(mode='journey',provider='codex',max_steps=5,ai_budget=5)
+    await runner_module.Runner().execute_android('run',run)
+    assert [a['status'] for a in run['actions']]==['failed','executed','executed'] and run['mission_outcome']=='success'
+    assert 'Refused: no control has been tried yet' in prompts[1]  # the second prompt carries the refusal as action history

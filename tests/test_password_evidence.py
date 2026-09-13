@@ -89,7 +89,7 @@ def test_runner_scrubs_observations_before_prompts_and_persistence(tmp_path, mon
         prompts.append(prompt)
         return {'findings': []}, runtime.ai.usage_record(provider, '', '', 'low')
 
-    page = SimpleNamespace(url='https://example.com', video=None, set_default_timeout=Mock(),
+    page = SimpleNamespace(url='https://example.com', video=None, set_default_timeout=Mock(), set_default_navigation_timeout=Mock(),
         on=lambda name, handler: handlers.update({name: handler}), goto=goto,
         wait_for_load_state=AsyncMock(), wait_for_timeout=AsyncMock(), evaluate=evaluate,
         screenshot=screenshot, content=AsyncMock(return_value='<p>'+secret+'</p>'), locator=Mock())

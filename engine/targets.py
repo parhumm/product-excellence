@@ -69,7 +69,7 @@ def resolve_mission(value, *, session=None):
     if target['type']=='web':
         raw['url']=raw.get('url') or target['url'];raw['allowed_domains']=raw.get('allowed_domains') or target.get('allowed_domains',[])
         host=urlsplit(raw['url']).hostname or ''
-        allowed=set(target.get('allowed_domains',[]))
+        allowed=set(target.get('allowed_domains',[]))|{(urlsplit(target['url']).hostname or '').lower()}
         if host.lower() not in allowed or not set(raw['allowed_domains'])<=allowed:raise ValueError('Mission URL and domains must stay within the target')
     else:
         raw['allowed_domains']=target.get('allowed_domains',[])

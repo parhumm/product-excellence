@@ -58,3 +58,12 @@ def test_apk_metadata_and_split_rejection(monkeypatch,tmp_path):
     assert metadata['package']=='dev.app' and metadata['abis']==[] and metadata['size']==3
     Result.stdout="package: name='dev.app' versionCode='7' versionName='1.7' split='config.arm64'\nlaunchable-activity: name='dev.app.Main'\n"
     with pytest.raises(ValueError,match='Split'):targets.inspect_apk(apk)
+
+def test_default_web_target_allows_its_own_host_without_project_domains(records):
+    with store.Session.begin() as s:
+        project=store.save('project',{'id':'site','name':'Site','url':'https://example.org','allowed_domains':[]},session=s)
+        targets.default_web(project,s)
+    mission={'project_id':'site','target_id':'web-site','name':'Audit','goal':'Audit the site','url':'','mode':'audit','provider':'none','pillars':['functionality']}
+    resolved=targets.resolve_mission(mission)
+    assert resolved['url']=='https://example.org' and resolved['platform']=='web'
+    with pytest.raises(ValueError):targets.resolve_mission({**mission,'url':'https://other.example'})

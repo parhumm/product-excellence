@@ -33,7 +33,9 @@ def seed():
     # Workspaces on this machine are seeded here; a shared one is seeded by the team server that created it.
     projects=store.all_records('project',local=True)
     if not projects and not hub.CONFIG.get('logins'):
-        projects=[store.save('project',{'id':'default','name':'Example','url':'https://example.com','allowed_domains':['example.com','www.example.com']},local=True)]
+        with store.Session.begin() as session:
+            projects=[store.save('project',{'id':'default','name':'Example','url':'https://example.com','allowed_domains':['example.com','www.example.com']},session=session,local=True)]
+            targets.default_web(projects[0],session)
     for p in projects:presets.seed_project(p)
 
 async def schedule_once():

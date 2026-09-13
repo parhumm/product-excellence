@@ -97,7 +97,7 @@ class Device:
         self.warnings=[];self.events=[];self.measurements={};self.videos=[];self.logs=[];self.network_before={};self.display=(1080,2400)
         package=app.get('package','')
         if not PACKAGE.fullmatch(package):raise AndroidError('Invalid Android package')
-        if not self.avd or self.avd!=os.environ.get('PEX_ANDROID_AVD',self.avd):raise AndroidError('Choose the designated disposable AVD')
+        if not self.avd or self.avd!=os.environ.get('PEX_ANDROID_AVD',''):raise AndroidError('Choose the designated disposable AVD')
 
     async def adb_call(self,*args,**kw):
         if not self.serial:raise AndroidError('Device is not ready')

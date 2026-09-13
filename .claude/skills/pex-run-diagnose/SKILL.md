@@ -58,6 +58,14 @@ curl -s -X PUT -H 'X-PEX-Request: 1' -H 'Content-Type: application/json' \
 
 Send `X-PEX-Revision` with the value of `_revision` when the run record has one.
 
+When the cause is an exhausted AI-call or step budget, continuing costs less than
+a replay: the run keeps its evidence and carries on from the page it stopped on,
+under the same run id. Ask first, as for any run.
+
+```bash
+.venv/bin/python scripts/cli.py continue <run id> --ai-calls 20 --wait
+```
+
 To re-test the same conditions instead of a changed mission, replay:
 
 ```bash

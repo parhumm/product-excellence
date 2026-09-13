@@ -221,6 +221,52 @@ def test_replay_error_does_not_fail_finished_parent(client):
     assert saved['status']=='completed' and 'persona' in saved['automatic_replay_error']
     assert client.post('/api/runs/'+r['id']+'/replay').status_code==422
 
+def stopped_run(client,**kw):
+    """A journey that ran out of budget: evidence recorded, goal not reached."""
+    m=mission(client,**{'mode':'journey','provider':'codex','ai_budget':20,'max_steps':20,**kw})
+    return store.save('run',{'mission':m,'mission_id':m['id'],'status':'blocked','mission_outcome':'budget_stop',
+                             'error':'Mission did not reach success: budget_stop','evaluation_error':'AI budget ended before pillar evaluation',
+                             'ai_calls':20,'observations':[{'id':'step-019','url':'https://example.com/last'}],
+                             'actions':[{'step':19,'status':'executed'}],'events':[],'findings':[]})
+
+def test_continue_adds_budget_and_keeps_the_same_run(client):
+    r=stopped_run(client)
+    answer=client.post('/api/runs/'+r['id']+'/continue',json={'ai_calls':20,'steps':10})
+    assert answer.status_code==200,answer.text
+    queued=answer.json()
+    assert queued['id']==r['id'] and queued['status']=='queued' and queued['continuations']==1
+    assert queued['mission']['ai_budget']==40 and queued['mission']['max_steps']==30
+    # The earlier evidence and its AI usage stay; the stale verdict does not.
+    assert queued['ai_calls']==20 and len(queued['observations'])==1
+    assert 'evaluation_error' not in queued and not queued['error'] and 'finished_at' not in queued
+    assert queued['events'][-1]['message']=='Continuing at action 21: AI budget now 40, step limit now 30'
+
+def test_continue_repeats_the_mission_budget_when_no_amount_is_given(client):
+    r=stopped_run(client)
+    queued=client.post('/api/runs/'+r['id']+'/continue',json={}).json()
+    assert queued['mission']['ai_budget']==40 and queued['mission']['max_steps']==40
+
+def test_continue_stops_at_the_highest_limits_a_mission_allows(client):
+    r=stopped_run(client)
+    r['mission'].update(ai_budget=60,max_steps=40);store.save('run',r)
+    answer=client.post('/api/runs/'+r['id']+'/continue',json={'ai_calls':10,'steps':10})
+    assert answer.status_code==422 and 'highest limits' in answer.json()['detail']
+
+@pytest.mark.parametrize('change,code,reason',[
+    ({'status':'running'},409,'Wait'),
+    ({'observations':[]},422,'nothing to continue'),
+    ({'status':'completed','mission_outcome':'success'},200,'')])
+def test_continue_refuses_what_it_cannot_resume(client,change,code,reason):
+    r=stopped_run(client);r.update(change);store.save('run',r)
+    answer=client.post('/api/runs/'+r['id']+'/continue',json={'ai_calls':5})
+    assert answer.status_code==code,answer.text
+    if reason:assert reason in answer.json()['detail']
+
+def test_continue_refuses_a_benchmark(client):
+    r=stopped_run(client,mode='benchmark',competitors=['https://rival.example'])
+    answer=client.post('/api/runs/'+r['id']+'/continue',json={'ai_calls':5})
+    assert answer.status_code==422 and 'benchmark' in answer.json()['detail']
+
 def test_invalid_project_edit_leaves_mission_and_history_unchanged(client):
     m=mission(client)
     assert client.put('/api/missions/'+m['id'],json={**m,'project_id':'missing'}).status_code==404

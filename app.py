@@ -8,7 +8,7 @@ from fastapi import FastAPI,HTTPException,Request,UploadFile,File,Header
 from fastapi.responses import HTMLResponse,FileResponse,Response,JSONResponse
 from fastapi.staticfiles import StaticFiles
 from engine import store,ai,netem,presets,pricing,hub,views,suggest
-from engine.contracts import Mission,GoalRequest,RunRequest,NetworkProfile,Egress,Schedule,Project
+from engine.contracts import Mission,GoalRequest,RunRequest,ContinueRequest,NetworkProfile,Egress,Schedule,Project
 from engine.runner import runner
 from engine.evaluate import finding_identity
 from engine.outcomes import gate,scores,executive_summary,sync_findings
@@ -209,6 +209,12 @@ async def replay(id:str):
     if original['status'] in ('queued','running'):raise HTTPException(409,'Wait for the original run to finish')
     try:return await runner.submit(original['mission'],original.get('baseline_id',''),id,network_snapshot=original.get('network_snapshot'))
     except ValueError as e:raise HTTPException(429 if 'Queue' in str(e) else 422,str(e))
+@app.post('/api/runs/{id}/continue')
+async def continue_run(id:str,req:ContinueRequest):
+    r=await hub.io(required,'run',id)
+    # Zero means "as much again as the mission asked for", so one click is enough.
+    try:return await runner.resume(id,req.ai_calls or r['mission']['ai_budget'],req.steps or r['mission']['max_steps'])
+    except ValueError as e:raise HTTPException(429 if 'Queue' in str(e) else 409 if str(e).startswith('Wait') else 422,str(e))
 @app.get('/api/compare')
 def compare(baseline:str,candidate:str):
     a=required('run',baseline);b=required('run',candidate)

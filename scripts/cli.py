@@ -7,6 +7,9 @@ sp=p.add_subparsers(dest='command',required=True)
 sp.add_parser('health');sp.add_parser('missions')
 sp.add_parser('models',help='List selectable AI models with their estimated prices')
 r=sp.add_parser('run');r.add_argument('mission_id');r.add_argument('--wait',action='store_true');r.add_argument('--network')
+k=sp.add_parser('continue',help='Carry on a finished run from the page it stopped on')
+k.add_argument('run_id');k.add_argument('--ai-calls',type=int,default=0,help='Extra AI calls; 0 repeats the mission budget')
+k.add_argument('--steps',type=int,default=0,help='Extra steps; 0 repeats the mission limit');k.add_argument('--wait',action='store_true')
 i=sp.add_parser('import');i.add_argument('file')
 e=sp.add_parser('export');e.add_argument('run_id');e.add_argument('--format',choices=['json','md'],default='md')
 f=sp.add_parser('findings',help='Print findings as JSON');f.add_argument('--project',default='');f.add_argument('--run');f.add_argument('--grouped',action='store_true',help='One row per issue instead of one per run')
@@ -58,6 +61,11 @@ elif args.command=='export':r=c.get(f'/runs/{args.run_id}/export',params={'forma
 elif args.command=='findings':
  r=c.get('/findings',params={'project':args.project,'grouped':args.grouped});r.raise_for_status()
  print(json.dumps([f for f in r.json() if not args.run or f.get('run_id')==args.run],indent=2));sys.exit(0)
+elif args.command=='continue':
+ r=c.post(f'/runs/{args.run_id}/continue',json={'ai_calls':args.ai_calls,'steps':args.steps});r.raise_for_status()
+ if args.wait:
+  while r.json()['status'] in ('queued','running'):
+   time.sleep(3);r=c.get('/runs/'+args.run_id);r.raise_for_status()
 elif args.command=='compare':r=c.get('/compare',params={'baseline':args.baseline,'candidate':args.candidate})
 elif args.command=='review':
  # The team server rejects a blind write: send back the revision the run carried when we read it.
@@ -72,6 +80,6 @@ else:
    time.sleep(3);r=c.get('/runs/'+id);r.raise_for_status()
 r.raise_for_status()
 print(r.text)
-if args.command=='run' and args.wait:
+if args.command in ('run','continue') and args.wait:
  run=r.json();print(usage_report(run))
  sys.exit(2 if run['status']!='completed' or run.get('gate')=='block' else 1 if run.get('gate')=='warn' else 0)

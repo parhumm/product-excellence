@@ -13,7 +13,7 @@ engine itself broke.
 | Payment or destructive control | an action with `status: policy_blocked` and "Payment, publication or destructive control blocked" | working as designed; end the goal before that step and report where it stopped |
 | Off-domain navigation | refusal "Navigation to HOST refused; allowed hosts: ..." | add the host to `allowed_domains` only if the workspace owns it; a competitor belongs in `competitors` on a benchmark |
 | Mutating request blocked | `blocked_request_log` entries with "Mutating method blocked", `policy_blocked_requests` above zero, `coverage_note` set | expected on forms; the flow is incomplete, say which part |
-| AI-call budget | `error` "AI-call budget exhausted" | raise `ai_budget`, or narrow the goal to one task |
+| AI-call budget | `error` "AI-call budget exhausted" | continue the run with `cli.py continue <run id> --ai-calls N --wait`, or narrow the goal to one task |
 | Time budget | `error` "Time budget exhausted" or "Wall-clock time budget exhausted" | raise `max_seconds`, or use a faster network profile |
 | Site refused the visit | `error` "Target returned HTTP ..." | an access or regional restriction; try another egress route or check the URL |
 | Page never loaded | `error` "Target could not be loaded under this network/route", `navigation_error` set | test on `baseline` first, then the impaired profile |
@@ -40,7 +40,8 @@ engine itself broke.
 ## Completed but thin
 
 - `evaluation_error` "AI budget ended before pillar evaluation": findings exist
-  but pillar scores are missing. Raise `ai_budget` and run again.
+  but pillar scores are missing. Continue the run to finish the review without
+  repeating the journey; it does not walk the site again.
 - `coverage_note` set: some flows were incomplete because mutating requests were
   blocked. The scores stand, the coverage does not.
 - A benchmark where one entry in `sites` has an `outcome` other than success:

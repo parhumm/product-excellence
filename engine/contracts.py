@@ -87,10 +87,17 @@ class GoalRequest(BaseModel):
     @field_validator('codex_account')
     @classmethod
     def account_alias(cls,v):return Mission.account_alias(v)
+def ceiling(field):
+    """The highest value a mission may hold for this field, so callers need not repeat the number."""
+    return next(c.le for c in Mission.model_fields[field].metadata if hasattr(c,'le'))
 class RunRequest(BaseModel):
     mission_id: str
     network: str | None = None
     baseline_id: str = ''
+class ContinueRequest(BaseModel):
+    """How much more work a finished run may do. Zero means the same amount its mission asked for."""
+    ai_calls: int = Field(default=0, ge=0, le=60)
+    steps: int = Field(default=0, ge=0, le=40)
 class NetworkProfile(BaseModel):
     name: str = Field(min_length=1,max_length=100)
     latency_ms: int = Field(default=0,ge=0,le=5000)

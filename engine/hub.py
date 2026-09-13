@@ -8,7 +8,8 @@ import httpx
 ROUTED={'project','mission','mission_version','run','schedule'}
 TERMINAL={'completed','blocked','failed','cancelled','interrupted'}
 # Playwright traces are large and only replayable next to the browser that wrote them.
-LOCAL_ONLY={'trace.zip'}
+# A continued run writes one per visit: trace.zip, trace-2.zip, and so on.
+local_only=lambda name:name=='trace.zip' or re.fullmatch(r'trace-\d+\.zip',name) is not None
 CONFIG={}
 WORKSPACE=ContextVar("workspace",default="")
 # A list while the browser is reading a page: that read may fall back to the last copy
@@ -209,7 +210,7 @@ def shareable(run):
     """The copy a server receives: links to evidence that never leaves this machine are dropped."""
     prefix=f'/api/runs/{run["id"]}/artifacts/'
     def strip(v):
-        if isinstance(v,dict):return {k:strip(x) for k,x in v.items() if not (isinstance(x,str) and x.startswith(prefix) and x[len(prefix):] in LOCAL_ONLY)}
+        if isinstance(v,dict):return {k:strip(x) for k,x in v.items() if not (isinstance(x,str) and x.startswith(prefix) and local_only(x[len(prefix):]))}
         if isinstance(v,list):return [strip(x) for x in v]
         return v
     return strip(run)
@@ -217,7 +218,7 @@ def shareable(run):
 def evidence_names(run,folder):
     """Every file a finished run ships: the ones it links plus the rest of its folder, minus local-only evidence."""
     names=artifact_names(run)|{p.name for p in folder.glob('*') if p.is_file() and not p.name.startswith('.') and p.name!='run.json'}
-    return names-LOCAL_ONLY
+    return {n for n in names if not local_only(n)}
 
 def put_artifact(run_id,path,workspace,expected=None):
     with path.open('rb') as f:
@@ -265,7 +266,7 @@ def _publish(run):
     item={'url':CONFIG['url'],'workspace':ws,'run':r}
     atomic(path,item)
     manifest=r.setdefault('_artifacts',{})
-    for name in LOCAL_ONLY:manifest.pop(name,None)  # a snapshot written before this rule must not ask the server for it
+    for name in [n for n in manifest if local_only(n)]:manifest.pop(name,None)  # a snapshot written before this rule must not ask the server for it
     names=evidence_names(r,store.ARTIFACTS/r['id']) if r['status'] in TERMINAL else artifact_names(r)
     for name in names:
         p=file_path(store.ARTIFACTS,r['id'],name)

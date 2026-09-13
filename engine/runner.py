@@ -10,7 +10,7 @@ from . import ai,netem,pricing,hub,store
 from .pricing import tokens as count
 from .evaluate import evaluate,fingerprint,compare_runs,finding_identity
 from .outcomes import coverage,gate,scores,executive_summary,sync_findings
-from .contracts import Mission
+from .contracts import Mission,ceiling
 from .prompts import (OUTCOME_RULE,compact_json,evidence_json,prompt_note,prompt_observation,prompt_observations,
                       prompt_actions,prompt_findings,prompt_finding)
 
@@ -180,6 +180,29 @@ class Runner:
             r=await read('run',id)
             if r and hub.shared(store.workspace_of('run',r)):await hub.io(hub.transition,r,'cancel')
             elif r and r['status']=='queued':r.update(status='cancelled',finished_at=now());await write('run',r)
+    async def resume(self,id,ai_calls,steps):
+        """Queue a finished run again so it carries on from its last page instead of starting over."""
+        r=await read('run',id)
+        if not r:raise ValueError('Run does not exist')
+        if r['status'] in ('queued','running'):raise ValueError('Wait for this run to finish before continuing it')
+        if hub.shared(store.workspace_of('run',r)):raise ValueError('Continue a run on the machine that recorded it; a shared run can only be replayed')
+        if r['mission']['mode']=='benchmark':raise ValueError('A benchmark visits several sites in order and cannot be continued; replay it instead')
+        if not r['observations']:raise ValueError('This run captured no page, so there is nothing to continue from; replay it instead')
+        if self.queue.qsize()>=20:raise ValueError('Queue is full; wait for current runs')
+        # A mission holds a highest allowed budget; a continuation raises the totals up to it, never past it.
+        budget=min(r['mission']['ai_budget']+ai_calls,ceiling('ai_budget'));allowed=min(r['mission']['max_steps']+steps,ceiling('max_steps'))
+        if budget==r['mission']['ai_budget'] and allowed==r['mission']['max_steps']:
+            raise ValueError(f"This run already holds the highest limits a mission allows: {ceiling('ai_budget')} AI calls and {ceiling('max_steps')} steps. Narrow the goal and replay instead.")
+        ai_calls=budget-r['mission']['ai_budget'];steps=allowed-r['mission']['max_steps']
+        r['mission']['ai_budget']=budget;r['mission']['max_steps']=allowed
+        r['continuations']=r.get('continuations',0)+1
+        r.update(status='queued',gate='not_evaluated',error='')
+        for key in ('finished_at','evaluation_error','ai_evaluation_completed','replay_result','coverage_note','automatic_replay_id','automatic_replay_error','publication_error','navigation_error'):r.pop(key,None)
+        # Actions are numbered from one in the timeline, so name the action this visit will plan first.
+        resume_at=(r['actions'][-1]['step']+2) if r['actions'] else 1
+        r['events'].append({'at':now(),'kind':'info','message':f'Continuing at action {resume_at}: AI budget now {budget}, step limit now {allowed}'})
+        await write('run',r)
+        self.owned.add(id);await self.queue.put(id);return r
     async def loop(self):
         while True:
             id=await self.queue.get()
@@ -216,9 +239,18 @@ class Runner:
         if hub.shared(store.workspace_of('run',r)):r=await hub.io(hub.transition,r,'start')
         self.snapshots[id]=r
         m=r['mission'];folder=ARTIFACTS/id;folder.mkdir(exist_ok=True)
-        r.update(status='running',started_at=now(),prompt_version='2026-09-06.7',network_applied=None)
-        start=time.monotonic();context=None;browser=None;pw=None;last_image_hash=None;remote=False;disconnect_task=None;http_cursor=0;console_cursor=0;blocked_cursor=0;finalizing=False
+        # A continued run keeps the evidence it already has and adds to it.
+        resuming=bool(r.get('continuations')) and bool(r['observations'])
+        elapsed_before=r.get('duration_seconds',0) if resuming else 0
+        part=r.get('continuations',0)+1
+        r.update(status='running',prompt_version='2026-09-06.7',network_applied=None)
+        r['resumed_at' if resuming else 'started_at']=now()
+        start=time.monotonic();context=None;browser=None;pw=None;last_image_hash=None;remote=False;disconnect_task=None;finalizing=False
+        # Events recorded before this continuation already belong to their own observation.
+        http_cursor=len(r['http']);console_cursor=len(r['console']);blocked_cursor=len(r.get('blocked_request_log',[]))
         rejections=0;raw_controls=[];observation_hosts={}
+        session=DATA/'secrets'/f'run-{id}.json'
+        recorded_before={p.name for p in (folder/'video').glob('*.webm')}
         # The password stays out of the run record and every prompt; only the fill uses it.
         secret=DATA/'secrets'/f"{r.get('mission_id') or ''}.json"
         sign_in_password=json.loads(secret.read_text()).get('password','') if m.get('login_identifier') and secret.exists() else ''
@@ -314,6 +346,8 @@ class Runner:
                 persona=DATA/'personas'/f"{m['persona_id']}.json"
                 if not persona.exists():raise StopRun('Persona session is missing')
                 options['storage_state']=str(persona)
+            # Cookies and storage the journey earned before the budget ended, so it continues signed in.
+            if resuming and session.exists():options['storage_state']=str(session)
             context=await browser.new_context(**options)
             await context.tracing.start(screenshots=True,snapshots=True,sources=False)
             await context.add_init_script(path=str(ROOT/'engine/collect.js'))
@@ -371,10 +405,13 @@ class Runner:
                         await event('Scheduled temporary disconnect')
                         await asyncio.sleep(profile['disconnect_seconds']);await context.set_offline(False)
                 disconnect_task=asyncio.create_task(disconnect_loop())
-            await event('Opening '+m['url'])
+            opening=r['observations'][-1]['url'] if resuming else m['url']
+            await event(('Continuing on ' if resuming else 'Opening ')+opening)
             try:
-                resp=await page.goto(m['url'],wait_until='domcontentloaded')
-                r['initial_status']=resp.status if resp else None
+                resp=await page.goto(opening,wait_until='domcontentloaded')
+                # The opening measurements describe the mission URL; a continuation keeps the originals.
+                if resuming:resp=None
+                else:r['initial_status']=resp.status if resp else None
                 if resp:
                     html=await resp.text();r['initial_html_summary']={'length':len(html),'has_title':'<title' in html.lower(),'has_h1':'<h1' in html.lower()}
                     # Raw HTML is local evidence, never served as active markup.
@@ -445,11 +482,17 @@ class Runner:
                         f.update(id=uuid.uuid4().hex,run_id=id,status='open',owner='');r['findings'].append(f);existing.add(f['fingerprint'])
                 await persist();return obs,image
             obs,image=await observe()
-            if r.get('initial_status',200) and r.get('initial_status',200)>=400:
-                raise StopRun(f"Target returned HTTP {r['initial_status']}. Evidence is saved; this may be an access or regional restriction.")
-            if r.get('navigation_error') and not obs.get('title'):raise StopRun('Target could not be loaded under this network/route. Inspect the saved evidence.')
-            if m['mode']!='audit':
-                await event('AI journey started using '+r['provider'])
+            if not resuming:
+                if r.get('initial_status',200) and r.get('initial_status',200)>=400:
+                    raise StopRun(f"Target returned HTTP {r['initial_status']}. Evidence is saved; this may be an access or regional restriction.")
+                if r.get('navigation_error') and not obs.get('title'):raise StopRun('Target could not be loaded under this network/route. Inspect the saved evidence.')
+            elif r.get('navigation_error'):raise StopRun('The page this run stopped on could not be reopened. Inspect the saved evidence, then replay.')
+            # A continuation that already reached its goal only needs the evidence review.
+            reviewing_only=resuming and r.get('mission_outcome') in ('success','audit_completed')
+            first_step=r['actions'][-1]['step']+1 if resuming and r['actions'] else 0
+            if resuming and not reviewing_only:r['mission_outcome']=None;r['success_basis']=''
+            if m['mode']!='audit' and not reviewing_only:
+                await event(('AI journey continued using ' if resuming else 'AI journey started using ')+r['provider'])
                 rejections=0
                 async def reject_action(action,reason):
                     nonlocal rejections
@@ -472,7 +515,7 @@ class Runner:
                         except Exception as e:await event('Could not open '+site+': '+hide(str(e))[:300],'warning')
                         obs,image=await observe()
                     try:
-                        for step in range(m['max_steps']):
+                        for step in range(first_step,m['max_steps']):
                             if time.monotonic()-start>m['max_seconds']:raise StopRun('Time budget exhausted')
                             if m.get('success_text') and m['success_text'] in obs['text']:
                                 r['mission_outcome']='success';r['success_basis']='Configured visible text matched';break
@@ -580,7 +623,7 @@ class Runner:
                     answered=[s for s in r['sites'] if s['outcome']=='success']
                     r['mission_outcome']='success' if answered else 'blocked'
                     r['success_basis']=str(len(answered))+' of '+str(len(r['sites']))+' sites answered the goal'
-            else:r['mission_outcome']='audit_completed'
+            elif not reviewing_only:r['mission_outcome']='audit_completed'
             if m.get('observe_seconds'):
                 await event('Observing playback and network behavior for '+str(m['observe_seconds'])+' seconds')
                 await page.wait_for_timeout(m['observe_seconds']*1000);obs,image=await observe()
@@ -648,24 +691,34 @@ class Runner:
         finally:
             if disconnect_task:
                 disconnect_task.cancel();await asyncio.gather(disconnect_task,return_exceptions=True)
+            # Each visit writes its own recording and trace; a continuation adds a part rather than overwriting one.
+            trace_name='trace.zip' if part==1 else f'trace-{part}.zip'
+            journey_name='journey.webm' if part==1 else f'journey-{part}.webm'
             if context:
                 video=page.video if 'page' in locals() else None
-                try:await asyncio.wait_for(context.tracing.stop(path=str(folder/'trace.zip')),20);r['trace']=f'/api/runs/{id}/artifacts/trace.zip'
+                # Cookies and storage so the next continuation reopens the page as this visit left it.
+                try:
+                    (DATA/'secrets').mkdir(exist_ok=True,mode=0o700)
+                    await asyncio.wait_for(context.storage_state(path=str(session)),20)
+                except Exception as e:r.setdefault('artifact_warnings',[]).append('Browser session was not saved; a continuation may start signed out: '+hide(str(e))[:150])
+                try:await asyncio.wait_for(context.tracing.stop(path=str(folder/trace_name)),20);r['trace']=f'/api/runs/{id}/artifacts/{trace_name}'
                 except Exception:pass
                 try:await asyncio.wait_for(context.close(),20)
                 except Exception:pass
                 if video and remote:
-                    try:await asyncio.wait_for(video.save_as(str(folder/'journey.webm')),45)
+                    try:await asyncio.wait_for(video.save_as(str(folder/journey_name)),45)
                     except Exception as e:r.setdefault('artifact_warnings',[]).append('Remote video transfer: '+hide(str(e))[:150])
             if browser:
                 try:await asyncio.wait_for(browser.close(),20)
                 except Exception:pass
             if not remote:
-                recordings=list((folder/'video').glob('*.webm'))
+                recordings=[p for p in (folder/'video').glob('*.webm') if p.name not in recorded_before] or list((folder/'video').glob('*.webm'))
                 if recordings:
-                    try:shutil.copyfile(max(recordings,key=lambda p:p.stat().st_size),folder/'journey.webm')
+                    try:shutil.copyfile(max(recordings,key=lambda p:p.stat().st_size),folder/journey_name)
                     except OSError as e:r.setdefault('artifact_warnings',[]).append('Video finalization: '+hide(str(e))[:150])
-            if (folder/'journey.webm').exists() and (folder/'journey.webm').stat().st_size>100:r['video']=f'/api/runs/{id}/artifacts/journey.webm'
+            parts=[f'journey.webm']+[f'journey-{n}.webm' for n in range(2,part+1)]
+            r['videos']=[f'/api/runs/{id}/artifacts/{n}' for n in parts if (folder/n).exists() and (folder/n).stat().st_size>100]
+            if r['videos']:r['video']=r['videos'][0]
             elif context:r.setdefault('artifact_warnings',[]).append('Video was not available; screenshots and trace are retained')
             if pw:
                 try:await asyncio.wait_for(pw.stop(),20)
@@ -675,7 +728,7 @@ class Runner:
             # A run that stopped early still shows which pillars were left unevaluated.
             if not r['coverage'] and r['observations']:r['coverage']=coverage(r)
             r['scores']=scores(r);r['executive_summary']=executive_summary(r)
-            r.update(finished_at=now(),duration_seconds=round(time.monotonic()-start,2));await persist()
+            r.update(finished_at=now(),duration_seconds=round(elapsed_before+time.monotonic()-start,2));await persist()
             (folder/'run.json').write_text(json.dumps(redact(r),ensure_ascii=False,indent=2))
 
 runner=Runner()

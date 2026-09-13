@@ -228,10 +228,13 @@ class Device:
             await self.shell('input','swipe',str(width//2),start,str(width//2),end,'400');return
         if not (await self.focused()).startswith(self.app['package']+'/'):raise AndroidError('Target app is not in the foreground; action refused')
         xml,root,_=await self._hierarchy();identity=self.controls.get(target)
-        matches=[]
+        matches=[];moved=[]
         for node in root.iter('node'):
             candidate=(self.app['package'],node.get('class',''),node.get('resource-id',''),node.get('content-desc',''),node.get('text',''),node.get('bounds',''))
             if candidate==identity:matches.append(node)
+            elif identity and candidate[:-1]==identity[:-1]:moved.append(node)
+        # Carousels and lists shift between observe and act; the same control at new bounds is still that control.
+        if not matches and len(moved)==1:matches=moved
         if len(matches)!=1:raise AndroidError('Control changed or is ambiguous; observe again')
         node=matches[0];box=parse_bounds(node.get('bounds'));x=(box[0]+box[2])//2;y=(box[1]+box[3])//2
         if node.get('password')=='true':raise AndroidError('Android password and OTP entry is not supported')

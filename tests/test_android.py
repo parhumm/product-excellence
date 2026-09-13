@@ -73,3 +73,26 @@ async def test_focused_app_is_read_from_the_full_window_dump(monkeypatch,tmp_pat
     device.serial='emulator-1'
     assert await device.focused()=='com.aparat.filimo/com.bluevod.app.features.vitrine.NewVitrineActivity'
     assert calls[0][-1]=='dumpsys window'
+
+@pytest.mark.asyncio
+async def test_tap_follows_a_control_whose_bounds_moved(monkeypatch,tmp_path):
+    """A carousel shifts between observe and act; the same control at new bounds is still tapped, two copies are not."""
+    calls=[]
+    async def fake(*args,**kw):
+        calls.append(args)
+        return 'dumpsys window' not in args[-1] and '' or 'mFocusedApp=ActivityRecord{1 u0 dev.pex.app/.Main t1}'
+    monkeypatch.setattr(android.targets,'tool',lambda name:Path('/bin/true'))
+    monkeypatch.setattr(android,'run',fake);monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run')
+    device.serial='emulator-1';device.display=(1080,2400)
+    device.controls={'pex-1':('dev.pex.app','android.widget.ImageView','dev.pex.app:id/poster','Poster','','[0,0][100,100]')}
+    node='<node class="android.widget.ImageView" resource-id="dev.pex.app:id/poster" content-desc="Poster" text="" bounds="%s"/>'
+    async def hierarchy():
+        xml='<hierarchy>'+node%'[200,0][300,100]'+'</hierarchy>';return xml,android.ElementTree.fromstring(xml),[]
+    device._hierarchy=hierarchy
+    await device.act({'type':'tap','target':'pex-1'})
+    assert calls[-1][-1]=='input tap 250 50'
+    async def hierarchy2():
+        xml='<hierarchy>'+node%'[200,0][300,100]'+node%'[400,0][500,100]'+'</hierarchy>';return xml,android.ElementTree.fromstring(xml),[]
+    device._hierarchy=hierarchy2
+    with pytest.raises(android.AndroidError,match='ambiguous'):await device.act({'type':'tap','target':'pex-1'})

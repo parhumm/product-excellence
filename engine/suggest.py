@@ -85,10 +85,11 @@ async def suggest(req, project):
     provider = provider or next((p for p in ('codex', 'claude') if health[p]['logged_in']), '')
     if not provider: raise ValueError('No AI worker is signed in. Open Settings to sign in Codex or Claude.')
     account = req.codex_account or project.get('codex_account') or 'default'
-    # Writing a goal is judgment work: the subscription's standard model, never the cheap or the frontier tier.
+    # The subscription's standard model, never the cheap or the frontier tier, but at low
+    # effort: two short goals do not need deliberation, and this button is waited on.
     model = pricing.LADDER[provider][1]
-    result, usage = await ai.call(provider, prompt(req, project), SCHEMA, timeout=120,
-                                  model=model, effort='medium', codex_account=account)
+    result, usage = await ai.call(provider, prompt(req, project), SCHEMA, timeout=60,
+                                  model=model, effort='low', codex_account=account)
     items = [clean(s, req.competitors) for s in (result.get('suggestions') or []) if s.get('goal')][:2]
     if not items: raise RuntimeError('The worker returned no usable goal')
     return {'suggestions': items, 'usage': usage}

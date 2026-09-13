@@ -364,8 +364,8 @@ def test_goal_suggestions_use_the_house_voice_and_the_standard_model(client,monk
     # A benchmark without competitor URLs cannot be saved, so it is offered as the journey it is.
     assert two[1]['mode']=='journey' and two[1]['caveat']=='needs competitor URLs'
     assert two[1]['pillars']==['cro'] and body['usage']['provider']=='codex'
-    # Judgment work runs on the subscription's standard model, never the cheap or the frontier tier.
-    assert seen['model']==pricing.LADDER['codex'][1] and seen['effort']=='medium'
+    # The subscription's standard model, at low effort so the form answers quickly.
+    assert seen['model']==pricing.LADDER['codex'][1] and seen['effort']=='low'
     assert seen['codex_account']=='default'
     # The prompt carries the user's words, the workspace facts and the shared goal voice.
     assert 'check if the pricing page explains renewal' in seen['prompt']

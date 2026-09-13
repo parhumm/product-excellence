@@ -86,7 +86,7 @@ async def test_tap_follows_a_control_whose_bounds_moved(monkeypatch,tmp_path):
     device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run')
     device.serial='emulator-1';device.display=(1080,2400)
     device.controls={'pex-1':('dev.pex.app','android.widget.ImageView','dev.pex.app:id/poster','Poster','','[0,0][100,100]')}
-    node='<node class="android.widget.ImageView" resource-id="dev.pex.app:id/poster" content-desc="Poster" text="" bounds="%s"/>'
+    node='<node class="android.widget.ImageView" clickable="true" resource-id="dev.pex.app:id/poster" content-desc="Poster" text="" bounds="%s"/>'
     async def hierarchy():
         xml='<hierarchy>'+node%'[200,0][300,100]'+'</hierarchy>';return xml,android.ElementTree.fromstring(xml),[]
     device._hierarchy=hierarchy
@@ -96,3 +96,21 @@ async def test_tap_follows_a_control_whose_bounds_moved(monkeypatch,tmp_path):
         xml='<hierarchy>'+node%'[200,0][300,100]'+node%'[400,0][500,100]'+'</hierarchy>';return xml,android.ElementTree.fromstring(xml),[]
     device._hierarchy=hierarchy2
     with pytest.raises(android.AndroidError,match='ambiguous'):await device.act({'type':'tap','target':'pex-1'})
+
+
+async def test_tap_ignores_the_unclickable_child_that_shares_the_bounds(monkeypatch,tmp_path):
+    """Compose wraps a clickable node around a child with identical bounds; only the clickable one counts as a match."""
+    calls=[]
+    async def fake(*args,**kw):
+        calls.append(args)
+        return 'dumpsys window' not in args[-1] and '' or 'mFocusedApp=ActivityRecord{1 u0 dev.pex.app/.Main t1}'
+    monkeypatch.setattr(android.targets,'tool',lambda name:Path('/bin/true'))
+    monkeypatch.setattr(android,'run',fake);monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run')
+    device.serial='emulator-1';device.display=(1080,2400)
+    device.controls={'pex-1':('dev.pex.app','android.view.View','','','','[220,2127][419,2337]')}
+    xml='<hierarchy><node class="android.view.View" clickable="true" enabled="true" text="" content-desc="" resource-id="" bounds="[220,2127][419,2337]"><node class="android.view.View" clickable="false" enabled="true" text="" content-desc="" resource-id="" bounds="[220,2127][419,2337]"/></node></hierarchy>'
+    async def hierarchy():return xml,android.ElementTree.fromstring(xml),[]
+    device._hierarchy=hierarchy
+    await device.act({'type':'tap','target':'pex-1'})
+    assert calls[-1][-1]=='input tap 319 2232'

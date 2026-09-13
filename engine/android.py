@@ -230,6 +230,8 @@ class Device:
         xml,root,_=await self._hierarchy();identity=self.controls.get(target)
         matches=[];moved=[]
         for node in root.iter('node'):
+            # Compose wraps a clickable node around a decorative child with identical bounds; observe() listed only the clickable one.
+            if not (node.get('clickable')=='true' or node.get('class')=='android.widget.EditText'):continue
             candidate=(self.app['package'],node.get('class',''),node.get('resource-id',''),node.get('content-desc',''),node.get('text',''),node.get('bounds',''))
             if candidate==identity:matches.append(node)
             elif identity and candidate[:-1]==identity[:-1]:moved.append(node)

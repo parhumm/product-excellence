@@ -138,6 +138,8 @@ class Device:
         if self.app.get('abis') and abi not in self.app['abis']:raise AndroidError(f'APK ABIs {self.app["abis"]} do not include device {abi}')
         renderer=await self.shell('getprop','ro.hardware.egl',check=False)
         self.measurements.update(api=api,abi=abi,renderer=renderer or 'auto',avd=self.avd)
+        # Android's one-time "swipe down to exit full screen" hint is a system window the app cannot dismiss; confirm it up front.
+        await self.shell('settings','put','secure','immersive_mode_confirmations','confirmed',check=False)
         self.log_process=await asyncio.create_subprocess_exec(str(self.adb),'-s',self.serial,'logcat','-v','threadtime',stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.DEVNULL)
         self.log_task=asyncio.create_task(self._read_logs())
         apk=store.DATA/'apps'/(self.app['sha256']+'.apk')

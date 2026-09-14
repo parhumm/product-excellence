@@ -53,8 +53,12 @@ PLAY_STATES={'0':'none','1':'stopped','2':'paused','3':'playing','6':'buffering'
              'NONE':'none','STOPPED':'stopped','PAUSED':'paused','PLAYING':'playing','BUFFERING':'buffering','ERROR':'error'}
 SESSION_STATE=re.compile(r'PlaybackState\s*\{([^}]*)\}')
 # Sections that follow the active list. Everything after them is history or configuration, never posted now.
-AFTER_ACTIVE=('Historical Notifications','Notification Statistics','Ranking Config','Zen Mode','Lights')
-RECORD_TEXT=re.compile(r'android\.(?:title|text|bigText|subText|summaryText)=\w*\s*\(([^)\n]*)\)')
+# They are headings, so they are anchored: a record's own fields carry 'mLights=false', and a bare
+# substring search cut the list at the very first record.
+AFTER_ACTIVE=re.compile(r'^\s{0,4}(?:Historical Notifications|Notification Statistics|Ranking Config|Zen Mode|Lights)\b',re.M)
+# The value runs to the end of its line: a film title carries its own brackets, as in
+# 'android.text=String ( x (240p) به گالری آفلاین اضافه شد)', so the first ')' is not the end.
+RECORD_TEXT=re.compile(r'android\.(?:title|text|bigText|subText|summaryText)=\w*\s*\((.*)\)\s*$',re.M)
 
 def parse_media(dump,package):
     """The package's own MediaSession sample, or None when the dump names no session for it."""
@@ -76,9 +80,8 @@ def parse_notifications(dump):
     """Only what is posted right now: the active list, cut before history and statistics."""
     start=dump.find('Notification List:')
     body=dump[start:] if start>=0 else dump
-    for marker in AFTER_ACTIVE:
-        cut=body.find(marker)
-        if cut>0:body=body[:cut]
+    cut=AFTER_ACTIVE.search(body)
+    if cut and cut.start()>0:body=body[:cut.start()]
     posted=[]
     for record in body.split('NotificationRecord(')[1:]:
         package=re.search(r'pkg=(\S+)',record);key=re.search(r'key=(\S+?)[:\s)]',record)
@@ -562,9 +565,15 @@ class Device:
         raise AndroidError('A screen recording for this run is still running; not pausing for input yet')
 
     async def _hierarchy(self):
-        await self.shell('uiautomator','dump','/data/local/tmp/pex-window.xml',timeout=10)
-        raw=await self.adb_call('exec-out','cat','/data/local/tmp/pex-window.xml',timeout=10)
-        return sanitize_xml(raw)
+        # uiautomator writes a good dump and still exits non-zero while a screen animates, and a
+        # half-written file parses as nothing, so trust the XML rather than the exit code, and retry once.
+        for attempt in (0,1):
+            await self.shell('uiautomator','dump','/data/local/tmp/pex-window.xml',timeout=20,check=False)
+            raw=await self.adb_call('exec-out','cat','/data/local/tmp/pex-window.xml',timeout=10,check=False)
+            try:return sanitize_xml(raw)
+            except ElementTree.ParseError as error:
+                if attempt:raise AndroidError('The device did not produce a readable window dump: '+raw.strip()[:200]) from error
+                await asyncio.sleep(1)
 
     async def observe(self,id):
         xml,root,sensitive=await self._hierarchy();size=await self.shell('wm','size');density=await self.shell('wm','density')
@@ -603,6 +612,15 @@ class Device:
         found=re.search(r'm(?:FocusedApp|CurrentFocus)=\S+ u\d+ ([A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)',dump)
         return found[1] if found else ''
 
+    async def type_focused(self,value):
+        """Type an operator-supplied value (a mobile number, an SMS code) into the focused text field.
+        The password refusal in act() is for AI-chosen values; a person answering a pause is the point here."""
+        _,root,_=await self._hierarchy()
+        fields=[n for n in root.iter('node') if n.get('class')=='android.widget.EditText']
+        focused=[n for n in fields if n.get('focused')=='true'] or (fields if len(fields)==1 else [])
+        if len(focused)!=1:raise AndroidError('No text field is focused on the device')
+        box=parse_bounds(focused[0].get('bounds'));x=(box[0]+box[2])//2;y=(box[1]+box[3])//2
+        await self.shell('input','tap',str(x),str(y));await self.shell('input','keycombination','KEYCODE_CTRL_LEFT','KEYCODE_A');await self.shell('input','text',value.replace(' ','%s'))
     async def act(self,action):
         kind=action.get('type');target=action.get('target') or ''
         if kind in ('wait',):await asyncio.sleep(2);return
@@ -621,7 +639,12 @@ class Device:
             if candidate==identity:matches.append(node)
             elif identity and candidate[:-1]==identity[:-1]:moved.append(node)
         # Carousels and lists shift between observe and act; the same control at new bounds is still that control.
-        if not matches and len(moved)==1:matches=moved
+        # A row of icon-only buttons is identical once bounds are dropped, so take the nearest of several
+        # only when it is clearly the nearest: within a third of the distance to the runner-up.
+        if not matches and moved and parse_bounds(identity[-1]):
+            want=parse_bounds(identity[-1]);wx,wy=(want[0]+want[2])//2,(want[1]+want[3])//2
+            near=sorted((((lambda b:((b[0]+b[2])//2-wx)**2+((b[1]+b[3])//2-wy)**2)(parse_bounds(node.get('bounds')) or want)),index,node) for index,node in enumerate(moved))
+            if len(near)==1 or near[0][0]*9<=near[1][0]:matches=[near[0][2]]
         if len(matches)!=1:raise AndroidError('Control changed or is ambiguous; observe again')
         node=matches[0];box=parse_bounds(node.get('bounds'));x=(box[0]+box[2])//2;y=(box[1]+box[3])//2
         if node.get('password')=='true':raise AndroidError('Android password and OTP entry is not supported')

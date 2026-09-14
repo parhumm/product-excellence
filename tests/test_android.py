@@ -99,6 +99,27 @@ async def test_tap_follows_a_control_whose_bounds_moved(monkeypatch,tmp_path):
     device._hierarchy=hierarchy2
     with pytest.raises(android.AndroidError,match='ambiguous'):await device.act({'type':'tap','target':'pex-1'})
 
+@pytest.mark.asyncio
+async def test_tap_picks_the_near_twin_when_a_row_of_identical_icons_shifts(monkeypatch,tmp_path):
+    """Filimo's detail page puts four icon-only buttons in a row; when the page shifts they differ only by bounds,
+    and the one a few pixels from where it was observed is the one that was observed."""
+    calls=[]
+    async def fake(*args,**kw):
+        calls.append(args)
+        return 'dumpsys window' not in args[-1] and '' or 'mFocusedApp=ActivityRecord{1 u0 dev.pex.app/.Main t1}'
+    monkeypatch.setattr(android.targets,'tool',lambda name:Path('/bin/true'))
+    monkeypatch.setattr(android,'run',fake);monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run')
+    device.serial='emulator-1';device.display=(1080,2400)
+    device.controls={'pex-5':('dev.pex.app','android.widget.Button','','','','[42,1596][267,1722]')}
+    node='<node class="android.widget.Button" clickable="true" resource-id="" content-desc="" text="" bounds="%s"/>'
+    async def hierarchy():
+        xml='<hierarchy>'+''.join(node%f'[{x},1640][{x+225},1766]' for x in (42,299,556,813))+'</hierarchy>'
+        return xml,android.ElementTree.fromstring(xml),[]
+    device._hierarchy=hierarchy
+    await device.act({'type':'tap','target':'pex-5'})
+    assert calls[-1][-1]=='input tap 154 1703'
+
 
 async def test_tap_ignores_the_unclickable_child_that_shares_the_bounds(monkeypatch,tmp_path):
     """Compose wraps a clickable node around a child with identical bounds; only the clickable one counts as a match."""
@@ -224,9 +245,10 @@ MEDIA_DUMP='''Sessions Stack - have 2 sessions:
 NOTIFICATION_DUMP='''Current Notification Manager state:
   Notification List:
     NotificationRecord(0xa: pkg=dev.pex.app user=0 id=1 key=0|dev.pex.app|1|null|10123: importance=3)
+      channel=NotificationChannel{mSound=null, mLights=false, mLightColor=0, mShowBadge=true}
       extras={
         android.title=String (Download finished)
-        android.text=String (Movie X)
+        android.text=String (Movie X (240p) added)
       }
     NotificationRecord(0xb: pkg=com.other user=0 id=2 key=0|com.other|2|null|10500: importance=3)
         android.title=String (Download finished)
@@ -243,7 +265,8 @@ def test_playback_and_notification_dumps_are_read_per_package_and_exclude_histor
     posted=android.parse_notifications(NOTIFICATION_DUMP)
     # The archived copy of the same notification must not read as still showing.
     assert [n['key'] for n in posted]==['0|dev.pex.app|1|null|10123','0|com.other|2|null|10500']
-    assert posted[0]['text']=='Download finished\nMovie X'
+    # A record's own 'mLights=false' is not the 'Lights' section, and a title carries its own brackets.
+    assert posted[0]['text']=='Download finished\nMovie X (240p) added'
 
 async def test_a_notification_shared_with_another_app_is_never_opened_by_text(monkeypatch,tmp_path):
     device=device_for(monkeypatch,tmp_path);calls=[]
@@ -263,3 +286,22 @@ async def _value(v):return v
 async def _shade():
     xml='<hierarchy rotation="0"><node text="Movie X" bounds="[0,100][100,140]" /></hierarchy>'
     return android.sanitize_xml(xml)
+
+
+@pytest.mark.asyncio
+async def test_a_window_dump_is_judged_by_its_xml_not_by_the_exit_code(monkeypatch,tmp_path):
+    """uiautomator exits non-zero mid-animation and can leave a half-written file; one retry recovers."""
+    monkeypatch.setattr(android.targets,'tool',lambda name:Path('/bin/true'))
+    slept=asyncio.sleep
+    monkeypatch.setattr(android.asyncio,'sleep',lambda seconds:slept(0))
+    reads=['UI hierchary dumped to: /data/local/tmp/pex-window.xml','<hierarchy><node bounds="[0,0][1,1]"/></hierarchy>']
+    async def fake(*args,**kw):
+        assert kw.get('check') is False
+        return reads.pop(0) if 'cat' in args else 'UI hierchary dumped to: /data/local/tmp/pex-window.xml'
+    monkeypatch.setattr(android,'run',fake);monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run')
+    device.serial='emulator-1'
+    xml,root,sensitive=await device._hierarchy()
+    assert root.find('node') is not None and sensitive==[]
+    reads[:]=['not xml','still not xml']
+    with pytest.raises(android.AndroidError,match='readable window dump'):await device._hierarchy()

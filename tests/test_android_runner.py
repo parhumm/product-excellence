@@ -1,4 +1,4 @@
-import asyncio
+import asyncio,json
 from pathlib import Path
 import pytest
 from engine import runner as runner_module
@@ -177,3 +177,44 @@ async def test_an_operator_step_that_nobody_answers_ends_the_scenario(monkeypatc
     run=await scenario_run(monkeypatch,tmp_path,[{'manual':'Sign in as the test account','timeout':1},{'check':{'text':'Now playing','within':1}}])
     assert [s['status'] for s in run['scenario']]==['error','skipped']
     assert 'No operator confirmed' in run['scenario'][0]['reason'] and run['mission_outcome']=='blocked'
+
+@pytest.mark.asyncio
+async def test_an_ask_step_types_the_operator_value_and_keeps_it_out_of_the_run(monkeypatch,tmp_path):
+    monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
+    async def write(kind,value):return value
+    monkeypatch.setattr(runner_module,'write',write)
+    typed=[]
+    class Typing(ScenarioDevice):
+        async def type_focused(self,value):assert self.recording is False;typed.append(value)
+    monkeypatch.setattr(runner_module.android,'Device',Typing)
+    run=native_run(tmp_path)
+    run['mission']['scenario']=[{'manual':'Enter the code from the SMS','ask':'SMS code','timeout':30},{'check':{'text':'Now playing','within':1}}]
+    worker=runner_module.Runner();task=asyncio.create_task(worker.execute_android('run',run))
+    for _ in range(400):
+        await asyncio.sleep(0.01)
+        if run.get('waiting_for'):break
+    waiting=run['waiting_for'];assert waiting['ask']=='SMS code'
+    await worker.continue_step('run',1,waiting['token'],'482913')
+    await task
+    assert typed==['482913'] and run['scenario'][0]['reason']=='The operator supplied SMS code'
+    assert '482913' not in json.dumps(run)
+
+@pytest.mark.asyncio
+async def test_an_ask_step_released_with_no_value_means_the_operator_did_it_themselves(monkeypatch,tmp_path):
+    monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
+    async def write(kind,value):return value
+    monkeypatch.setattr(runner_module,'write',write)
+    typed=[]
+    class Typing(ScenarioDevice):
+        async def type_focused(self,value):typed.append(value)
+    monkeypatch.setattr(runner_module.android,'Device',Typing)
+    run=native_run(tmp_path)
+    run['mission']['scenario']=[{'manual':'Enter the code from the SMS','ask':'SMS code','timeout':30},{'check':{'text':'Now playing','within':1}}]
+    worker=runner_module.Runner();task=asyncio.create_task(worker.execute_android('run',run))
+    for _ in range(400):
+        await asyncio.sleep(0.01)
+        if run.get('waiting_for'):break
+    await worker.continue_step('run',1,run['waiting_for']['token'])
+    await task
+    assert typed==[] and run['scenario'][0]['reason']=='The operator confirmed this step'
+    assert [s['status'] for s in run['scenario']]==['passed','passed']

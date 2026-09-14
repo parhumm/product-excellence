@@ -8,7 +8,7 @@ mission:
   platform: android
   name: A shared link opened while signed out
   goal: Open a shared link while signed out, sign in, and check the app returns to the linked title
-  mode: audit
+  mode: journey
   provider: codex
   pillars: [functionality]
   max_steps: 14

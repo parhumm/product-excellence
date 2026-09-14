@@ -240,7 +240,7 @@ A shipped journey arrives with `<placeholders>` where your own film title or acc
 
 If you do not know what the app is supposed to do, say so: set a check's policy to **Nobody has confirmed this yet**. It is then recorded as a question about intended behaviour rather than a defect, and it never lowers a score or blocks a release.
 
-A manual step stops the recording first and waits for you. The run page shows the instruction, says the recording is paused, and offers **Continue run**. The wait counts against the mission's own time limit, and the page shows whichever is shorter. Manual steps need an emulator you can see, so start the console with `PEX_ANDROID_WINDOW=1`.
+A manual step stops the recording first and waits for you. The run page shows the instruction, says the recording is paused, and offers **Continue run**. The wait counts against the mission's own time limit, and the page shows whichever is shorter. Manual steps need an emulator you can see, so start the console with `PEX_ANDROID_WINDOW=1`. When a manual step carries `ask` (for example `ask: SMS code`), you type the value on the run page instead and the console enters it into the focused field on the device, so a sign-in that sends a code to your phone can be finished without touching the emulator.
 
 **Start state** decides what the device holds when the steps begin. Fresh clears the app's data, which is not a reinstall and changes nothing on the server. Keep leaves whatever the last run left. Load restores a device state you saved under **Settings → Android device**: that brings back this Mac's emulator, not an account or a paid subscription, so the steps still check those.
 

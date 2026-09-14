@@ -201,12 +201,14 @@ class Runner:
             r=await read('run',id)
             if r and store.remote('run',r):await hub.io(hub.transition,r,'cancel')
             elif r and r['status']=='queued':r.update(status='cancelled',finished_at=now());await write('run',r)
-    async def continue_step(self,id,step,token):
+    async def continue_step(self,id,step,token,value=''):
         """Release one operator pause. A wrong, stale or already used request releases nothing."""
         pause=self.pauses.get(id)
         if not pause or pause['step']!=step or pause['event'].is_set() or not secrets.compare_digest(pause['token'],token):
             raise ValueError('This run is not waiting for that step')
-        pause['event'].set()
+        # An empty answer to an ask means the operator did it on the device themselves; only a value is typed.
+        if value and not pause['ask']:raise ValueError('This step takes no value')
+        pause['value']=value;pause['event'].set()
         return {'ok':True,'step':step}
     async def resume(self,id,ai_calls,steps):
         """Queue a finished run again so it carries on from its last page instead of starting over."""
@@ -847,20 +849,25 @@ class Runner:
                     if provider=='none':return 'blocked','This scenario needs a signed-in AI worker to carry out its goals',[]
                     outcome,reason,evidence,observation=await self._ai_goal(r,device,folder,observation,text,deadline,until,event)
                     return outcome,reason,evidence
-                async def wait_for_operator(result,instruction,timeout):
+                async def wait_for_operator(result,instruction,timeout,ask=''):
                     # Nothing may still be recording while an operator types credentials, so prove it stopped first.
                     await device.stop_recording()
                     if deadline-time.monotonic()<5:raise ScenarioError('Too little run time is left to wait for an operator')
                     # The operator is shown the shorter of their own timeout and the run's own deadline.
                     left=min(timeout,deadline-time.monotonic())
-                    pause={'step':result['number'],'token':uuid.uuid4().hex,'instruction':instruction,
+                    pause={'step':result['number'],'token':uuid.uuid4().hex,'instruction':instruction,'ask':ask,
                            'seconds':round(left),'until':now(offset=left)}
                     self.pauses[id]=dict(pause,event=asyncio.Event());r['waiting_for']=pause
                     result.update(status='waiting')
                     await event(f"Step {result['number']} is waiting for the operator: {instruction}",'warning')
                     try:
                         await asyncio.wait_for(self.pauses[id]['event'].wait(),left)
-                        result.update(status='passed',reason='The operator confirmed this step')
+                        supplied=self.pauses[id]['value']
+                        if supplied:
+                            # The value lives only on the pause; it is typed while the recording is still stopped.
+                            await device.type_focused(supplied)
+                            result.update(status='passed',reason=f'The operator supplied {ask}')
+                        else:result.update(status='passed',reason='The operator confirmed this step')
                     except asyncio.TimeoutError:
                         raise ScenarioError(f'No operator confirmed this step within {round(left)} s')
                     finally:

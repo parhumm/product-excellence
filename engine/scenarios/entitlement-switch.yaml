@@ -9,7 +9,7 @@ mission:
   platform: android
   name: Playback across a transport switch
   goal: Start a title on Wi-Fi and see what playback does after the device moves to mobile data
-  mode: audit
+  mode: journey
   provider: codex
   pillars: [functionality]
   max_steps: 12

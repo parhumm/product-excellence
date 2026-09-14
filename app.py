@@ -361,7 +361,7 @@ async def continue_step(id:str,req:ContinueStepRequest):
     r=await hub.io(required,'run',id)
     if store.remote('run',r):raise HTTPException(409,'Continue an operator step on the machine running the device')
     if r['status']!='running':raise HTTPException(409,'This run is not waiting for an operator')
-    try:return await runner.continue_step(id,req.step,req.token)
+    try:return await runner.continue_step(id,req.step,req.token,req.value)
     except ValueError as e:raise HTTPException(409,str(e))
 @app.get('/api/scenarios')
 def scenario_templates():

@@ -10,7 +10,7 @@ mission:
   platform: android
   name: Downloads and search history per account
   goal: Check that one account's downloads and search history do not appear under another account
-  mode: audit
+  mode: journey
   provider: codex
   pillars: [functionality]
   max_steps: 24

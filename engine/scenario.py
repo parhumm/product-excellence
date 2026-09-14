@@ -173,7 +173,7 @@ class Scenario:
             return
         if kind=='manual':
             if not self.pause:raise ScenarioError('Operator continuation is not configured on this console')
-            await self.pause(result,step['manual'],step.get('timeout') or 300)
+            await self.pause(result,step['manual'],step.get('timeout') or 300,step.get('ask',''))
             return
         if kind=='event':
             self.cursor=self.device.log_cursor()

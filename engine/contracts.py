@@ -118,6 +118,7 @@ class Step(BaseModel):
     goal: str = Field(default='', max_length=4000)
     until: Until | None = None
     manual: str = Field(default='', max_length=4000)
+    ask: str = Field(default='', max_length=80)
     timeout: int | None = Field(default=None, ge=1, le=1800)
     event: Event | None = None
     check: Check | None = None
@@ -136,6 +137,7 @@ class Step(BaseModel):
         if len(chosen)!=1:raise ValueError('Each step is exactly one of: '+', '.join(KINDS))
         if self.until is not None and not self.goal:raise ValueError('until describes when a goal step may stop early')
         if self.timeout is not None and not self.manual:raise ValueError('timeout is how long an operator step may wait')
+        if self.ask and not self.manual:raise ValueError('ask names the value an operator step supplies')
         if self.goal and len(self.goal)<5:raise ValueError('Describe the goal in at least five characters')
         if self.manual and self.timeout is None:self.timeout=300
         return self
@@ -275,6 +277,8 @@ class ContinueStepRequest(BaseModel):
     model_config=ConfigDict(extra='forbid')
     step: int = Field(ge=1, le=40)
     token: str = Field(pattern=r'^[0-9a-f]{32}$')
+    # Typed with `input text`, which only carries ASCII; never stored anywhere.
+    value: str = Field(default='', max_length=64, pattern=r'^[\x20-\x7e]*$')
 class DraftRequest(BaseModel):
     """One ask for scenario steps. Nothing is stored and no device is touched."""
     model_config=ConfigDict(extra='forbid')

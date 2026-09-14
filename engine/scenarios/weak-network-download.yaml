@@ -9,7 +9,7 @@ mission:
   platform: android
   name: Download over a weak link with pauses
   goal: Download a title on a slow link with two pauses, then play it with the device offline
-  mode: audit
+  mode: journey
   provider: codex
   pillars: [functionality]
   max_steps: 20

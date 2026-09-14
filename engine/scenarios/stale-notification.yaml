@@ -9,7 +9,7 @@ mission:
   platform: android
   name: A notification opened much later
   goal: Open a notification long after it arrived and check it returns to the right screen
-  mode: audit
+  mode: journey
   provider: codex
   pillars: [functionality]
   max_steps: 14

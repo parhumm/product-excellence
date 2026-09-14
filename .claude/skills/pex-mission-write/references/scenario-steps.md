@@ -10,7 +10,7 @@ Every step is exactly one of these five, plus an optional `name` used only as a 
 - `check: {<one fact>, within: N}` — the fact has to become true once inside N seconds. Default 10.
 - `hold: {<one fact>, for: N}` — the fact has to stay true across the whole N seconds.
 - `event: {<one operation>}` — something done to the device rather than the app.
-- `manual: "…"` — ask the person at the device to do something, with an optional `timeout` in seconds
+- `manual: "…"` — ask the person at the device to do something, with an optional `timeout` in seconds. Add `ask: "SMS code"` when the person should supply a value instead: the run page shows a field, and the console types the answer into the focused text field on the device (ASCII only, one field per step).
   (default 300). Recording stops while they work, so use it only for sign-in, payment and anything
   else the AI worker must not see or type.
 

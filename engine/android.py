@@ -647,9 +647,10 @@ class Device:
             if len(near)==1 or near[0][0]*9<=near[1][0]:matches=[near[0][2]]
         if len(matches)!=1:raise AndroidError('Control changed or is ambiguous; observe again')
         node=matches[0];box=parse_bounds(node.get('bounds'));x=(box[0]+box[2])//2;y=(box[1]+box[3])//2
-        if node.get('password')=='true':raise AndroidError('Android password and OTP entry is not supported')
         if kind=='tap':await self.shell('input','tap',str(x),str(y));return
         if kind in ('type','fill'):
+            # A tap may focus a password field so an operator can type into it; the AI still may not.
+            if node.get('password')=='true':raise AndroidError('Android password and OTP entry is not supported')
             value=action.get('value','')
             if not value.isascii():raise AndroidError('Unicode input needs a preconfigured ADBKeyboard')
             await self.shell('input','tap',str(x),str(y));await self.shell('input','keycombination','KEYCODE_CTRL_LEFT','KEYCODE_A');await self.shell('input','text',value.replace(' ','%s'));return

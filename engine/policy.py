@@ -23,12 +23,12 @@ def redact(value):
 
 PASSWORD_PLACEHOLDER='{{password}}'
 
-def scrub(value,secret):
+def scrub(value,secret,placeholder=PASSWORD_PLACEHOLDER):
     # Reflections in structured evidence need the same protection as raw captures.
     if not secret:return value
-    if isinstance(value,dict):return {k:scrub(v,secret) for k,v in value.items()}
-    if isinstance(value,list):return [scrub(v,secret) for v in value]
-    if isinstance(value,str):return value.replace(secret,PASSWORD_PLACEHOLDER)
+    if isinstance(value,dict):return {k:scrub(v,secret,placeholder) for k,v in value.items()}
+    if isinstance(value,list):return [scrub(v,secret,placeholder) for v in value]
+    if isinstance(value,str):return value.replace(secret,placeholder)
     return value
 
 def site_hosts(host):
@@ -76,7 +76,7 @@ def mutation_allowed(method, url, mission):
 
 def action_allowed(action, mission, target=None):
     kind=action.get('type')
-    if kind not in ('click','type','focus','select','forward','press','scroll','open','back','reload','wait','finish'): return False,'Unsupported action'
+    if kind not in ('click','type','focus','select','forward','press','scroll','open','back','reload','wait','ask','finish'): return False,'Unsupported action'
     if kind=='open':
         # Models put the URL in either field; refuse with the field or host that was wrong.
         url=action.get('value') or action.get('target') or ''
@@ -87,7 +87,12 @@ def action_allowed(action, mission, target=None):
             return False,(f'Navigation to {host} refused; allowed hosts: {hosts}' if host
                           else 'open needs an absolute http(s) URL in value, on an allowed host: '+hosts)
     if kind=='click' and RISKY.search((target or {}).get('text','')+' '+(target or {}).get('href','')): return False,'Payment, publication or destructive control blocked'
-    if kind in ('click','type','focus','select') and not target:return False,'Missing current target'
+    if kind in ('click','type','focus','select','ask') and not target:return False,'Missing current target'
+    if kind=='ask':
+        # The operator types the value into this field, so it has to be a field that takes typing.
+        tag=target.get('tag') or ''
+        if not (tag in ('input','textarea') or tag.endswith('EditText')) or target.get('input_type') in ('file','checkbox','radio','submit','button','image','range','color'):
+            return False,'ask needs the text field that takes the value as its target'
     if kind=='type':
         if not target: return False,'Missing target'
         password_field=target.get('input_type')=='password'
@@ -98,7 +103,7 @@ def action_allowed(action, mission, target=None):
             if action.get('value')!=PASSWORD_PLACEHOLDER:
                 return False,'Type exactly '+PASSWORD_PLACEHOLDER+' into the password field; the stored sign-in password is filled for you'
             return True,''
-        if target.get('input_type') in ('password','file') or SENSITIVE.search(target.get('text','')): return False,'Use a prepared persona or mission sign-in credentials; secrets cannot be typed by AI'
+        if target.get('input_type') in ('password','file') or SENSITIVE.search(target.get('text','')): return False,'Return action ask with this field as target and a short name of the value in value; the operator supplies it. Never invent it.'
     if kind=='press' and action.get('value') not in ('Tab','Escape','ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Home','End'):
         # Enter inside a search box is how many sites run a search, and some expose no submit control.
         if not (action.get('value')=='Enter' and (target or {}).get('input_type')=='search'):

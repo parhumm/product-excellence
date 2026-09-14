@@ -5,7 +5,7 @@ from .store import DATA
 from . import pricing
 
 ACTION_SCHEMA={'type':'object','properties':{
-    'type':{'type':'string','enum':['click','type','focus','select','forward','press','scroll','open','back','reload','wait','finish']},
+    'type':{'type':'string','enum':['click','type','focus','select','forward','press','scroll','open','back','reload','wait','ask','finish']},
     'target':{'type':'string'},'value':{'type':'string'},'reason':{'type':'string'},
     'outcome':{'type':'string','enum':['continue','success','blocked']}},
     'required':['type','target','value','reason','outcome'],'additionalProperties':False}

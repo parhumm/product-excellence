@@ -190,3 +190,102 @@ def test_budget_stop_still_spends_one_call_on_the_review(tmp_path, monkeypatch):
     assert final['ai_summary']['headline'] == 'Reviewed'
     # Every observation says which visit recorded it, so a continuation reads as a later part.
     assert {o['part'] for o in final['observations']} == {1}
+
+
+def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypatch):
+    """The operator supplies what the AI cannot invent, and the value stays out of every record."""
+    import pytest
+    from unittest.mock import Mock
+    runtime = importlib.import_module('engine.runner')
+    artifacts = tmp_path / 'artifacts'
+    artifacts.mkdir()
+    supplied = '0912 345 6789'
+    mission = Mission(name='Fixture', url='https://example.com', goal='Sign in with a code',
+                      browser='firefox', mode='journey', provider='codex',
+                      ai_budget=4, max_steps=3).model_dump()
+    run = {'id': 'run-test', 'mission_id': 'mission-test', 'mission': mission,
+           'status': 'queued', 'network_snapshot': NetworkProfile(name='Baseline').model_dump(),
+           'observations': [], 'actions': [], 'events': [], 'findings': [], 'http': [],
+           'console': [], 'coverage': {}, 'ai_calls': 0, 'ai_usage': [], 'ai_totals': {},
+           'replay_of': '', 'baseline_id': ''}
+    saved, filled, prompts = [], [], []
+    planned = [{'type': 'ask', 'target': 'pex-0', 'value': 'mobile number',
+                'reason': 'The form needs a number I do not have', 'outcome': 'continue'},
+               {'type': 'finish', 'target': '', 'value': '', 'reason': 'Signed in', 'outcome': 'success'}]
+
+    async def write(kind, record):
+        saved.append(copy.deepcopy(record))
+        return record
+
+    async def evaluate(script):
+        if 'typeof window.axe' in script:
+            return True
+        if 'axe.run' in script:
+            return {'violations': [], 'passes': [], 'incomplete': []}
+        # The site reflects the number it was given, the way a "code sent to ..." line does.
+        return {'url': 'https://example.com', 'title': 'Sign in',
+                'text': 'Code sent to ' + filled[0] if filled else 'Sign in',
+                'controls': [{'id': 'pex-0', 'tag': 'input', 'role': '', 'input_type': 'tel',
+                              'text': 'Mobile number', 'href': ''}],
+                'metadata': {}, 'viewport': {}, 'metrics': {'lcp': 0, 'inp': None}}
+
+    async def screenshot(path, **kwargs):
+        from pathlib import Path
+        Path(path).write_bytes(b'fake screenshot')
+
+    async def goto(*args, **kwargs):
+        return SimpleNamespace(status=200, text=AsyncMock(return_value='<p>Sign in</p>'))
+
+    async def ai_call(provider, prompt, schema, *args, **kwargs):
+        prompts.append(prompt)
+        if 'Choose ONE legitimate next browser action' in prompt:
+            return planned.pop(0), runtime.ai.usage_record(provider, '', '', 'low')
+        return ({'findings': [], 'executive_summary': {'headline': 'Reviewed', 'summary': 'All of it.',
+                 'next_steps': ['Continue the run.']}}, runtime.ai.usage_record(provider, '', '', 'low'))
+
+    field = SimpleNamespace(
+        evaluate=AsyncMock(return_value={'text': 'Mobile number', 'href': '', 'input_type': 'tel', 'tag': 'input'}),
+        fill=AsyncMock(side_effect=lambda value: filled.append(value)))
+    page = SimpleNamespace(url='https://example.com', video=None, set_default_timeout=Mock(),
+        set_default_navigation_timeout=Mock(), on=Mock(), goto=goto, wait_for_load_state=AsyncMock(),
+        wait_for_timeout=AsyncMock(), evaluate=evaluate, screenshot=screenshot,
+        content=AsyncMock(return_value='<p>Sign in</p>'), locator=Mock(return_value=field))
+    context = SimpleNamespace(tracing=SimpleNamespace(start=AsyncMock(), stop=AsyncMock()),
+        add_init_script=AsyncMock(), route=AsyncMock(), new_page=AsyncMock(return_value=page),
+        on=Mock(), set_offline=AsyncMock(), close=AsyncMock(), storage_state=AsyncMock())
+    browser = SimpleNamespace(new_context=AsyncMock(return_value=context), close=AsyncMock())
+    pw = SimpleNamespace(firefox=SimpleNamespace(launch=AsyncMock(return_value=browser)), stop=AsyncMock())
+    monkeypatch.setattr(runtime, 'DATA', tmp_path)
+    monkeypatch.setattr(runtime, 'ARTIFACTS', artifacts)
+    monkeypatch.setattr(runtime, 'read', AsyncMock(side_effect=lambda kind, id, *args: run if id else None))
+    monkeypatch.setattr(runtime, 'write', write)
+    monkeypatch.setattr(runtime.hub, 'enabled', lambda: False)
+    monkeypatch.setattr(runtime, 'async_playwright', lambda: SimpleNamespace(start=AsyncMock(return_value=pw)))
+    monkeypatch.setattr(runtime.ai, 'call', ai_call)
+
+    async def journey():
+        worker = runtime.Runner()
+        task = asyncio.create_task(worker.execute('run-test'))
+        for _ in range(600):
+            await asyncio.sleep(0.01)
+            if run.get('waiting_for'):
+                break
+        waiting = dict(run['waiting_for'])
+        assert waiting['kind'] == 'ask' and waiting['ask'] == 'mobile number' and waiting['needs_value'] is True
+        # redact() blanks every key named token; the published record still has to carry this one.
+        assert saved[-1]['waiting_for']['token'] == waiting['token']
+        with pytest.raises(ValueError, match='no device to type on'):
+            await worker.continue_step('run-test', waiting['step'], waiting['token'])
+        await worker.continue_step('run-test', waiting['step'], waiting['token'], supplied)
+        await task
+        return waiting
+
+    waiting = asyncio.run(journey())
+    assert filled == [supplied] and 'Mobile number' in waiting['instruction']
+    final = saved[-1]
+    assert final['status'] == 'completed', final.get('error')
+    assert [a['status'] for a in final['actions']] == ['executed', 'executed']
+    assert final['observations'][-1]['text'] == 'Code sent to {{supplied}}'
+    assert final['waiting_for'] is None
+    assert all(supplied not in json.dumps(record) for record in saved)
+    assert all(supplied not in prompt for prompt in prompts)

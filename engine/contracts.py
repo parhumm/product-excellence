@@ -278,7 +278,9 @@ class ContinueStepRequest(BaseModel):
     step: int = Field(ge=1, le=40)
     token: str = Field(pattern=r'^[0-9a-f]{32}$')
     # Typed with `input text`, which only carries ASCII; never stored anywhere.
-    value: str = Field(default='', max_length=64, pattern=r'^[\x20-\x7e]*$')
+    value: str = Field(default='', max_length=200, pattern=r'^[\x20-\x7e]*$')
+    # The operator can decline to supply the value; the run carries on knowing it was skipped.
+    skip: bool = False
 class DraftRequest(BaseModel):
     """One ask for scenario steps. Nothing is stored and no device is touched."""
     model_config=ConfigDict(extra='forbid')

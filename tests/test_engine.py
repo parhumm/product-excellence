@@ -25,6 +25,12 @@ def test_payment_and_secret_policy():
  assert not action_allowed({'type':'press','value':'Enter'},M,{'input_type':'password'})[0]
  assert not action_allowed({'type':'press','value':'Space'},M,{'input_type':'search'})[0]
  assert not action_allowed({'type':'type'},M,{'input_type':'password'})[0]
+ # A value the AI cannot invent is asked of the operator instead of ending the run.
+ assert 'ask' in action_allowed({'type':'type'},M,{'input_type':'password'})[1]
+ assert action_allowed({'type':'ask','target':'pex-0','value':'SMS code'},M,{'tag':'input','input_type':'tel'})[0]
+ assert action_allowed({'type':'ask','target':'pex-1','value':'password'},M,{'tag':'android.widget.EditText','input_type':'password'})[0]
+ for field in (None,{'tag':'button','input_type':''},{'tag':'input','input_type':'file'}):
+  assert not action_allowed({'type':'ask','target':'pex-2','value':'card number'},M,field)[0]
  assert action_allowed({'type':'click'},M,{'text':'Search movies'})[0]
 def test_password_scrubbed_from_page_captures():
     from engine.policy import scrub, PASSWORD_PLACEHOLDER

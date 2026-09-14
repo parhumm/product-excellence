@@ -218,3 +218,56 @@ async def test_an_ask_step_released_with_no_value_means_the_operator_did_it_them
     await task
     assert typed==[] and run['scenario'][0]['reason']=='The operator confirmed this step'
     assert [s['status'] for s in run['scenario']]==['passed','passed']
+
+
+class AskingDevice(ScenarioDevice):
+    """A device whose screen has one text field, for the AI journey that needs a value for it."""
+    def __init__(self,*a,**k):super().__init__(*a,**k);self.taps=[];self.typed=[]
+    async def observe(self,id):
+        screen=await super().observe(id)
+        screen['controls']=[{'id':'pex-1','tag':'android.widget.EditText','role':'textbox','text':'','label':'Mobile number',
+                             'labeled':True,'input_type':'text','box':{'x':0,'y':0,'width':100,'height':40},'identity':'x'}]
+        return screen
+    async def act(self,action):self.taps.append((action['type'],action['target']))
+    async def type_focused(self,value):assert self.recording is False;self.typed.append(value)
+
+async def ask_journey(monkeypatch,tmp_path,answer):
+    """Run a plain AI journey whose first action asks the operator, and release the pause with `answer`."""
+    monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
+    async def write(kind,value):return value
+    monkeypatch.setattr(runner_module,'write',write)
+    devices=[]
+    class Recorded(AskingDevice):
+        def __init__(self,*a,**k):super().__init__(*a,**k);devices.append(self)
+    monkeypatch.setattr(runner_module.android,'Device',Recorded)
+    planned=[{'type':'ask','target':'pex-1','value':'SMS code','reason':'the app needs the code','outcome':'continue'},
+             {'type':'finish','target':'','value':'','reason':'signed in','outcome':'success'}]
+    prompts=[]
+    async def call(provider,prompt,schema,image=None,timeout=100,model='',effort='low',codex_account=''):
+        prompts.append(prompt);return planned.pop(0),runner_module.ai.usage_record(provider,model,model,effort)
+    monkeypatch.setattr(runner_module.ai,'call',call)
+    run=native_run(tmp_path);run['mission'].update(mode='journey',provider='codex',max_steps=4,ai_budget=4)
+    worker=runner_module.Runner();task=asyncio.create_task(worker.execute_android('run',run))
+    for _ in range(400):
+        await asyncio.sleep(0.01)
+        if run.get('waiting_for'):break
+    waiting=dict(run['waiting_for'])
+    await worker.continue_step('run',waiting['step'],waiting['token'],**answer)
+    await task
+    return run,waiting,devices[0],prompts,worker
+
+@pytest.mark.asyncio
+async def test_an_ai_journey_asks_the_operator_and_types_what_they_supply(monkeypatch,tmp_path):
+    run,waiting,device,_,worker=await ask_journey(monkeypatch,tmp_path,{'value':'482913'})
+    assert waiting['kind']=='ask' and waiting['ask']=='SMS code' and waiting['needs_value'] is False
+    # The field is focused first, so the supplied value lands in it, and nothing records while it is typed.
+    assert device.taps==[('tap','pex-1')] and device.typed==['482913'] and device.recording is True
+    assert [a['status'] for a in run['actions']]==['executed','executed'] and run['mission_outcome']=='success'
+    assert '482913' not in json.dumps(run) and run['waiting_for'] is None and 'run' not in worker.pauses
+
+@pytest.mark.asyncio
+async def test_a_skipped_ask_lets_the_ai_journey_carry_on_without_the_value(monkeypatch,tmp_path):
+    run,_,device,prompts,_=await ask_journey(monkeypatch,tmp_path,{'skip':True})
+    assert device.typed==[] and [a['status'] for a in run['actions']]==['skipped','executed']
+    assert run['actions'][0]['error']=='The operator skipped: SMS code'
+    assert 'The operator skipped: SMS code' in prompts[1]  # the AI sees the skip and chooses what to do next

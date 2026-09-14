@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **A run can ask you for a value instead of giving up.** When a web run or an
+  Android journey reaches a field it has no value for (a phone number, email,
+  username, password, one-time code, authenticator code or card details), it
+  pauses and the run page asks for that value, with **Skip** and **Stop run**
+  next to it. The value is filled into the field, masked in screenshots and
+  scrubbed from the saved evidence, and never stored in the run.
 - **Android missions can carry an ordered scenario.** Up to 40 steps on one
   device: goals for the AI worker, checks that a fact becomes true, holds that a
   fact stays true, events done to the device, and manual steps handed to the

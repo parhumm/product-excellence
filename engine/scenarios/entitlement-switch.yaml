@@ -1,0 +1,34 @@
+id: entitlement-switch
+name: Playback across a transport switch
+about: >-
+  Plays a title, then moves the device from Wi-Fi to mobile data while it is playing and watches what
+  the player reports next. This changes the transport only. It does not change a subscription, prove
+  zero-rating, or ask the backend what the account is entitled to, so the playback hold is recorded as
+  an observation rather than a requirement.
+mission:
+  platform: android
+  name: Playback across a transport switch
+  goal: Start a title on Wi-Fi and see what playback does after the device moves to mobile data
+  mode: audit
+  provider: codex
+  pillars: [functionality]
+  max_steps: 12
+  ai_budget: 12
+  max_seconds: 1800
+  reset: fresh
+  scenario:
+    - name: Reach the title
+      goal: Open "<Movie title>" and start playing it
+      until: {text: "<Text shown on the player screen>"}
+    - name: Playback is really running
+      check: {playing: true, within: 30}
+    - name: Move to mobile data
+      event: {network: cellular}
+    - name: Playback after the switch
+      hold: {playing: true, for: 30, policy: unknown, severity: info}
+    - name: The player screen is still there
+      check: {text: "<Text shown on the player screen>", within: 10, policy: unknown}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}
+    - name: Put the network back
+      event: {network: restore}

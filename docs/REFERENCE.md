@@ -119,6 +119,44 @@ Network scope is explicit: Linux netem shapes container **egress**, including co
 
 Use **Network & routes → Add a proxy route** for a real remote egress. Supply an HTTP(S) or SOCKS5 endpoint and credentials you control. Labels do not prove ISP/ASN identity; verify the provider and route independently. No ISP endpoints or credentials are bundled.
 
+## Android scenarios
+
+An Android mission may carry an ordered scenario of at most 40 steps. Without one, the mission runs as a single AI journey exactly as before.
+
+Build it in the mission form's **Scenario** section. Five shipped journeys fill the rows, **Draft the steps** asks the signed-in AI worker for a first draft from a sentence, and the advanced view shows the same steps as YAML. The rows and the YAML are one model: text that does not parse stays in the editor and never replaces working rows.
+
+Each step is exactly one of five keys, plus an optional `name` used only as a label:
+
+```yaml
+- goal: "Open '<Movie title>' and start playback"
+- check: {playing: true, within: 15}
+- event: {network: cellular}
+- hold: {playing: true, for: 20, policy: unknown}
+- manual: "Sign in as <Account B>"
+```
+
+- `goal` gives the AI worker one instruction, with an optional `until: {text: "…"}` early stop. Reaching it proves navigation, nothing later.
+- `check` requires a fact to become true once inside `within` seconds, default 10.
+- `hold` requires it to stay true across `for` seconds, sampled about every two seconds. The result reports how many samples were taken over how long, and gaps are recorded rather than smoothed over.
+- `event` acts on the device: `network`, `speed` with an optional `delay_ms`, a standalone `delay_ms`, `wait`, `home`, `kill`, `relaunch`, `deep_link` and `open_notification`.
+- `manual` hands the device to a person. Recording is stopped and confirmed stopped before the notice appears, so credentials are never recorded or sent to the AI worker. The run page offers **Continue**; the wait counts against the run's own budget and is shown as the shorter of the two.
+
+A check or hold states exactly one fact: `text`, `text_absent`, `activity` (`contains` or `equals`), `playing`, `notification`, or `no_crash`. Three modifiers apply to any of them. `policy: unknown` marks a behaviour nobody has confirmed: it is recorded as an observation with severity `info`, deducts nothing, blocks nothing, and can never be required. `severity` defaults to P2. `required` defaults to true under confirmed policy; a required failure or a required measurement that could not be established stops the steps that depend on it.
+
+Evidence that cannot be read is never read as a negative. An unreachable hierarchy, an unknown foreground package or a parser error makes a step **unavailable**, which is a coverage gap, not a defect. The run page lists those separately from findings, alongside the questions raised by unknown-policy steps.
+
+### Start state and saved device states
+
+Fresh app data clears the package before the run. That is `pm clear`, not a reinstall, and it changes nothing on any server. Keep leaves whatever the last run left behind, which is useful for exploring and useless for confirming a reproduction. Load restores a device state saved on this Mac.
+
+Manage those states under **Settings → Android device**. A state is saved under a generated id, is never overwritten, and is validated against what is actually on disk before it loads: changed or missing files fail the load instead of quietly using the current device. Saving and deleting share the lock a run holds, so both wait while a mission is in progress. A saved state restores the local emulator only; an account, a paid entitlement and an expired session are still the scenario's job to check.
+
+Manual steps need an emulator with a visible window. Start the console with `PEX_ANDROID_WINDOW=1`, and restart an emulator that is already running without one; the environment variable alone does not give a window to a process that started without it.
+
+### Replay and reproduction
+
+**Compare releases** answers two separate questions and says so. Whether the conditions match is one: the scenario digest, requested and actual start state, fault settings, package, device properties and network settings all take part. Whether a finding seen in both runs may be called **reproduced** is another: that needs the same APK, a start state that was established rather than inherited, no operator attestation in the middle, and no required step left without evidence. When it cannot be called a reproduction the console says which of those is missing, and a matching finding counts as a second observation instead.
+
 ## Fresh installation
 
 ```bash

@@ -5,6 +5,7 @@ reads, so the console button and the skill cannot drift apart. Nothing here is
 stored: the user applies a suggestion to the form and saves the mission itself.
 """
 from . import ai, pricing, store, views
+from .contracts import Step
 
 MODES = ['journey', 'explore', 'audit', 'benchmark']
 PILLARS = ['functionality', 'cro', 'seo_aeo', 'ux_ui', 'performance']
@@ -17,6 +18,7 @@ SCHEMA = {'type': 'object', 'properties': {'suggestions': {'type': 'array', 'ite
     'required': ['suggestions'], 'additionalProperties': False}
 
 VOICE = (store.ROOT / '.claude/skills/pex-mission-write/references/goal-voice.md').read_text()
+STEPS = (store.ROOT / '.claude/skills/pex-mission-write/references/scenario-steps.md').read_text()
 # The order pex-mission-suggest uses to decide which mission is worth running next.
 LADDER = ('1. A pillar that already carries open findings and has no mission revisiting it.\n'
           '2. A feature the website advertises that no existing mission touches.\n'
@@ -98,3 +100,62 @@ async def suggest(req, project):
     items = [clean(s, req.competitors,(project.get('_target') or {}).get('type')=='android') for s in (result.get('suggestions') or []) if s.get('goal')][:2]
     if not items: raise RuntimeError('The worker returned no usable goal')
     return {'suggestions': items, 'usage': usage}
+
+
+# Keywords a strict output schema rejects. The shapes and enums survive; the limits are
+# re-applied by Step.model_validate below, which is the only schema that decides what is valid.
+UNSUPPORTED = ('minLength', 'maxLength', 'pattern', 'minimum', 'maximum', 'exclusiveMinimum',
+               'exclusiveMaximum', 'minItems', 'maxItems', 'default', 'format', 'title', 'examples')
+
+
+def strict(node):
+    """The same Step contract, spelled the way a strict JSON-schema worker will accept."""
+    if isinstance(node, dict):
+        out = {k: strict(v) for k, v in node.items() if k not in UNSUPPORTED}
+        if out.get('type') == 'object':
+            out['additionalProperties'] = False
+            out['required'] = list(out.get('properties', {}))
+        return out
+    if isinstance(node, list): return [strict(n) for n in node]
+    return node
+
+
+def step_schema():
+    generated = strict(Step.model_json_schema(by_alias=True))
+    defs = generated.pop('$defs', {})
+    return {'type': 'object', '$defs': defs, 'additionalProperties': False, 'required': ['steps'],
+            'properties': {'steps': {'type': 'array', 'items': generated}}}
+
+
+async def draft(req, project):
+    """Scenario steps from a description. Nothing runs and no device is touched."""
+    health = await ai.health()
+    provider = req.provider if req.provider in ('codex', 'claude') and health[req.provider]['logged_in'] else ''
+    provider = provider or next((p for p in ('codex', 'claude') if health[p]['logged_in']), '')
+    if not provider: raise ValueError('No AI worker is signed in. Open Settings to sign in Codex or Claude.')
+    target = project.get('_target') or {}
+    known = [t.strip()[:200] for t in req.texts if t.strip()][:30]
+    ask = ('A tester described one journey to run on an Android device. Return the ordered steps that carry '
+           'it out, using only the vocabulary below.\n\n'
+           f"App: {target.get('name','')} ({target.get('package','')})\n"
+           f"Build: {project.get('_build',{}).get('version_name','')}\n"
+           'Text the tester says appears in this app: ' + ('; '.join(known) or 'none given') + '\n\n'
+           '--- The step vocabulary ---\n' + STEPS +
+           '\n--- Rules ---\n'
+           '- Establish the screen with a goal before checking text on it, and before any absence check.\n'
+           '- Use manual only for sign-in, payment or anything a password reaches. Never put a password in a goal.\n'
+           '- Put an unknown policy on any expectation the tester has not stated as a requirement.\n'
+           '- Restore the network with an event when the scenario changed it.\n'
+           '- Write <Placeholders> wherever a real title, term or account has to be filled in later.\n'
+           '- Give each step a short name. Return at most 40 steps and no prose.\n\n'
+           'What the tester wrote:\n' + req.description)
+    account = req.codex_account or project.get('codex_account') or 'default'
+    result, usage = await ai.call(provider, ask, step_schema(), timeout=120,
+                                  model=pricing.LADDER[provider][1], effort='low', codex_account=account)
+    steps, rejected = [], []
+    for index, item in enumerate((result.get('steps') or [])[:40], 1):
+        clean = {k: v for k, v in item.items() if v not in (None, '', [], {})}
+        try: steps.append(Step.model_validate(clean).model_dump(by_alias=True, exclude_defaults=True, exclude_none=True))
+        except Exception as error: rejected.append(f'Step {index}: ' + str(error).split('\n')[1 if '\n' in str(error) else 0][:160])
+    if not steps: raise RuntimeError('The worker returned no usable step. ' + ('; '.join(rejected)[:400]))
+    return {'steps': steps, 'rejected': rejected[:5], 'usage': usage}

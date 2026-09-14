@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 import pytest
 from engine import runner as runner_module
@@ -13,7 +14,7 @@ async def test_native_audit_final_log_changes_gate(monkeypatch,tmp_path):
     async def write(kind,value):saved.append(value.copy());return value
     monkeypatch.setattr(runner_module,'write',write)
     class FakeDevice:
-        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[]
+        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
         async def start(self):pass
         async def launch(self,url):self.measurements={'launch_ms':400,'launch_status':'ok','api':34,'abi':'arm64-v8a','renderer':'auto'}
         async def observe(self,id):
@@ -41,7 +42,7 @@ async def test_stop_failure_still_publishes_terminal(monkeypatch,tmp_path):
     async def write(kind,value):saved.append(value.copy());return value
     monkeypatch.setattr(runner_module,'write',write)
     class Broken:
-        def __init__(self,*a,**k):self.measurements={};self.videos=[];self.logs=[];self.warnings=[]
+        def __init__(self,*a,**k):self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
         async def start(self):raise ValueError('setup failed')
         async def stop(self):raise ValueError('cleanup failed')
     monkeypatch.setattr(runner_module.android,'Device',Broken)
@@ -54,7 +55,7 @@ async def test_native_journey_resolves_dynamic_model_before_the_cli_call(monkeyp
     async def write(kind,value):return value
     monkeypatch.setattr(runner_module,'write',write)
     class FakeDevice:
-        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[]
+        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
         async def start(self):pass
         async def launch(self,url):pass
         async def observe(self,id):
@@ -78,7 +79,7 @@ async def test_native_journey_refuses_a_blocked_finish_before_any_tap(monkeypatc
     async def write(kind,value):return value
     monkeypatch.setattr(runner_module,'write',write)
     class FakeDevice:
-        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.taps=[]
+        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[];self.taps=[]
         async def start(self):pass
         async def launch(self,url):pass
         async def observe(self,id):
@@ -97,3 +98,82 @@ async def test_native_journey_refuses_a_blocked_finish_before_any_tap(monkeypatc
     assert [a['status'] for a in run['actions']]==['failed','executed','executed'] and run['mission_outcome']=='success'
     assert [e['message'][:8] for e in run['events'] if e['message'].startswith('Action')]==['Action 1','Action 2','Action 3']  # each action is logged as it happens
     assert 'Refused: no control has been tried yet' in prompts[1]  # the second prompt carries the refusal as action history
+
+
+class ScenarioDevice:
+    """A device that answers the scenario interpreter without adb, used by both scenario runs below."""
+    text='Now playing'
+    def __init__(self,*a,**k):
+        self.folder=Path(a[2]);self.measurements={'start_state':'fresh'};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
+        self.app={'package':'dev.pex.app'};self.homed=0;self.recording=True
+    async def start(self):pass
+    async def launch(self,url):self.measurements.update(launch_ms=400,launch_status='ok',api=34,abi='arm64-v8a',renderer='auto')
+    async def observe(self,id):
+        (self.folder/(id+'.png')).write_bytes(b'png')
+        return {'id':id,'url':'android-app://dev.pex.app/Player','title':'App','lang':'en-US','dir':'ltr','text':self.text,'viewport':{'width':1080,'height':2400,'density_dpi':420,'rotation':0},'controls':[],'metrics':{},'checks':{'hierarchy':{'status':'supported'},'gfxinfo':{'status':'unavailable'},'meminfo':{'status':'supported'},'logcat':{'status':'supported'}},'console_events':[],'screenshot':'/api/runs/run/artifacts/'+id+'.png','part':1}
+    async def sample(self):return {'at':'now','activity':'dev.pex.app/Player','package':'dev.pex.app','text':self.text,'labels':''}
+    def log_cursor(self):return 0
+    def crash_since(self,cursor):return ''
+    async def home(self):self.homed+=1
+    async def stop_recording(self):self.recording=False
+    async def start_recording(self):self.recording=True
+    async def stop(self):pass
+
+async def scenario_run(monkeypatch,tmp_path,steps):
+    monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
+    async def write(kind,value):return value
+    monkeypatch.setattr(runner_module,'write',write)
+    monkeypatch.setattr(runner_module.android,'Device',ScenarioDevice)
+    run=native_run(tmp_path);run['mission']['scenario']=steps
+    await runner_module.Runner().execute_android('run',run)
+    return run
+
+@pytest.mark.asyncio
+async def test_scenario_verdicts_become_findings_coverage_gaps_and_skipped_steps(monkeypatch,tmp_path):
+    run=await scenario_run(monkeypatch,tmp_path,[{'event':{'home':True}},{'hold':{'no_crash':True,'for':1}},
+                                                 {'check':{'text':'Downloads','within':1}},{'check':{'text':'Now playing','within':1}}])
+    assert [s['status'] for s in run['scenario']]==['passed','passed','failed','skipped']
+    finding=next(f for f in run['findings'] if f['rule'].startswith('scenario-'))
+    assert finding['severity']=='P2' and finding['classification']=='defect' and finding['verifier_status']=='CONFIRMED'
+    assert run['mission_outcome']=='blocked' and run['status']=='blocked' and run['gate']=='warn'
+    assert run['scenario_coverage']['status']=='partial' and run['coverage']['functionality']['status']=='not_evaluated'
+    assert run['scenario_digest'] and finding['rule'].endswith('-3-text')  # rule names the scenario, the step and the oracle
+
+@pytest.mark.asyncio
+async def test_an_unknown_expectation_is_recorded_without_blocking_or_deducting(monkeypatch,tmp_path):
+    run=await scenario_run(monkeypatch,tmp_path,[{'hold':{'text':'Downloads','for':1,'policy':'unknown'}}])
+    finding=next(f for f in run['findings'] if f['rule'].startswith('scenario-'))
+    assert finding['severity']=='info' and finding['classification']=='observation'
+    assert run['mission_outcome']=='success' and run['gate']=='warn' and run['scores']['functionality']['score']==100
+
+@pytest.mark.asyncio
+async def test_an_operator_step_stops_recording_and_only_the_issued_token_releases_it(monkeypatch,tmp_path):
+    monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
+    async def write(kind,value):return value
+    monkeypatch.setattr(runner_module,'write',write)
+    devices=[]
+    class Recorded(ScenarioDevice):
+        def __init__(self,*a,**k):super().__init__(*a,**k);devices.append(self)
+    monkeypatch.setattr(runner_module.android,'Device',Recorded)
+    run=native_run(tmp_path)
+    run['mission']['scenario']=[{'manual':'Sign in as the test account','timeout':30},{'check':{'text':'Now playing','within':1}}]
+    worker=runner_module.Runner();task=asyncio.create_task(worker.execute_android('run',run))
+    for _ in range(400):
+        await asyncio.sleep(0.01)
+        if run.get('waiting_for'):break
+    waiting=run['waiting_for']
+    assert waiting['step']==1 and waiting['instruction'].startswith('Sign in') and devices[0].recording is False
+    assert run['scenario'][0]['status']=='waiting'
+    for step,token in ((2,waiting['token']),(1,'0'*32)):
+        with pytest.raises(ValueError,match='not waiting'):await worker.continue_step('run',step,token)
+    await worker.continue_step('run',1,waiting['token'])
+    with pytest.raises(ValueError,match='not waiting'):await worker.continue_step('run',1,waiting['token'])
+    await task
+    assert [s['status'] for s in run['scenario']]==['passed','passed'] and run['scenario'][0]['reason'].startswith('The operator')
+    assert run['waiting_for'] is None and devices[0].recording is True and 'run' not in worker.pauses
+
+@pytest.mark.asyncio
+async def test_an_operator_step_that_nobody_answers_ends_the_scenario(monkeypatch,tmp_path):
+    run=await scenario_run(monkeypatch,tmp_path,[{'manual':'Sign in as the test account','timeout':1},{'check':{'text':'Now playing','within':1}}])
+    assert [s['status'] for s in run['scenario']]==['error','skipped']
+    assert 'No operator confirmed' in run['scenario'][0]['reason'] and run['mission_outcome']=='blocked'

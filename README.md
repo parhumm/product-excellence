@@ -65,6 +65,41 @@ universal or Java-only APK. Create a mission for that target, choose the build
 and `pex-test`, then run it. The APK's package data is cleared for each mission;
 the AVD is never wiped. APK bytes stay on this Mac even when metadata is shared.
 
+## Stateful Android scenarios
+
+Some questions need an ordered journey rather than one goal: a download paused
+and resumed on a weak link, a second account on the same device, a notification
+opened an hour later, a shared link that survives a sign-in. A mission for an
+Android target can carry up to 40 ordered steps, built in the **Scenario**
+section of the mission form.
+
+Five journeys ship with the console and fill the rows for you: playback across a
+transport switch, a download over a weak link with pauses, downloads and search
+history per account, a notification opened much later, and a shared link opened
+while signed out. Each leaves `<placeholders>` where a real title or account
+belongs, and a mission cannot be saved while one remains.
+
+A step is a goal for the AI worker, a check that a fact becomes true, a hold that
+a fact stays true, an event done to the device, or a manual step that hands the
+phone to the person sitting at it. Recording stops while they work, so passwords
+and one-time codes are never captured or sent to the AI worker. The run page
+shows each step as it happens and offers **Continue** when a manual step is
+waiting.
+
+Start state is explicit: fresh app data, keep whatever the last run left, or load
+a device state saved under **Settings → Android device**. A saved state restores
+this Mac's emulator only, never an account or a paid entitlement, so the steps
+still check those. Manual steps need a visible emulator window:
+
+```bash
+PEX_ANDROID_AVD=pex-test PEX_ANDROID_WINDOW=1 ./start.command
+```
+
+What a scenario measures, it measures; it does not prove more. Switching
+transport is not switching a subscription. Emulator shaping is the configuration
+the console accepted, not the bytes the app moved. Offline playback shows the
+download was usable for the seconds observed, not that every byte is intact.
+
 ## Product tour
 
 ### Define a mission

@@ -1,0 +1,49 @@
+id: weak-network-download
+name: Download over a weak link with pauses
+about: >-
+  Shapes the emulator link down to a slow profile, starts a download, pauses and resumes it twice,
+  requires the finished state, takes the device offline and opens the file. Offline playback here is
+  evidence that the downloaded title is usable over the interval measured. It is not proof that every
+  byte of the file is intact or that the whole title plays.
+mission:
+  platform: android
+  name: Download over a weak link with pauses
+  goal: Download a title on a slow link with two pauses, then play it with the device offline
+  mode: audit
+  provider: codex
+  pillars: [functionality]
+  max_steps: 20
+  ai_budget: 20
+  max_seconds: 2400
+  reset: fresh
+  scenario:
+    - name: Slow the link before anything downloads
+      event: {speed: edge, delay_ms: 400}
+    - name: Start the download
+      goal: Open "<Movie title>" and start downloading it
+    - name: The download is under way
+      check: {text: "<Text shown while downloading>", within: 60}
+    - name: Pause it
+      goal: Pause the download of "<Movie title>"
+    - name: Let it sit paused
+      event: {wait: 10}
+    - name: Resume it
+      goal: Resume the download of "<Movie title>"
+    - name: Pause it again
+      goal: Pause the download of "<Movie title>"
+    - name: Resume it again
+      goal: Resume the download of "<Movie title>"
+    - name: The download finishes
+      check: {text: "<Text shown when the download is finished>", within: 900, severity: P1}
+    - name: Put the network back
+      event: {network: restore}
+    - name: Cut the device off
+      event: {network: offline}
+    - name: Open the downloaded title
+      goal: Open the downloads list and play the downloaded "<Movie title>"
+    - name: It plays offline
+      hold: {playing: true, for: 30, severity: P1}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}
+    - name: Put the network back
+      event: {network: restore}

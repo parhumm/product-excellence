@@ -1,0 +1,37 @@
+id: stale-notification
+name: A notification opened much later
+about: >-
+  Creates a notification, sends the app to the background, waits, then opens that notification and
+  checks where it lands. The notification is matched to this package before the shade is touched, so
+  another app's notification with the same words is refused instead of tapped. If your build can delete
+  the content behind a notification, run the same steps again after removing it.
+mission:
+  platform: android
+  name: A notification opened much later
+  goal: Open a notification long after it arrived and check it returns to the right screen
+  mode: audit
+  provider: codex
+  pillars: [functionality]
+  max_steps: 14
+  ai_budget: 14
+  max_seconds: 1800
+  reset: fresh
+  scenario:
+    - name: Make the app post a notification
+      goal: Do the thing that makes the app post a notification saying "<Notification text>"
+    - name: The notification is posted
+      check: {notification: {text: "<Notification text>"}, within: 120, severity: P1}
+    - name: Leave the app
+      event: {home: true}
+    - name: Let the system reclaim it
+      event: {kill: true}
+    - name: Wait a while
+      event: {wait: 60}
+    - name: The notification is still there
+      check: {notification: {text: "<Notification text>"}, within: 10}
+    - name: Open it
+      event: {open_notification: "<Notification text>"}
+    - name: It landed on the expected screen
+      check: {text: "<Text shown on the screen it should open>", within: 30, severity: P1}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

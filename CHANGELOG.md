@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased
+
+- **Android missions can carry an ordered scenario.** Up to 40 steps on one
+  device: goals for the AI worker, checks that a fact becomes true, holds that a
+  fact stays true, events done to the device, and manual steps handed to the
+  person sitting at it. A mission without a scenario runs exactly as before.
+- **Five shipped journeys** cover the questions that need state: playback across
+  a transport switch, a download over a weak link with pauses, downloads and
+  search history per account, a notification opened much later, and a shared
+  link opened while signed out. Each leaves placeholders where a real title or
+  account belongs, and refuses to save while one is left.
+- **A guided builder, and the same steps as YAML.** Ordered rows with native
+  controls for every step kind, event and fact; move, duplicate and remove from
+  the keyboard; a budget line that offers to raise the limit when the waits need
+  more time. The advanced view spells the same steps as text, and text that does
+  not parse stays in the editor instead of replacing working rows.
+- **Draft the steps from a sentence.** The signed-in AI worker writes a first
+  scenario, validated against the same schema the form uses. Nothing is replaced
+  until you say so, and drafting never touches the device.
+- **Manual steps without recording credentials.** Recording is stopped and
+  confirmed stopped before the operator notice appears. The run page shows the
+  instruction, the paused recording, the real remaining time and a Continue
+  control; the recording resumes afterwards and the gap is reported.
+- **The run page shows the scenario.** A numbered progress strip and a step
+  table, each step reporting a word and its evidence rather than a colour.
+  Measurements that were not available and questions about intended behaviour
+  are listed apart from the defects, and a refresh no longer takes the control
+  out from under you.
+- **Evidence that cannot be read is never read as a failure.** An unreachable
+  screen, an unknown foreground package or a parser error makes a step
+  unavailable: a coverage gap, not a defect.
+- **Unconfirmed behaviour is a question, not a defect.** A check marked
+  `policy: unknown` is recorded as an observation with severity info. It deducts
+  nothing and blocks nothing.
+- **Start state is explicit.** Fresh app data, keep what the last run left, or
+  load a device state saved on this Mac. Saved states live under Settings →
+  Android device: never overwritten, validated against what is on disk before
+  they load, and refused while a run owns the device.
+- **Comparison says what it can establish.** Matching conditions and the right to
+  call a finding reproduced are answered separately, with the actual reason when
+  a reproduction cannot be claimed: a different build, a start state that was
+  inherited rather than established, an operator attestation, or a required step
+  left without evidence.
+
 ## 1.5.2 — 2026-09-14
 
 - **New demo videos.** The landing page and the README now show five

@@ -56,6 +56,44 @@ Write the goal the way the presets are written:
 Set `pillars` to what the goal actually judges. Raise `max_steps`, `max_seconds`
 and `ai_budget` only as far as the task needs, and tell the user what you chose.
 
+## 2b. Android journeys that need more than one goal
+
+A question about state rather than a single task becomes a `scenario`: an ordered
+list of steps on one device. Downloads that survive a weak link, a second account
+on the same phone, a notification opened an hour later, a shared link that
+survives a sign-in. Read `references/scenario-steps.md` for the five step kinds,
+the facts a check or hold may state, the device events and the three modifiers.
+
+Start from the nearest shipped journey in `engine/scenarios/` rather than an
+empty list. There are five, and the console lists them with their display text at
+`/api/scenarios`:
+
+| Journey | Answers |
+| --- | --- |
+| `entitlement-switch` | Does playback survive a move to another transport? |
+| `weak-network-download` | Does a paused and resumed download finish and play? |
+| `profile-isolation` | Are downloads and search history separate per account? |
+| `stale-notification` | Does a notification opened much later land in the right place? |
+| `shared-link-login` | Does a shared link still reach its page after signing in? |
+
+Keep the shape they set:
+
+- Anchor a screen with a `goal` before asserting text on it, and never assert
+  that text is absent without anchoring first.
+- Use `manual` only for sign-in, payment and one-time codes. Recording stops
+  while a person works, so every manual step costs coverage: use the fewest.
+- Mark a fact `policy: unknown` whenever nobody has confirmed what the app should
+  do. It is then recorded as an observation, not held against the release.
+- Leave `<placeholders>` for real titles and accounts, and say in your summary
+  which ones the user has to replace before the mission can be saved.
+- Set `reset: fresh` unless the journey needs what the last run left. `snapshot`
+  names a device state saved on that one Mac.
+- Budget for the waits: `max_seconds` has to cover every `within`, `for`, `wait`
+  and operator timeout plus the app's own work. The presets start at 1800.
+
+Say plainly what the scenario cannot establish, using the last section of
+`references/scenario-steps.md`.
+
 ## 3. Show it, then import it
 
 Write the YAML to the scratchpad using the mission schema,

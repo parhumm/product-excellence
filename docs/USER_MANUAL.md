@@ -222,6 +222,30 @@ Four things to know about the numbers:
 A model with no published price shows `n/a` rather than a guess, and a run
 containing one is marked partial.
 
+### Android journeys with steps
+
+Some questions are about what the app remembers, not about one page. A download paused twice on a weak connection. A second account on the same phone. A notification opened an hour later. A link a friend sent, opened before signing in.
+
+Choose an Android target and the mission form grows a **Scenario** section. Open **Start from a shipped journey** and pick one of the five, or describe the journey in a sentence and press **Draft the steps** to have the AI worker write a first version. Either way you get ordered rows you can edit, reorder and remove. **Advanced: edit as YAML** shows the same steps as text for anyone who prefers it.
+
+A row is one of five things:
+
+- **Goal** — one instruction the AI worker carries out, such as opening a film and starting it.
+- **Check** — a fact that has to become true within a number of seconds.
+- **Hold** — a fact that has to stay true across a number of seconds, sampled throughout.
+- **Event** — something done to the device: change the network, slow it down, wait, press home, kill the app, open a link, open a notification.
+- **Manual** — hand the phone to the person sitting at it. Use it for signing in, paying and one-time codes.
+
+A shipped journey arrives with `<placeholders>` where your own film title or account belongs. The mission refuses to save while one is left, which is what stops a template running against the wrong content.
+
+If you do not know what the app is supposed to do, say so: set a check's policy to **Nobody has confirmed this yet**. It is then recorded as a question about intended behaviour rather than a defect, and it never lowers a score or blocks a release.
+
+A manual step stops the recording first and waits for you. The run page shows the instruction, says the recording is paused, and offers **Continue run**. The wait counts against the mission's own time limit, and the page shows whichever is shorter. Manual steps need an emulator you can see, so start the console with `PEX_ANDROID_WINDOW=1`.
+
+**Start state** decides what the device holds when the steps begin. Fresh clears the app's data, which is not a reinstall and changes nothing on the server. Keep leaves whatever the last run left. Load restores a device state you saved under **Settings → Android device**: that brings back this Mac's emulator, not an account or a paid subscription, so the steps still check those.
+
+While the run works, each step appears with its number, its outcome in words and the evidence it used. Steps that could not be measured are listed apart from the findings, because missing evidence is a gap in coverage and not a defect.
+
 ### 4. Run and watch
 
 Press **Run**.

@@ -55,6 +55,12 @@ budget, writes the goal, and shows you the whole YAML file before importing
 anything. Say yes and it imports; it then offers the run command instead of
 starting the run itself.
 
+Ask it for an ordered Android journey and it writes a scenario instead of a
+single goal: "download a film over a weak connection, pause and resume it twice,
+then play it offline". It starts from the nearest of the five shipped journeys,
+keeps a placeholder wherever a real title or account belongs, and tells you which
+steps need a person at the device.
+
 ```
 > /pex-run-brief <the run id>
 ```

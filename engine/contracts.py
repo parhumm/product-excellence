@@ -1,7 +1,144 @@
 import re
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Literal
 from urllib.parse import urlsplit
+
+# --- Android scenario steps -------------------------------------------------
+# A scenario is an ordered list of steps stored as normalized objects. YAML is an
+# editing and exchange representation only; the mission never keeps the text.
+PLACEHOLDER=re.compile(r'<[^<>]{0,120}>')
+ORACLES=('text','text_absent','activity','playing','notification','no_crash')
+EVENTS=('network','speed','delay_ms','kill','home','wait','relaunch','deep_link','open_notification')
+KINDS=('goal','manual','event','check','hold')
+STRICT=dict(extra='forbid',populate_by_name=True,serialize_by_alias=True)
+
+def https_link(value):
+    # A template still carrying its <placeholder> is reported by step number later, not as a bad URL here.
+    if PLACEHOLDER.fullmatch(value):return value
+    u=urlsplit(value)
+    if u.scheme!='https' or not u.hostname or u.username or u.password:raise ValueError('Deep links need an HTTPS URL without credentials')
+    return value
+
+def placeholder_in(value):
+    """The first unresolved <placeholder> anywhere in a step, so the author is told what to replace."""
+    if isinstance(value,str):
+        found=PLACEHOLDER.search(value);return found.group(0) if found else ''
+    if isinstance(value,dict):
+        for item in value.values():
+            found=placeholder_in(item)
+            if found:return found
+    if isinstance(value,list):
+        for item in value:
+            found=placeholder_in(item)
+            if found:return found
+    return ''
+
+class Match(BaseModel):
+    """Exact or substring match on package/activity. No author-supplied regular expression is executed."""
+    model_config=ConfigDict(**STRICT)
+    contains: str = Field(default='', max_length=300)
+    equals: str = Field(default='', max_length=300)
+    @model_validator(mode='after')
+    def one(self):
+        if bool(self.contains)==bool(self.equals):raise ValueError('Match an activity with exactly one of contains or equals')
+        return self
+
+class Notification(BaseModel):
+    model_config=ConfigDict(**STRICT)
+    text: str = Field(min_length=1, max_length=300)
+    present: bool = True
+
+class Until(BaseModel):
+    """An early stop for a goal. Reaching it proves navigation, nothing later in the scenario."""
+    model_config=ConfigDict(**STRICT)
+    text: str = Field(min_length=1, max_length=300)
+
+class Oracle(BaseModel):
+    model_config=ConfigDict(**STRICT)
+    text: str = Field(default='', max_length=4000)
+    text_absent: str = Field(default='', max_length=4000)
+    activity: Match | None = None
+    playing: bool | None = None
+    notification: Notification | None = None
+    no_crash: bool | None = None
+    policy: Literal['confirmed','unknown'] = 'confirmed'
+    severity: Literal['P1','P2','P3','info'] = 'P2'
+    required: bool | None = None
+    @property
+    def kind(self):return next(k for k in ORACLES if getattr(self,k) not in (None,''))
+    @model_validator(mode='after')
+    def one_oracle(self):
+        chosen=[k for k in ORACLES if getattr(self,k) not in (None,'')]
+        if len(chosen)!=1:raise ValueError('A check or hold states exactly one of: '+', '.join(ORACLES))
+        # An unknown expectation is an observation: it never blocks a release, so it cannot be required.
+        if self.policy=='unknown':
+            if self.required:raise ValueError('An unknown-policy observation records what happened; it cannot be required')
+            self.required=False
+        elif self.required is None:self.required=True
+        return self
+
+class Check(Oracle):
+    """Establish the fact once, any time inside the window."""
+    within: int = Field(default=10, ge=1, le=1800)
+
+class Hold(Oracle):
+    """Establish the fact repeatedly across the whole interval."""
+    for_: int = Field(default=10, ge=1, le=1800, alias='for')
+
+class Event(BaseModel):
+    model_config=ConfigDict(**STRICT)
+    network: Literal['wifi','cellular','offline','restore'] | None = None
+    speed: Literal['edge','gsm','umts','lte','full'] | None = None
+    delay_ms: int | None = Field(default=None, ge=0, le=5000)
+    kill: bool | None = None
+    home: bool | None = None
+    wait: int | None = Field(default=None, ge=1, le=1800)
+    relaunch: bool | None = None
+    deep_link: str | None = Field(default=None, max_length=2000)
+    open_notification: str | None = Field(default=None, min_length=1, max_length=300)
+    @property
+    def kind(self):
+        chosen=[k for k in EVENTS if getattr(self,k) is not None]
+        if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
+        return chosen[0]
+    @model_validator(mode='after')
+    def one_operation(self):
+        chosen=[k for k in EVENTS if getattr(self,k) is not None]
+        # A link speed may carry its own added delay; everything else stands alone.
+        if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
+        if len(chosen)!=1:raise ValueError('An event step performs exactly one of: '+', '.join(EVENTS))
+        for flag in ('kill','home','relaunch'):
+            if getattr(self,flag) is False:raise ValueError(flag+' takes true, or leave the key out')
+        if self.deep_link:https_link(self.deep_link)
+        return self
+
+class Step(BaseModel):
+    model_config=ConfigDict(**STRICT)
+    name: str = Field(default='', max_length=200)
+    goal: str = Field(default='', max_length=4000)
+    until: Until | None = None
+    manual: str = Field(default='', max_length=4000)
+    timeout: int | None = Field(default=None, ge=1, le=1800)
+    event: Event | None = None
+    check: Check | None = None
+    hold: Hold | None = None
+    @property
+    def kind(self):return next(k for k in KINDS if getattr(self,k) not in (None,''))
+    @property
+    def seconds(self):
+        """Time this step commits to spend. Windows and operator timeouts are maximums, not runtime."""
+        if self.hold:return self.hold.for_
+        if self.event:return self.event.wait or 0
+        return 0
+    @model_validator(mode='after')
+    def one_kind(self):
+        chosen=[k for k in KINDS if getattr(self,k) not in (None,'')]
+        if len(chosen)!=1:raise ValueError('Each step is exactly one of: '+', '.join(KINDS))
+        if self.until is not None and not self.goal:raise ValueError('until describes when a goal step may stop early')
+        if self.timeout is not None and not self.manual:raise ValueError('timeout is how long an operator step may wait')
+        if self.goal and len(self.goal)<5:raise ValueError('Describe the goal in at least five characters')
+        if self.manual and self.timeout is None:self.timeout=300
+        return self
 
 class Mission(BaseModel):
     project_id: str = 'default'
@@ -41,6 +178,10 @@ class Mission(BaseModel):
     login_password: str = Field(default='', max_length=200)
     egress_id: str = ''
     release: str = Field(default='live', max_length=100)
+    # Android start state. `fresh` clears app data before the mission; `keep` carries it between runs.
+    reset: Literal['fresh','keep'] = 'fresh'
+    snapshot: str = Field(default='', pattern=r'^$|^[a-z0-9]{8,64}$')
+    scenario: list[Step] = Field(default_factory=list, max_length=40)
     pillars: list[Literal['functionality','cro','seo_aeo','ux_ui','performance']] = Field(min_length=1,default_factory=lambda:['functionality','cro','seo_aeo','ux_ui','performance'])
     @field_validator('url')
     @classmethod
@@ -76,6 +217,20 @@ class Mission(BaseModel):
         # An explicit target owns the platform; the request is validated again after
         # target resolution. Legacy web missions still need their own URL here.
         if self.platform=='web' and not self.url and not self.target_id:raise ValueError('Website missions require a URL')
+        if self.platform!='android' and (self.scenario or self.snapshot or self.reset!='fresh'):
+            raise ValueError('Scenarios and saved device state apply to Android missions')
+        if self.snapshot:
+            # The name of a saved state is not its identity; loading one always keeps the data it holds.
+            if 'reset' in self.model_fields_set and self.reset=='fresh':raise ValueError('A saved device state keeps its data; choose Keep previous app data or remove the snapshot')
+            self.reset='keep'
+        if self.scenario:
+            if 'functionality' not in self.pillars:raise ValueError('Scenario verdicts are recorded under Functionality; select that pillar')
+            committed=0
+            for number,step in enumerate(self.scenario,1):
+                found=placeholder_in(step.model_dump())
+                if found:raise ValueError(f'Step {number} still says {found}; replace it with the real value before saving')
+                committed+=step.seconds
+            if committed>=self.max_seconds:raise ValueError(f'The waits and holds in this scenario already need {committed} s; raise the run time limit above that')
         if self.platform=='android':
             if self.mode=='benchmark' or self.competitors or self.persona_id or self.egress_id or self.login_identifier or self.login_password:raise ValueError('Android missions do not support benchmark, competitors, personas, egress or sign-in')
             if 'seo_aeo' in self.pillars:raise ValueError('Android missions do not support SEO/AEO')
@@ -115,6 +270,35 @@ class ContinueRequest(BaseModel):
     """How much more work a finished run may do. Zero means the same amount its mission asked for."""
     ai_calls: int = Field(default=0, ge=0, le=60)
     steps: int = Field(default=0, ge=0, le=40)
+class ContinueStepRequest(BaseModel):
+    """Which operator pause is being released. The token is issued by the run and used once."""
+    model_config=ConfigDict(extra='forbid')
+    step: int = Field(ge=1, le=40)
+    token: str = Field(pattern=r'^[0-9a-f]{32}$')
+class DraftRequest(BaseModel):
+    """One ask for scenario steps. Nothing is stored and no device is touched."""
+    model_config=ConfigDict(extra='forbid')
+    project_id: str = 'default'
+    target_id: str = ''
+    build: str = ''
+    description: str = Field(min_length=10, max_length=4000)
+    # Text the author says appears in their app. Nothing is read off a device for this.
+    texts: list[str] = Field(default_factory=list, max_length=30)
+    provider: Literal['codex','claude','auto','none'] = 'auto'
+    codex_account: str = Field(default='', max_length=80)
+    @field_validator('codex_account')
+    @classmethod
+    def account_alias(cls,v):return Mission.account_alias(v)
+class ScenarioText(BaseModel):
+    """Translate between the step rows and their YAML spelling. Comments are not preserved."""
+    model_config=ConfigDict(extra='forbid')
+    yaml: str = Field(default='', max_length=40000)
+    steps: list[Step] = Field(default_factory=list, max_length=40)
+class SnapshotRequest(BaseModel):
+    """Save the designated AVD's current state under a new managed ID. Names are labels, never identity."""
+    model_config=ConfigDict(extra='forbid')
+    name: str = Field(min_length=1, max_length=100)
+    project_id: str = 'default'
 class NetworkProfile(BaseModel):
     name: str = Field(min_length=1,max_length=100)
     latency_ms: int = Field(default=0,ge=0,le=5000)

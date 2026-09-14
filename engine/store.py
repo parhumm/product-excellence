@@ -1,5 +1,5 @@
 import os, uuid, logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy import create_engine, Column, String, JSON, Integer, select, inspect, text, update, delete as sql_delete
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -24,7 +24,9 @@ class Record(Base):
 
 class Conflict(ValueError): pass
 
-def now(): return datetime.now(timezone.utc).isoformat()
+def now(offset=0):
+    """Now, or a moment `offset` seconds from now for a deadline the reader can compare against."""
+    return (datetime.now(timezone.utc)+timedelta(seconds=offset)).isoformat()
 def workspace_of(kind, value):
     if kind == 'project': return value.get('id', '')
     return value.get('project_id') or (value.get('mission') or {}).get('project_id') or (value.get('snapshot') or {}).get('project_id', '')

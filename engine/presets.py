@@ -9,6 +9,8 @@ Goals are written for the engine's read-only policy: nothing is submitted,
 purchased or deleted, navigation stays on the workspace's own domains, and a
 password reaches the browser only through the {{password}} placeholder.
 """
+import yaml
+from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 from engine import store
 from engine.contracts import Mission
@@ -62,3 +64,14 @@ def seed_project(project, session=None):
                           allowed_domains=domains + spec.pop('allowed_domains', []), **spec)
         store.save('mission', {'version': 1, 'template': template, **mission.model_dump(exclude={'login_password'})}, session=session)
     return store.save('project', {**project, 'presets': PRESET_VERSION}, session=session)
+# --- shipped scenario templates ---------------------------------------------
+# The order the five stateful journeys are usually worked through, not alphabetical.
+PRESET_ORDER=('entitlement-switch','weak-network-download','profile-isolation','stale-notification','shared-link-login')
+
+def scenarios():
+    """The shipped Android scenario templates: display text plus a mission still missing its target, build and device."""
+    found={}
+    for path in (Path(__file__).parent/'scenarios').glob('*.yaml'):
+        raw=yaml.safe_load(path.read_text(encoding='utf-8'))
+        found[raw['id']]={'id':raw['id'],'name':raw['name'],'about':' '.join(raw['about'].split()),'mission':raw['mission']}
+    return [found[id] for id in PRESET_ORDER if id in found]+[v for k,v in sorted(found.items()) if k not in PRESET_ORDER]

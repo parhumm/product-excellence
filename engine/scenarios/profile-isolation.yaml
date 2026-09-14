@@ -1,0 +1,52 @@
+id: profile-isolation
+name: Downloads and search history per account
+about: >-
+  An operator signs in as the first account, the run creates a search and a download, then the account
+  is switched in the app and the second account's screens are checked for the first account's data.
+  This tests switching accounts, not switching profiles inside one account. Say which one you meant
+  before reading the result, and remember that an operator sign-in is an attestation, not a verified
+  server state.
+mission:
+  platform: android
+  name: Downloads and search history per account
+  goal: Check that one account's downloads and search history do not appear under another account
+  mode: audit
+  provider: codex
+  pillars: [functionality]
+  max_steps: 24
+  ai_budget: 24
+  max_seconds: 2700
+  reset: fresh
+  scenario:
+    - name: Sign in as the first account
+      manual: Sign in on the device as <First account identifier>, then continue
+      timeout: 600
+    - name: The first account is signed in
+      check: {text: "<Text shown only to the first account>", within: 30, severity: P1}
+    - name: Search for something
+      goal: Search for "<Search term>" and open a result
+    - name: Download a title
+      goal: Download "<Movie title>" and wait until it is listed as downloaded
+    - name: The download is listed for this account
+      check: {text: "<Movie title>", within: 60}
+    - name: The search is in this account's history
+      goal: Open the search screen and show the recent searches
+    - name: The search term is in the history
+      check: {text: "<Search term>", within: 20}
+    - name: Sign out in the app
+      goal: Sign out of the current account
+    - name: Sign in as the second account
+      manual: Sign in on the device as <Second account identifier>, then continue
+      timeout: 600
+    - name: The second account is signed in
+      check: {text: "<Text shown only to the second account>", within: 30, severity: P1}
+    - name: Open this account's downloads
+      goal: Open the downloads list
+    - name: The other account's download is not here
+      hold: {text_absent: "<Movie title>", for: 10, severity: P1}
+    - name: Open this account's search screen
+      goal: Open the search screen and show the recent searches
+    - name: The other account's search is not here
+      hold: {text_absent: "<Search term>", for: 10, severity: P1}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

@@ -9,6 +9,15 @@ calls an AI, so Run, Replay and the mission forms are switched off there and
 read "Coming soon". Everyone keeps running tests on their own machine with their
 own Claude or ChatGPT subscription.
 
+Android scenarios stay local in the same way. The designated AVD, the emulator
+window an operator needs for a manual step, and every saved device state live on
+one Mac: the server holds none of them and no console can borrow another's. A
+published run carries the steps, their outcomes, samples and recordings, so a
+teammate reads what happened without being able to reproduce it from the server.
+A mission that names a saved device state runs only on the Mac that saved it;
+elsewhere it reports the missing prerequisite instead of quietly starting from
+whatever the device holds.
+
 ## Upgrade to 1.5.0
 
 Upgrade the hub first, then every execution console in a workspace before anyone uses targets, Android or local/private items. Stop new submissions, let active runs finish, and drain `data/pending-publication` on every console before taking coordinated database and artifact checkpoints. Default web targets add records to the existing JSON store; there is no schema change and historical payloads or evidence are not rewritten. The supplementary pre-write export is `data/backups/records-before-targets-*.json`.

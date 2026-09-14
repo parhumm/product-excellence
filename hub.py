@@ -199,7 +199,8 @@ def validate(kind,id,body,ws,old,s):
         if key in body and (not isinstance(body[key],str) or len(body[key])>64):raise HTTPException(422,'Invalid timestamp')
     if body.get('id')!=id:raise HTTPException(422,'URL and record IDs differ')
     if store.workspace_of(kind,body)!=ws:raise HTTPException(403,'Workspace cannot change')
-    for v in (body,body.get('mission',{}),body.get('snapshot',{})):
+    # Only a stored mission version carries a nested snapshot; a mission's own `snapshot` names a device state.
+    for v in (body,body.get('mission',{}))+((body.get('snapshot',{}),) if kind=='mission_version' else ()):
         if not isinstance(v,dict):raise HTTPException(422,'Invalid snapshot')
         if v.get('project_id',ws)!=ws:raise HTTPException(403,'Workspace cannot change')
     def secrets_check(v):

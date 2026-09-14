@@ -27,6 +27,18 @@ def plain_headline(run):
     if status in ('failed','cancelled','interrupted'):return STATUS_HEADLINE[status]
     return OUTCOME_HEADLINE.get(run.get('mission_outcome')) or STATUS_HEADLINE.get(status) or ('Run '+status)
 
+def scenario_coverage(run):
+    """What the scenario actually established. Missing, skipped or unreadable evidence is a gap."""
+    steps=run.get('scenario') or []
+    if not steps:return {}
+    gaps=[f"Step {s['number']} {s['status']}: {s.get('reason') or s['requested']}"[:300]
+          for s in steps if s['status'] not in ('passed','failed')]
+    checks=[s for s in steps if s['kind'] in ('check','hold')]
+    passed=sum(1 for s in checks if s['status']=='passed')
+    note=f'{passed} of {len(checks)} checks established'+(f'; {len(gaps)} steps left no usable evidence' if gaps else '')
+    return {'status':'evaluated' if not gaps else 'partial','steps':len(steps),'checks':len(checks),
+            'passed':passed,'failed':sum(1 for s in checks if s['status']=='failed'),'gaps':gaps[:20],'note':note}
+
 def coverage(run):
     ai_done=run.get('ai_evaluation_completed',False)
     observations=run.get('observations',[])
@@ -34,6 +46,9 @@ def coverage(run):
     result={}
     if (run.get('platform') or run.get('mission',{}).get('platform'))=='android':
         checks=(observations[-1].get('checks',{}) if observations else {})
+        scenario=run.get('scenario_coverage') or {}
+        # A device this run left shaped cannot be trusted to have measured itself, or the next run.
+        unrestored=[e['setting'] for e in (run.get('network_restore') or []) if not e.get('restored')]
         for pillar in run['mission']['pillars']:
             if pillar=='cro':done=ai_done
             elif pillar=='ux_ui':done=bool(observations) and all(o.get('checks',{}).get('hierarchy',{}).get('status')=='supported' for o in observations)
@@ -41,6 +56,13 @@ def coverage(run):
             else:done=bool(observations) and any((checks.get(k) or {}).get('status')=='supported' for k in ('gfxinfo','meminfo'))
             unavailable=[k for k,v in checks.items() if v.get('status')!='supported']
             result[pillar]={'status':'evaluated' if done else 'not_evaluated','method':'deterministic + AI' if ai_done else 'deterministic','note':'Android lab checks; unavailable: '+(', '.join(unavailable) if unavailable else 'none')}
+            # A scenario reports under Functionality; incomplete scenario evidence leaves that pillar unevaluated.
+            if pillar=='functionality' and scenario:
+                if scenario['status']!='evaluated':result[pillar]['status']='not_evaluated'
+                result[pillar]['note']+=' · Scenario: '+scenario['note']
+            if unrestored:
+                result[pillar]['status']='not_evaluated'
+                result[pillar]['note']+=' · Network settings left changed on the device: '+', '.join(unrestored)
         return result
     for pillar in run['mission']['pillars']:
         done=bool(observations)

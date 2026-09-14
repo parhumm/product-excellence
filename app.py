@@ -4,11 +4,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 import yaml
+from pydantic import ValidationError
 from fastapi import FastAPI,HTTPException,Request,UploadFile,File,Header
 from fastapi.responses import HTMLResponse,FileResponse,Response,JSONResponse
 from fastapi.staticfiles import StaticFiles
 from engine import store,ai,netem,presets,pricing,hub,views,suggest,targets,android
-from engine.contracts import Mission,GoalRequest,RunRequest,ContinueRequest,NetworkProfile,Egress,Schedule,Project,Target
+from engine.contracts import Mission,GoalRequest,RunRequest,ContinueRequest,ContinueStepRequest,SnapshotRequest,DraftRequest,ScenarioText,Step,NetworkProfile,Egress,Schedule,Project,Target
 from engine.runner import runner
 from engine.evaluate import finding_identity
 from engine.outcomes import gate,scores,executive_summary,sync_findings
@@ -355,6 +356,76 @@ async def continue_run(id:str,req:ContinueRequest):
     # Zero means "as much again as the mission asked for", so one click is enough.
     try:return await runner.resume(id,req.ai_calls or r['mission']['ai_budget'],req.steps or r['mission']['max_steps'])
     except ValueError as e:raise HTTPException(429 if 'Queue' in str(e) else 409 if str(e).startswith('Wait') else 422,str(e))
+@app.post('/api/runs/{id}/continue-step')
+async def continue_step(id:str,req:ContinueStepRequest):
+    r=await hub.io(required,'run',id)
+    if store.remote('run',r):raise HTTPException(409,'Continue an operator step on the machine running the device')
+    if r['status']!='running':raise HTTPException(409,'This run is not waiting for an operator')
+    try:return await runner.continue_step(id,req.step,req.token)
+    except ValueError as e:raise HTTPException(409,str(e))
+@app.get('/api/scenarios')
+def scenario_templates():
+    """The shipped stateful journeys. Each mission still needs a target, build and device."""
+    return presets.scenarios()
+def problem(error):
+    """The first thing pydantic objected to, in the author's words rather than the validator's."""
+    first=error.errors()[0];where='.'.join(str(part) for part in first['loc'] if not isinstance(part,int))
+    return (where+': ' if where else '')+first['msg'].replace('Value error, ','')[:300]
+def compact(step):
+    """The step as an author would write it: nothing that is already implied."""
+    row=step.model_dump(by_alias=True,exclude_defaults=True,exclude_none=True)
+    for kind in ('check','hold'):
+        oracle=row.get(kind)
+        # Required is derived from the policy; printing it back only when it was overridden.
+        if oracle and oracle.get('required') is (oracle.get('policy','confirmed')=='confirmed'):oracle.pop('required')
+    return row
+@app.post('/api/scenarios/yaml')
+def scenario_yaml(req:ScenarioText):
+    """One normalized model, two spellings. Invalid YAML is refused and changes nothing."""
+    steps=req.steps
+    if req.yaml.strip():
+        try:parsed=yaml.safe_load(req.yaml)
+        except yaml.YAMLError as e:raise HTTPException(422,'This is not valid YAML: '+str(e).split('\n')[0][:300])
+        if not isinstance(parsed,list):raise HTTPException(422,'A scenario is a list of steps, one per dash')
+        if len(parsed)>40:raise HTTPException(422,'A scenario holds at most 40 steps')
+        steps=[]
+        for number,item in enumerate(parsed,1):
+            if not isinstance(item,dict):raise HTTPException(422,f'Step {number} is not a step: write one key such as goal, check, hold, event or manual')
+            try:steps.append(Step.model_validate(item))
+            except ValidationError as e:raise HTTPException(422,f'Step {number}: '+problem(e))
+            except ValueError as e:raise HTTPException(422,f'Step {number}: '+str(e)[:300])
+    rows=[compact(s) for s in steps]
+    return {'steps':rows,'yaml':yaml.safe_dump(rows,allow_unicode=True,sort_keys=False,default_flow_style=False) if rows else ''}
+@app.post('/api/scenarios/draft')
+async def draft_scenario(req:DraftRequest):
+    """Steps suggested from a description. Nothing is saved and no device is touched."""
+    project=await hub.io(required,'project',req.project_id)
+    target=await hub.io(store.get,'target',req.target_id,req.project_id) if req.target_id else None
+    if req.target_id and not target:raise HTTPException(404,'Target not found in this workspace')
+    if not target or target['type']!='android':raise HTTPException(422,'Scenarios are drafted against an Android target')
+    builds=target.get('builds',[]);build=next((b for b in builds if b['sha256']==req.build),None) if req.build else max((b for b in builds if not b.get('archived')),key=lambda b:(b['version_code'],b['uploaded_at'],b['sha256']),default=None)
+    try:return await suggest.draft(req,{**project,'_target':target,'_build':build or {}})
+    except ValueError as e:raise HTTPException(422,str(e))
+    except Exception as e:raise HTTPException(502,'The AI worker could not draft the steps: '+str(e)[:300])
+def designated_avd():
+    avd=os.environ.get('PEX_ANDROID_AVD','')
+    if not avd:raise HTTPException(422,'Name the designated disposable AVD in PEX_ANDROID_AVD before managing snapshots')
+    return avd
+@app.get('/api/android/snapshots')
+def android_snapshots(project:str=''):
+    avd=designated_avd()
+    try:return {'avd':avd,'snapshots':android.snapshots(avd,project)}
+    except android.AndroidError as e:raise HTTPException(422,str(e))
+@app.post('/api/android/snapshots')
+async def save_android_snapshot(req:SnapshotRequest):
+    avd=designated_avd()
+    try:return await android.capture_snapshot(avd,req.name,req.project_id)
+    except android.AndroidError as e:raise HTTPException(409 if 'busy' in str(e) else 422,str(e))
+@app.delete('/api/android/snapshots/{id}')
+async def remove_android_snapshot(id:str,project:str=''):
+    avd=designated_avd()
+    try:return await android.delete_snapshot(avd,id,project)
+    except android.AndroidError as e:raise HTTPException(409 if 'busy' in str(e) else 404 if 'no managed snapshot' in str(e) else 422,str(e))
 @app.get('/api/compare')
 def compare(baseline:str,candidate:str):
     a=required('run',baseline);b=required('run',candidate)

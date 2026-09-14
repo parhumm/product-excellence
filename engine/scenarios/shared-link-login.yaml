@@ -1,0 +1,33 @@
+id: shared-link-login
+name: A shared link opened while signed out
+about: >-
+  Opens a shared link on a signed-out device, has an operator sign in, and checks that the app returns
+  to the linked title rather than the home screen. Start from fresh app data or a snapshot you captured
+  while signed out. A preserved session would skip the sign-in that this scenario exists to test.
+mission:
+  platform: android
+  name: A shared link opened while signed out
+  goal: Open a shared link while signed out, sign in, and check the app returns to the linked title
+  mode: audit
+  provider: codex
+  pillars: [functionality]
+  max_steps: 14
+  ai_budget: 14
+  max_seconds: 1800
+  reset: fresh
+  scenario:
+    - name: The device is signed out
+      check: {text: "<Text shown only when signed out>", within: 30, severity: P1}
+    - name: Open the shared link
+      event: {deep_link: "<https link to the shared title>"}
+    - name: The app asks for a sign-in
+      check: {text: "<Text on the sign-in screen>", within: 30, severity: P1}
+    - name: Sign in
+      manual: Sign in on the device as <Account identifier>, then continue
+      timeout: 600
+    - name: The linked title is on screen
+      check: {text: "<Movie title>", within: 60, severity: P1}
+    - name: It is the title's own screen, not the home screen
+      check: {text: "<Text shown only on a title page>", within: 20}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

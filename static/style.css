@@ -28,3 +28,56 @@ abbr[title]{text-decoration:none;cursor:help;border-bottom:1px dotted var(--line
 .workspaces small{display:block;margin-top:2px}
 .workspaces .field{min-width:260px}
 [hidden]{display:none!important}fieldset{border:1px solid var(--line);border-radius:5px;padding:12px 14px;margin:0}legend{font-size:12px;font-weight:600;padding:0 5px}
+/* A pause needs an answer, so its two actions sit directly under the words that ask for one. */
+.notice .toolbar{margin:12px 0 0}
+
+/* A scenario is an ordered set of instructions, so it reads as a numbered list, never a grid of cards. */
+.scenario{gap:10px}
+.scenariotools{border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:0 16px;margin:6px 0}
+.scenariotools>details+details{border-top:1px solid var(--line)}
+.scenariotools>details>summary{color:var(--ink)}
+.preset{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:12px 0;border-top:1px solid var(--line)}
+.preset:first-child{border-top:0}
+.preset small{display:block;margin-top:4px;max-width:64ch}
+.presetact{display:flex;gap:10px;align-items:center;white-space:nowrap}
+.draftbody{display:grid;gap:10px;padding-bottom:16px}
+.draftbody textarea{min-height:72px}
+.draftlines{margin:8px 0;padding-left:22px;font-size:12px;color:var(--muted)}
+.draftlines li{padding:2px 0;overflow-wrap:anywhere}
+.startstate .checks{flex-direction:column;gap:10px;margin-bottom:0}
+.startstate .checks label{align-items:flex-start}
+.startstate .checks small{display:block;margin-top:2px}
+.startstate .field{margin-top:14px}
+.steps{list-style:none;margin:2px 0 0;padding:0}
+.step,.nosteps{padding:14px 0;border-top:1px solid var(--line)}
+.stephead{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stepno{min-width:22px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stephead select{width:auto;min-width:190px}
+.stephead>input{flex:1;min-width:150px}
+.stepacts{margin-left:auto;display:flex;gap:6px}
+.stepbody{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 0 32px}
+.cell{display:flex;flex-direction:column;gap:5px;flex:1;min-width:150px}
+.cell.wide{flex:3;min-width:250px}
+.cell.narrow{flex:0 0 120px;min-width:120px}
+.cell>span{font-size:11px;font-weight:600;color:var(--muted)}
+p.cell{margin:0;align-self:center;font-size:12px}
+/* An unreplaced <placeholder> is the one thing that stops a template running, so it stays visible. */
+.step input.ph{background:oklch(96% .035 80);border-color:oklch(84% .05 80)}
+#scenario-summary{font-size:12px}
+#scenario-summary .compact{margin-left:8px}
+#scenario-yaml{min-height:280px;font-family:ui-monospace,monospace;font-size:12px}
+@media(max-width:720px){.stepbody{margin-left:0}.preset{display:block}.presetact{margin-top:10px}}
+
+/* Step progress is a line of numbered controls: the mark and the word carry the status, colour never does it alone. */
+.stepstrip{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0 0 20px;max-height:168px;overflow:auto}
+.stepstrip .stepchip{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:94px;padding:7px 10px;font-size:11px;font-weight:400;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);white-space:normal;text-align:left}
+.stepstrip .stepchip strong{font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums}
+.stepchip.passed{background:var(--wash);border-color:oklch(84% .04 155);color:var(--accent)}
+.stepchip.failed{background:oklch(95% .023 25);border-color:oklch(86% .04 25);color:var(--danger)}
+.stepchip.unavailable,.stepchip.error{background:oklch(95% .035 80);border-color:oklch(86% .04 80);color:var(--warn)}
+.stepchip.running{background:oklch(94% .025 245);border-color:oklch(84% .04 245);color:oklch(39% .09 245)}
+.steptable td:first-child{white-space:nowrap}
+.steptable td:nth-child(2),.steptable td:last-child{overflow-wrap:anywhere}
+.plain{list-style:none;padding:0;margin:0 0 16px}
+.plain li{padding:7px 0;border-top:1px solid var(--line);max-width:90ch}
+@media(max-width:720px){.stepstrip .stepchip{min-width:0;flex:1 1 auto}.steptable td{padding:11px 12px}}

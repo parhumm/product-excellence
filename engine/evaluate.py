@@ -78,12 +78,74 @@ def evaluate_android(observation,logs='',measurements=None):
     for match in re.finditer(r'ANR in ([\w.:]+)([^\n]*)',logs):add('anr','functionality','App stopped responding',match.group(0),'Responsive main thread','Move blocking work off the main thread','P1')
     return result
 
+SCENARIO_ADVICE={'text':'Reproduce this step and fix the screen that did not show it',
+ 'text_absent':'Find what still carries the previous account or session state on this screen',
+ 'activity':'Follow the same route and fix where the app lands',
+ 'playing':'Inspect the player and its media session at this point of the journey',
+ 'notification':'Inspect what the app posts and where opening it leads',
+ 'no_crash':'Fix the first application stack frame in the recorded block'}
+
+def scenario_digest(steps):
+    """Stable identity for one ordered scenario, so an unchanged replay keeps the same rules."""
+    return hashlib.sha256(json.dumps(steps or [],sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()[:16]
+
+def scenario_findings(run):
+    """One finding per check that measured a contradiction.
+
+    Unavailable, skipped and failed-to-run steps are coverage gaps instead: they say the
+    evidence is missing, which is never the same as evidence that the app misbehaved.
+    """
+    digest=run.get('scenario_digest') or scenario_digest(run.get('mission',{}).get('scenario'))
+    latest=(run.get('observations') or [{}])[-1];result=[]
+    for step in run.get('scenario') or []:
+        if step.get('status')!='failed' or step.get('kind') not in ('check','hold'):continue
+        # An unknown expectation records what happened; it is not a defect and never costs a score.
+        unknown=step.get('policy')=='unknown';oracle=step.get('oracle') or step['kind']
+        sample=next((s for s in reversed(step.get('samples') or []) if s.get('verdict')=='fail'),{})
+        item=dict(rule=f"scenario-{digest}-{step['number']}-{oracle}",pillar='functionality',
+                  title=(step.get('name') or step['requested'])[:200],
+                  observed=(sample.get('observed') or step.get('reason') or '')[:2000],
+                  expected=step['requested'],
+                  recommendation='Agree the intended behaviour, then record this step as a confirmed expectation' if unknown
+                                 else SCENARIO_ADVICE.get(oracle,'Reproduce this step on the same build and fix what it measured'),
+                  severity='info' if unknown else step.get('severity','P2'),
+                  classification='observation' if unknown else 'defect',
+                  evidence_id=(step.get('evidence') or [latest.get('id','')])[-1],url=latest.get('url',''),
+                  verifier_status='CONFIRMED',source='deterministic',confidence=1.0,status='open',owner='',scenario_step=step['number'])
+        item['fingerprint']=fingerprint(item);result.append(item)
+    return result
+
+def reproduction_eligibility(a,b):
+    """Whether a finding seen again in run b may be called reproduced, and the reason when it may not.
+
+    A configuration comparison is not a reproduction: the build must be the same one, and the
+    starting conditions must have been established rather than inherited or attested by a person.
+    """
+    if a.get('app',{}).get('sha256')!=b.get('app',{}).get('sha256'):
+        return {'eligible':False,'reason':'The replay ran a different build, so a matching finding is a comparison, not a reproduction'}
+    state=b.get('measurements',{}).get('start_state','')
+    if state=='kept':
+        return {'eligible':False,'reason':'This run kept whatever the previous run left on the device, so its starting conditions were not established'}
+    if any(step.get('kind')=='manual' for step in b.get('scenario') or []):
+        return {'eligible':False,'reason':'An operator completed part of this scenario, so the console cannot attest to the account and server conditions'}
+    gaps=[step for step in (b.get('scenario') or []) if step.get('required') and step.get('status') not in ('passed','failed')]
+    if gaps:
+        return {'eligible':False,'reason':f"Step {gaps[0]['number']} left no usable evidence, so the conditions this finding needs were not verified"}
+    note='Local device state was restored; account and server conditions were still checked by the scenario' if state=='snapshot' else ''
+    return {'eligible':True,'reason':note}
+
 def compare_runs(a,b):
     platform_a=a.get('platform') or a.get('mission',{}).get('platform') or 'web';platform_b=b.get('platform') or b.get('mission',{}).get('platform') or 'web'
     if platform_a=='android' or platform_b=='android':
         keys=('project_id','platform','target_id','goal','success_text','mode','pillars','provider','model','model_max','effort','max_steps','observe_seconds','url','allowed_domains')
         ma={**a.get('mission',{}),'platform':platform_a};mb={**b.get('mission',{}),'platform':platform_b}
         mismatch=[k for k in keys if ma.get(k)!=mb.get(k)]
+        # Older Android runs carry none of these, so their defaults keep them comparable with each other.
+        if scenario_digest(ma.get('scenario'))!=scenario_digest(mb.get('scenario')):mismatch.append('scenario')
+        for key in ('reset','snapshot'):
+            if (ma.get(key) or '')!=(mb.get(key) or ''):mismatch.append(key)
+        if a.get('measurements',{}).get('start_state')!=b.get('measurements',{}).get('start_state'):mismatch.append('start_state')
+        if a.get('faults')!=b.get('faults'):mismatch.append('fault_settings')
         if a.get('target',{}).get('package')!=b.get('target',{}).get('package'):mismatch.append('package')
         for key in ('api','abi','renderer','display','density_dpi','rotation','locale'):
             if a.get('device',{}).get(key)!=b.get('device',{}).get(key):mismatch.append('device_'+key)
@@ -91,7 +153,7 @@ def compare_runs(a,b):
         fa={finding_identity(f):f for f in a.get('findings',[]) if f.get('verifier_status')!='REJECTED'};fb={finding_identity(f):f for f in b.get('findings',[]) if f.get('verifier_status')!='REJECTED'}
         compatible=not mismatch;complete=compatible and b.get('status')=='completed' and not b.get('evaluation_error') and all(v.get('status')=='evaluated' for v in b.get('coverage',{}).values())
         delta={k:(b.get('measurements',{}).get(k)-a.get('measurements',{}).get(k)) if isinstance(a.get('measurements',{}).get(k),(int,float)) and isinstance(b.get('measurements',{}).get(k),(int,float)) else None for k in ('launch_ms','jank_pct','pss_kb')}
-        return {'compatible':compatible,'mismatches':mismatch,'build_changed':a.get('app',{}).get('sha256')!=b.get('app',{}).get('sha256'),'new':[fb[k] for k in fb.keys()-fa.keys()],'resolved':[fa[k] for k in fa.keys()-fb.keys()] if complete else [],'not_assessed':[fa[k] for k in fa.keys()-fb.keys()] if not complete else [],'identity_uncertain':[],'persisting':[fb[k] for k in fb.keys()&fa.keys()],'metric_delta':delta,'baseline':a['id'],'candidate':b['id']}
+        return {'compatible':compatible,'mismatches':mismatch,'reproduction':reproduction_eligibility(a,b),'build_changed':a.get('app',{}).get('sha256')!=b.get('app',{}).get('sha256'),'new':[fb[k] for k in fb.keys()-fa.keys()],'resolved':[fa[k] for k in fa.keys()-fb.keys()] if complete else [],'not_assessed':[fa[k] for k in fa.keys()-fb.keys()] if not complete else [],'identity_uncertain':[],'persisting':[fb[k] for k in fb.keys()&fa.keys()],'metric_delta':delta,'baseline':a['id'],'candidate':b['id']}
     keys=('project_id','browser','viewport','network','persona_id','egress_id','locale','mode','pillars','provider','model','model_max','effort','success_text','max_steps','observe_seconds','competitors')
     mismatch=[k for k in keys if a['mission'].get(k)!=b['mission'].get(k)]
     if a['mission'].get('goal')!=b['mission'].get('goal'):mismatch.append('goal')

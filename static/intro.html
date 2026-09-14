@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Product Excellence · open-source website testing with evidence</title>
-<meta name="description" content="Run AI-guided website journeys on your Mac, keep the evidence locally, and share completed results from your own server. Open source under Apache 2.0.">
+<title>Product Excellence · open-source website and Android app testing with evidence</title>
+<meta name="description" content="Run AI-guided website and Android app journeys on your Mac, keep the evidence locally, and share completed results from your own server. Open source under Apache 2.0.">
 <meta name="theme-color" content="#0d3b29">
 <meta property="og:title" content="Product Excellence">
-<meta property="og:description" content="Open-source website testing that runs on your Mac and records evidence you can challenge.">
+<meta property="og:description" content="Open-source website and Android app testing that runs on your Mac and records evidence you can challenge.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="/static/intro/02-run.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -64,7 +64,8 @@ section{padding-block:clamp(4.5rem,9vw,8rem)}
 /* Demo videos */
 .video-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(18rem,1fr);gap:clamp(1rem,2.5vw,2rem);align-items:start}.video-layout figure{margin:0}.video-stack{display:grid;gap:clamp(1rem,2.5vw,2rem)}
 .video-frame{overflow:hidden;border:1px solid var(--line);border-radius:6px;background:var(--green-deep);aspect-ratio:16/9}.video-frame iframe{display:block;width:100%;height:100%;border:0}
-.video-layout figcaption{display:flex;justify-content:space-between;gap:1rem;margin-top:.75rem;font-size:.8rem;color:var(--muted)}.video-layout figcaption strong{color:var(--ink);font-size:.9rem}.video-layout figcaption a{white-space:nowrap}
+.video-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,2.5vw,2rem);margin-top:clamp(1rem,2.5vw,2rem)}.video-grid figure{margin:0}
+#demos figcaption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.25rem 1rem;margin-top:.75rem;font-size:.8rem;color:var(--muted)}#demos figcaption strong{color:var(--ink);font-size:.9rem}#demos figcaption a{white-space:nowrap}#demos figcaption p{flex-basis:100%;margin:0;line-height:1.5}
 
 /* Product flow */
 .proof{background:var(--paper-strong);border-block:1px solid var(--line)}
@@ -92,7 +93,7 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
 }
 @media(max-width:640px){
   .nav-links a:not(.github-link){display:none}.hero{padding-top:3.5rem}.hero-grid{grid-template-columns:minmax(0,1fr)}.hero h1{font-size:clamp(3.1rem,17vw,5rem)}
-  .actions{display:grid}.button{width:100%}.video-stack,.flow,.presets ul{grid-template-columns:1fr}.flow li+li{padding-left:0;border-left:0}.bounds li{grid-template-columns:1fr;gap:.45rem}
+  .actions{display:grid}.button{width:100%}.video-stack,.video-grid,.flow,.presets ul{grid-template-columns:1fr}.flow li+li{padding-left:0;border-left:0}.bounds li{grid-template-columns:1fr;gap:.45rem}
   .close-grid,.footer .wrap{align-items:stretch;flex-direction:column}.close .actions{justify-content:flex-start}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition-duration:.01ms!important}.button:hover{transform:none}}
@@ -114,7 +115,7 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
       <div>
         <p class="status">Open source · Version {{version}}</p>
         <h1>Test like a user. <span>Keep the evidence.</span></h1>
-        <p class="hero-copy"><strong>Product Excellence</strong> sends a bounded AI worker through real browser journeys, records what happened, and turns the evidence into findings you can verify.</p>
+        <p class="hero-copy"><strong>Product Excellence</strong> sends a bounded AI worker through real website and Android app journeys, records what happened, and turns the evidence into findings you can verify.</p>
         <div class="actions">
           <a class="button button-primary" href="https://github.com/parhumm/product-excellence" rel="noopener">Get it on GitHub</a>
           <a class="button button-secondary" href="https://github.com/parhumm/product-excellence/releases" rel="noopener">View releases</a>
@@ -133,24 +134,34 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
   <section id="demos">
     <div class="wrap">
       <div class="section-head">
-        <div><p class="eyebrow">Watch the product</p><h2>See the browser do the work.</h2></div>
-        <p>Three real demonstrations, from a first run to competitor benchmarking and a full autonomous product review.</p>
+        <div><p class="eyebrow">Watch the product</p><h2>See the agent do the work.</h2></div>
+        <p>Five real demonstrations on websites and Android apps, from a first run to competitor benchmarks, release comparison and APK regression testing. Narrated in Persian.</p>
       </div>
       <div class="video-layout">
         <figure>
-          <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/J3eB6ubtHlY" title="Product Excellence product walkthrough" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
-          <figcaption><strong>Product walkthrough</strong><a href="https://www.youtube.com/watch?v=J3eB6ubtHlY" rel="noopener">Watch on YouTube</a></figcaption>
+          <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/r8QQtYkrxb4" title="Introduction to Product Excellence" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+          <figcaption><strong>Introduction</strong><a href="https://www.youtube.com/watch?v=r8QQtYkrxb4" rel="noopener">Watch on YouTube</a><p>The agent moves through a website or Android app like a real user, keeps screenshots and video, and prioritizes findings across UX, accessibility, SEO, AEO, CRO and performance.</p></figcaption>
         </figure>
         <div class="video-stack">
           <figure>
-            <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/hBI4OIh3i1k" title="Product Excellence benchmark example" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
-            <figcaption><strong>Benchmark example</strong><a href="https://www.youtube.com/watch?v=hBI4OIh3i1k" rel="noopener">YouTube</a></figcaption>
+            <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/VwYABsNf4u4" title="Android app QA with the Filimo APK" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+            <figcaption><strong>Android app QA</strong><a href="https://www.youtube.com/watch?v=VwYABsNf4u4" rel="noopener">YouTube</a><p>Upload an APK, run a mission on the emulator, keep actions, screenshots and video, then compare app versions to catch regressions before release.</p></figcaption>
           </figure>
           <figure>
-            <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/uo8Pz48uLsE" title="Autonomous UX, SEO, CRO and performance review" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
-            <figcaption><strong>Autonomous product review</strong><a href="https://www.youtube.com/watch?v=uo8Pz48uLsE" rel="noopener">YouTube</a></figcaption>
+            <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/Ok6i2ArJwgQ" title="Benchmark, network conditions and release comparison" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+            <figcaption><strong>Benchmark, network and release comparison</strong><a href="https://www.youtube.com/watch?v=Ok6i2ArJwgQ" rel="noopener">YouTube</a><p>Compare two releases, separate new, resolved and persisting findings, throttle the network or route through a proxy, and share results on your own team server.</p></figcaption>
           </figure>
         </div>
+      </div>
+      <div class="video-grid">
+        <figure>
+          <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/SKGr2jgTstw" title="Competitor benchmark demo with Ring and Filimo" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+          <figcaption><strong>Competitor benchmark demo</strong><a href="https://www.youtube.com/watch?v=SKGr2jgTstw" rel="noopener">YouTube</a><p>One real user goal run read-only across Ring, Filimo and their competitors: an apartment search and picking a comedy series, scored on the same criteria.</p></figcaption>
+        </figure>
+        <figure>
+          <div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/XNXlnK2NqOc" title="Video player test on Aparat" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+          <figcaption><strong>Video player test (Aparat)</strong><a href="https://www.youtube.com/watch?v=XNXlnK2NqOc" rel="noopener">YouTube</a><p>Play, seek, volume, quality, speed and full screen exercised like a user, with UX, accessibility, SEO, AEO, CRO, performance, JavaScript errors and network findings in one run.</p></figcaption>
+        </figure>
       </div>
     </div>
   </section>

@@ -8,7 +8,48 @@ Each workspace can contain multiple website and Android targets while keeping
 missions, runs and findings separate. It signs in with your Claude or ChatGPT subscription through
 their command line tools, so there are no API keys to manage.
 
-Version 1.5.0. New here? Read the [user manual](docs/USER_MANUAL.md).
+Version 1.5.2. New here? Read the [user manual](docs/USER_MANUAL.md).
+
+## Video demo
+
+Five demonstrations of real runs. The narration is in Persian.
+
+### Introduction
+
+[![Introduction to Product Excellence](https://img.youtube.com/vi/r8QQtYkrxb4/maxresdefault.jpg)](https://www.youtube.com/watch?v=r8QQtYkrxb4)
+
+The agent moves through a website or Android app like a real user, keeps
+screenshots and video, and prioritizes findings across UX, accessibility, SEO,
+AEO, CRO and performance.
+
+### Android app QA
+
+[![Android app QA with the Filimo APK](https://img.youtube.com/vi/VwYABsNf4u4/maxresdefault.jpg)](https://www.youtube.com/watch?v=VwYABsNf4u4)
+
+Upload an APK, run a mission on the emulator, keep actions, screenshots and
+video, then compare app versions to catch regressions before release.
+
+### Benchmark, network and release comparison
+
+[![Benchmark, network conditions and release comparison](https://img.youtube.com/vi/Ok6i2ArJwgQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=Ok6i2ArJwgQ)
+
+Compare two releases, separate new, resolved and persisting findings, throttle
+the network or route through a proxy, and share results on your own team server.
+
+### Competitor benchmark demo
+
+[![Competitor benchmark demo with Ring and Filimo](https://img.youtube.com/vi/SKGr2jgTstw/maxresdefault.jpg)](https://www.youtube.com/watch?v=SKGr2jgTstw)
+
+One real user goal run read-only across Ring, Filimo and their competitors: an
+apartment search and picking a comedy series, scored on the same criteria.
+
+### Video player test (Aparat)
+
+[![Video player test on Aparat](https://img.youtube.com/vi/XNXlnK2NqOc/maxresdefault.jpg)](https://www.youtube.com/watch?v=XNXlnK2NqOc)
+
+Play, seek, volume, quality, speed and full screen exercised like a user, with
+UX, accessibility, SEO, AEO, CRO, performance, JavaScript errors and network
+findings in one run.
 
 ## First Android run
 
@@ -23,27 +64,6 @@ In **Settings → Targets and app builds**, add an Android target and upload a
 universal or Java-only APK. Create a mission for that target, choose the build
 and `pex-test`, then run it. The APK's package data is cleared for each mission;
 the AVD is never wiped. APK bytes stay on this Mac even when metadata is shared.
-
-## Video demo
-
-### Product walkthrough
-
-[![Watch the Product Excellence demo](https://img.youtube.com/vi/J3eB6ubtHlY/maxresdefault.jpg)](https://www.youtube.com/watch?v=J3eB6ubtHlY)
-
-### Benchmark example
-
-[![Watch the Product Excellence benchmark example](https://img.youtube.com/vi/hBI4OIh3i1k/maxresdefault.jpg)](https://www.youtube.com/watch?v=hBI4OIh3i1k)
-
-### Autonomous UX, SEO, CRO and performance review
-
-[![Watch the AI Product Excellence demo](https://img.youtube.com/vi/uo8Pz48uLsE/maxresdefault.jpg)](https://youtu.be/uo8Pz48uLsE)
-
-See an AI agent take a real user goal, navigate the product independently,
-collect evidence and evaluate functionality, UX and accessibility, CRO, SEO and
-AEO, and performance. The result turns browser automation, deterministic checks,
-network analysis and AI reasoning into prioritized product recommendations.
-
-*From automated testing to automated product understanding.*
 
 ## Product tour
 

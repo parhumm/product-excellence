@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.2 — 2026-09-14
+
+- **New demo videos.** The landing page and the README now show five
+  demonstrations covering websites and Android apps: an introduction, Android
+  app QA with an APK, benchmarks with network conditions and release
+  comparison, a competitor benchmark, and a full video player test.
+- **The site says what the tool tests.** The page title, description and
+  opening paragraph name Android app testing beside website testing.
+- **Research notes** on stateful product QA and on Android failure discovery
+  are included in the repository.
+
 ## 1.5.1 — 2026-09-13
 
 - **Add an Android app in one step.** Settings → Websites and Android apps takes

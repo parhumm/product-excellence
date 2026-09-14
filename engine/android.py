@@ -4,6 +4,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 from PIL import Image,ImageDraw
 from . import store,targets
+from .policy import scrub
 
 PACKAGE=re.compile(r'^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$')
 TOKEN=re.compile(r'^[A-Za-z0-9_.:-]+$')
@@ -29,7 +30,9 @@ async def run(*args,timeout=30,limit=2*1024*1024,binary=False,check=True):
         raise
     stdout,stderr=await asyncio.gather(*readers)
     if stdout[1]>limit or stderr[1]>limit:raise AndroidError('Android command output exceeded its safety limit')
-    if check and process.returncode:raise AndroidError((stderr[0] or stdout[0]).decode(errors='replace')[-1000:])
+    if check and process.returncode:
+        msg=(stderr[0] or stdout[0]).decode(errors='replace')[-1000:].strip()
+        raise AndroidError(msg or f'{args[0]} exited with code {process.returncode}')
     return stdout[0] if binary else stdout[0].decode(errors='replace').strip()
 
 def avd_dir(name):
@@ -245,6 +248,8 @@ class Device:
         self.warnings=[];self.events=[];self.measurements={};self.videos=[];self.logs=[];self.network_before={};self.display=(1080,2400)
         self.record_task=None;self.record_stop=False;self.video_parts=[];self.gaps=[]
         self.network_changed=set();self.network_restore=[];self.faults=[]
+        # Operator-supplied values never reach evidence, a prompt or the run record.
+        self.supplied=[]
         package=app.get('package','')
         if not PACKAGE.fullmatch(package):raise AndroidError('Invalid Android package')
         if not self.avd or self.avd!=os.environ.get('PEX_ANDROID_AVD',''):raise AndroidError('Choose the designated disposable AVD')
@@ -575,20 +580,29 @@ class Device:
                 if attempt:raise AndroidError('The device did not produce a readable window dump: '+raw.strip()[:200]) from error
                 await asyncio.sleep(1)
 
+    def _hide(self,value):
+        """Replace every operator-supplied value wherever the device reflects it back."""
+        for given in self.supplied:value=scrub(value,given,'{{supplied}}')
+        return value
+
     async def observe(self,id):
         xml,root,sensitive=await self._hierarchy();size=await self.shell('wm','size');density=await self.shell('wm','density')
         width,height=map(int,re.findall(r'(\d+)x(\d+)',size)[-1]);dpi=int(re.findall(r'(\d+)',density)[-1]);self.display=(width,height)
         controls=[];self.controls={}
         for node in root.iter('node'):
             box=parse_bounds(node.get('bounds'));enabled=node.get('enabled')=='true'
+            # A node holding a value the operator typed is as sensitive as a password field.
+            holds=any(given in (node.get('text') or '') for given in self.supplied)
+            if holds and box:sensitive.append(box)
             actionable=enabled and box and box[2]>box[0] and box[3]>box[1] and (node.get('clickable')=='true' or node.get('class')=='android.widget.EditText')
             if not actionable:continue
             x1,y1,x2,y2=box;x1=max(0,min(width,x1));x2=max(0,min(width,x2));y1=max(0,min(height,y1));y2=max(0,min(height,y2))
             if x2<=x1 or y2<=y1:continue
             raw_identity=(self.app['package'],node.get('class',''),node.get('resource-id',''),node.get('content-desc',''),node.get('text',''),node.get('bounds',''))
             cid='pex-'+str(len(controls)+1);self.controls[cid]=raw_identity
-            password=node.get('password')=='true';label='Password field' if password else node.get('content-desc') or node.get('text','')
-            controls.append({'id':cid,'tag':node.get('class',''),'role':'textbox' if node.get('class')=='android.widget.EditText' else 'button','text':'' if password else node.get('text',''),'label':label,'labeled':bool(label),'resource_id':node.get('resource-id',''),'input_type':'password' if password else 'text' if node.get('class')=='android.widget.EditText' else '','disabled':False,'checked':node.get('checked')=='true','href':'','options':[],'box':{'x':x1,'y':y1,'width':x2-x1,'height':y2-y1},'identity':hashlib.sha256(repr(raw_identity).encode()).hexdigest()[:24]})
+            password=node.get('password')=='true'
+            label='Password field' if password else self._hide(node.get('content-desc') or node.get('text',''))
+            controls.append({'id':cid,'tag':node.get('class',''),'role':'textbox' if node.get('class')=='android.widget.EditText' else 'button','text':'' if password else self._hide(node.get('text','')),'label':label,'labeled':bool(label),'filled':holds,'resource_id':node.get('resource-id',''),'input_type':'password' if password else 'text' if node.get('class')=='android.widget.EditText' else '','disabled':False,'checked':node.get('checked')=='true','href':'','options':[],'box':{'x':x1,'y':y1,'width':x2-x1,'height':y2-y1},'identity':hashlib.sha256(repr(raw_identity).encode()).hexdigest()[:24]})
         png=await self.adb_call('exec-out','screencap','-p',binary=True,limit=20*1024*1024)
         screenshot=self.folder/(id+'.png');screenshot.write_bytes(png)
         if sensitive:
@@ -602,7 +616,7 @@ class Device:
         activity=await self.focused()
         locale=await self.shell('getprop','persist.sys.locale',check=False) or await self.shell('getprop','ro.product.locale',check=False)
         self.measurements.update(display=f'{width}x{height}',density_dpi=dpi,rotation=int(root.get('rotation','0')),locale=locale,pss_kb=int(pss[1]) if pss else None,jank_pct=None)
-        observation={'id':id,'at':store.now(),'url':'android-app://'+self.app['package']+'/'+activity,'title':self.app['package'],'lang':locale,'dir':'ltr','text':'\n'.join(n.get('text','') for n in root.iter('node') if n.get('text')),'viewport':{'width':width,'height':height,'density_dpi':dpi,'rotation':int(root.get('rotation','0'))},'controls':controls,'metrics':{'jank_pct':None,'janky_frames':None,'total_frames':None,'pss_kb':int(pss[1]) if pss else None,'crashes':0},'checks':{'hierarchy':{'status':'supported'},'gfxinfo':{'status':'unavailable'},'meminfo':{'status':'supported' if pss else 'unavailable'},'logcat':{'status':'supported'}},'console_events':[],'hierarchy':xml,'screenshot':'/api/runs/'+self.run_id+'/artifacts/'+screenshot.name if screenshot else '' ,'part':1}
+        observation={'id':id,'at':store.now(),'url':'android-app://'+self.app['package']+'/'+activity,'title':self.app['package'],'lang':locale,'dir':'ltr','text':self._hide('\n'.join(n.get('text','') for n in root.iter('node') if n.get('text'))),'viewport':{'width':width,'height':height,'density_dpi':dpi,'rotation':int(root.get('rotation','0'))},'controls':controls,'metrics':{'jank_pct':None,'janky_frames':None,'total_frames':None,'pss_kb':int(pss[1]) if pss else None,'crashes':0},'checks':{'hierarchy':{'status':'supported'},'gfxinfo':{'status':'unavailable'},'meminfo':{'status':'supported' if pss else 'unavailable'},'logcat':{'status':'supported'}},'console_events':[],'hierarchy':self._hide(xml),'screenshot':'/api/runs/'+self.run_id+'/artifacts/'+screenshot.name if screenshot else '' ,'part':1}
         (self.folder/(id+'.json')).write_text(json.dumps(observation,ensure_ascii=False,indent=2))
         return observation
 
@@ -620,6 +634,7 @@ class Device:
         focused=[n for n in fields if n.get('focused')=='true'] or (fields if len(fields)==1 else [])
         if len(focused)!=1:raise AndroidError('No text field is focused on the device')
         box=parse_bounds(focused[0].get('bounds'));x=(box[0]+box[2])//2;y=(box[1]+box[3])//2
+        self.supplied.append(value)
         await self.shell('input','tap',str(x),str(y));await self.shell('input','keycombination','KEYCODE_CTRL_LEFT','KEYCODE_A');await self.shell('input','text',value.replace(' ','%s'))
     async def act(self,action):
         kind=action.get('type');target=action.get('target') or ''

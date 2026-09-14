@@ -62,6 +62,14 @@ def test_sign_in_policy():
  assert mutation_allowed('POST','https://example.com/api/auth/lookup',signed)
  assert not mutation_allowed('POST','https://example.com/api/auth/lookup',M)
  assert not mutation_allowed('POST','https://www.google-analytics.com/g/collect',signed)
+ # An ask-driven sign-in has no stored identifier; the value the operator typed must reach the site.
+ assert mutation_allowed('POST','https://example.com/api/auth/lookup',M,True)
+ assert not mutation_allowed('POST','https://www.google-analytics.com/g/collect',M,True)
+ # A journey submits the website's own forms; every other mode, and every third party, stays read-only.
+ journey={**M,'mode':'journey'}
+ assert mutation_allowed('POST','https://example.com/api/auth/lookup',journey)
+ assert not mutation_allowed('POST','https://www.google-analytics.com/g/collect',journey)
+ assert not mutation_allowed('POST','https://example.com/api/auth/lookup',{**M,'mode':'audit'})
 def test_open_url_from_either_field_and_precise_refusal():
  # A model that puts the URL in target must not be refused as an off-domain navigation.
  assert action_allowed({'type':'open','target':'https://example.com/x','value':''},M)[0]

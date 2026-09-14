@@ -202,15 +202,19 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
     supplied = '0912 345 6789'
     mission = Mission(name='Fixture', url='https://example.com', goal='Sign in with a code',
                       browser='firefox', mode='journey', provider='codex',
-                      ai_budget=4, max_steps=3).model_dump()
+                      ai_budget=5, max_steps=4).model_dump()
     run = {'id': 'run-test', 'mission_id': 'mission-test', 'mission': mission,
            'status': 'queued', 'network_snapshot': NetworkProfile(name='Baseline').model_dump(),
            'observations': [], 'actions': [], 'events': [], 'findings': [], 'http': [],
            'console': [], 'coverage': {}, 'ai_calls': 0, 'ai_usage': [], 'ai_totals': {},
            'replay_of': '', 'baseline_id': ''}
     saved, filled, prompts = [], [], []
+    # A real field keeps what is already in it: fill replaces, press_sequentially appends.
+    box = {'value': ''}
     planned = [{'type': 'ask', 'target': 'pex-0', 'value': 'mobile number',
                 'reason': 'The form needs a number I do not have', 'outcome': 'continue'},
+               {'type': 'click', 'target': 'pex-1', 'value': '',
+                'reason': 'The number is in the field; continue', 'outcome': 'continue'},
                {'type': 'finish', 'target': '', 'value': '', 'reason': 'Signed in', 'outcome': 'success'}]
 
     async def write(kind, record):
@@ -224,9 +228,12 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
             return {'violations': [], 'passes': [], 'incomplete': []}
         # The site reflects the number it was given, the way a "code sent to ..." line does.
         return {'url': 'https://example.com', 'title': 'Sign in',
-                'text': 'Code sent to ' + filled[0] if filled else 'Sign in',
+                'text': 'Code sent to ' + box['value'] if box['value'] else 'Sign in',
+                # Once the value has landed the page reports the field as filled, as observe.js does.
                 'controls': [{'id': 'pex-0', 'tag': 'input', 'role': '', 'input_type': 'tel',
-                              'text': 'Mobile number', 'href': ''}],
+                              'text': 'Mobile number', 'href': '', 'filled': bool(box['value'])},
+                             {'id': 'pex-1', 'tag': 'button', 'role': '', 'input_type': '',
+                              'text': 'Continue', 'href': '', 'filled': False}],
                 'metadata': {}, 'viewport': {}, 'metrics': {'lcp': 0, 'inp': None}}
 
     async def screenshot(path, **kwargs):
@@ -245,7 +252,9 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
 
     field = SimpleNamespace(
         evaluate=AsyncMock(return_value={'text': 'Mobile number', 'href': '', 'input_type': 'tel', 'tag': 'input'}),
-        fill=AsyncMock(side_effect=lambda value: filled.append(value)))
+        fill=AsyncMock(side_effect=lambda value: (filled.append(value), box.update(value=value))),
+        press_sequentially=AsyncMock(side_effect=lambda value: (filled.append(value), box.update(value=box['value'] + value))),
+        click=AsyncMock())
     page = SimpleNamespace(url='https://example.com', video=None, set_default_timeout=Mock(),
         set_default_navigation_timeout=Mock(), on=Mock(), goto=goto, wait_for_load_state=AsyncMock(),
         wait_for_timeout=AsyncMock(), evaluate=evaluate, screenshot=screenshot,
@@ -281,10 +290,15 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
         return waiting
 
     waiting = asyncio.run(journey())
-    assert filled == [supplied] and 'Mobile number' in waiting['instruction']
+    # The field is cleared before the value is typed, or a second ask would append to the first.
+    assert filled == ['', supplied] and box['value'] == supplied and 'Mobile number' in waiting['instruction']
     final = saved[-1]
     assert final['status'] == 'completed', final.get('error')
-    assert [a['status'] for a in final['actions']] == ['executed', 'executed']
+    assert [a['status'] for a in final['actions']] == ['executed', 'executed', 'executed']
+    action_prompts = [p for p in prompts if 'Choose ONE legitimate next browser action' in p]
+    assert all('A control with filled:true already holds its value' in p for p in action_prompts)
+    # The first observation has nothing in the field; the second must carry the flag to the worker.
+    assert '"filled":true' not in action_prompts[0] and '"filled":true' in action_prompts[1]
     assert final['observations'][-1]['text'] == 'Code sent to {{supplied}}'
     assert final['waiting_for'] is None
     assert all(supplied not in json.dumps(record) for record in saved)

@@ -271,3 +271,35 @@ async def test_a_skipped_ask_lets_the_ai_journey_carry_on_without_the_value(monk
     assert device.typed==[] and [a['status'] for a in run['actions']]==['skipped','executed']
     assert run['actions'][0]['error']=='The operator skipped: SMS code'
     assert 'The operator skipped: SMS code' in prompts[1]  # the AI sees the skip and chooses what to do next
+
+
+@pytest.mark.asyncio
+async def test_observe_hides_a_supplied_value_from_the_screen_the_hierarchy_and_the_prompt(monkeypatch,tmp_path):
+    """A value the operator typed is as sensitive as a password: black box, {{supplied}} everywhere."""
+    from io import BytesIO
+    from PIL import Image
+    from engine import android
+    monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run',avd='pex-test')
+    device.supplied.append('0912 345 6789')
+    xml=('<hierarchy rotation="0"><node class="android.widget.EditText" bounds="[0,0][100,40]" enabled="true" '
+         'clickable="true" text="0912 345 6789" resource-id="" content-desc="" password="false" checked="false"/>'
+         '<node class="android.widget.TextView" bounds="[0,60][300,100]" enabled="true" clickable="false" '
+         'text="Code sent to 0912 345 6789" resource-id="" content-desc="" password="false" checked="false"/></hierarchy>')
+    async def hierarchy():return android.sanitize_xml(xml)
+    async def shell(*args,**kw):
+        return {('wm','size'):'Physical size: 1080x2400',('wm','density'):'Physical density: 420'}.get(args[:2],'')
+    buffer=BytesIO();Image.new('RGB',(1080,2400),'white').save(buffer,'PNG')
+    async def adb_call(*args,**kw):return buffer.getvalue()
+    monkeypatch.setattr(device,'_hierarchy',hierarchy)
+    monkeypatch.setattr(device,'shell',shell)
+    monkeypatch.setattr(device,'adb_call',adb_call)
+
+    screen=await device.observe('step-000')
+    control=screen['controls'][0]
+    assert control['text']=='{{supplied}}' and control['label']=='{{supplied}}' and control['filled'] is True
+    assert screen['text']=='{{supplied}}\nCode sent to {{supplied}}'
+    assert '0912 345 6789' not in json.dumps(screen) and '{{supplied}}' in screen['hierarchy']
+    painted=Image.open(tmp_path/'step-000.png').convert('RGB')
+    # Both the field and the line echoing it are covered.
+    assert painted.getpixel((50,20))==(0,0,0) and painted.getpixel((150,80))==(0,0,0)

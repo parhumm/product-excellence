@@ -68,11 +68,14 @@ def allowed_url(url, mission):
     except ValueError: pass
     return True
 
-def mutation_allowed(method, url, mission):
-    # A mission with sign-in credentials needs the website's own POSTs to reach it.
-    # Everything else, third-party analytics included, stays read-only.
+def mutation_allowed(method, url, mission, operator_supplied=False):
+    # A journey operates the website the way a person would, so the website's own form
+    # submissions must reach it; so must they for stored sign-in credentials, or once the
+    # operator has typed a value into this run. An audit, an exploration and a benchmark stay
+    # read-only, and no mode ever lets a third party — analytics included — be written to.
     if method in ('GET','HEAD','OPTIONS'): return True
-    return bool(mission.get('login_identifier')) and allowed_url(url,mission)
+    own=(mission.get('mode')=='journey' or bool(mission.get('login_identifier')) or operator_supplied)
+    return own and allowed_url(url,mission)
 
 def action_allowed(action, mission, target=None):
     kind=action.get('type')
@@ -87,7 +90,7 @@ def action_allowed(action, mission, target=None):
             return False,(f'Navigation to {host} refused; allowed hosts: {hosts}' if host
                           else 'open needs an absolute http(s) URL in value, on an allowed host: '+hosts)
     if kind=='click' and RISKY.search((target or {}).get('text','')+' '+(target or {}).get('href','')): return False,'Payment, publication or destructive control blocked'
-    if kind in ('click','type','focus','select','ask') and not target:return False,'Missing current target'
+    if kind in ('click','type','focus','select','ask') and not target:return False,'Missing current target: target must be a control id from the current observation, such as pex-2, not a label or a value name'
     if kind=='ask':
         # The operator types the value into this field, so it has to be a field that takes typing.
         tag=target.get('tag') or ''

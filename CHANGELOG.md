@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.0 — 2026-09-15
 
 - **The landing page describes journeys, one-sentence missions, operator-assisted
   runs, routes and network profiles.**

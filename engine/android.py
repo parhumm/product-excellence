@@ -415,6 +415,9 @@ class Device:
     async def home(self):
         await self.shell('input','keyevent','KEYCODE_HOME')
 
+    async def back(self):
+        await self.shell('input','keyevent','4')
+
     async def background_kill(self):
         """Approximate the system reclaiming a backgrounded app. A foreground service can refuse this."""
         await self.home();await asyncio.sleep(1)

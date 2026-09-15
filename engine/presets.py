@@ -13,7 +13,7 @@ import yaml
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 from engine import store
-from engine.contracts import Mission
+from engine.contracts import Mission, PLACEHOLDER
 
 # Bump when presets are added; a workspace already stamped with the current
 # value is left alone, so a preset the user deleted does not come back.
@@ -65,13 +65,20 @@ def seed_project(project, session=None):
         store.save('mission', {'version': 1, 'template': template, **mission.model_dump(exclude={'login_password'})}, session=session)
     return store.save('project', {**project, 'presets': PRESET_VERSION}, session=session)
 # --- shipped scenario templates ---------------------------------------------
-# The order the five stateful journeys are usually worked through, not alphabetical.
-PRESET_ORDER=('entitlement-switch','weak-network-download','profile-isolation','stale-notification','shared-link-login')
+# The order the journeys are usually worked through, not alphabetical. A journey carries
+# no platform: the target the author picks decides whether it runs on a device or a page.
+PRESET_ORDER=('entitlement-switch','weak-network-download','profile-isolation','stale-notification','shared-link-login',
+              'playback-offline','session-survives-restart','sign-out-really-signs-out','filter-survives-restart',
+              'back-after-search','form-rejects-bad-input','checkout-on-slow-link')
 
 def scenarios():
-    """The shipped Android scenario templates: display text plus a mission still missing its target, build and device."""
+    """The shipped journeys: display text, what each one needs, and the blanks still to fill."""
     found={}
     for path in (Path(__file__).parent/'scenarios').glob('*.yaml'):
         raw=yaml.safe_load(path.read_text(encoding='utf-8'))
-        found[raw['id']]={'id':raw['id'],'name':raw['name'],'about':' '.join(raw['about'].split()),'mission':raw['mission']}
+        mission=raw['mission']
+        text=' '.join([mission['name'],mission['goal'],yaml.safe_dump(mission.get('scenario') or [],allow_unicode=True)])
+        found[raw['id']]={'id':raw['id'],'name':raw['name'],'about':' '.join(raw['about'].split()),
+                          'tags':raw.get('tags') or [],'needs':raw.get('needs') or [],
+                          'blanks':list(dict.fromkeys(PLACEHOLDER.findall(text))),'mission':mission}
     return [found[id] for id in PRESET_ORDER if id in found]+[v for k,v in sorted(found.items()) if k not in PRESET_ORDER]

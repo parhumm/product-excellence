@@ -5,8 +5,9 @@ about: >-
   the player reports next. This changes the transport only. It does not change a subscription, prove
   zero-rating, or ask the backend what the account is entitled to, so the playback hold is recorded as
   an observation rather than a requirement.
+tags: [playback, network, mobile data]
+needs: ["Chromium when run on a website"]
 mission:
-  platform: android
   name: Playback across a transport switch
   goal: Start a title on Wi-Fi and see what playback does after the device moves to mobile data
   mode: journey

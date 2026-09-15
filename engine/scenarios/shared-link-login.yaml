@@ -4,8 +4,9 @@ about: >-
   Opens a shared link on a signed-out device, has an operator sign in, and checks that the app returns
   to the linked title rather than the home screen. Start from fresh app data or a snapshot you captured
   while signed out. A preserved session would skip the sign-in that this scenario exists to test.
+tags: [deep link, sign-in, sharing]
+needs: ["An operator to sign in"]
 mission:
-  platform: android
   name: A shared link opened while signed out
   goal: Open a shared link while signed out, sign in, and check the app returns to the linked title
   mode: journey

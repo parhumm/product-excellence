@@ -1,0 +1,27 @@
+id: form-rejects-bad-input
+name: A form rejects bad input before sending
+about: >-
+  Opens one form, submits a single invalid value, and checks that the message appears and the form is
+  still in front. It tests this one field on this one form. Nothing is bought, deleted or sent, and a
+  form that rejects one bad value may still accept another.
+tags: [forms, validation, input]
+needs: []
+mission:
+  name: A form rejects bad input before sending
+  goal: Submit one invalid value to a form and check it is refused on the form itself
+  mode: journey
+  provider: codex
+  pillars: [functionality]
+  max_steps: 12
+  ai_budget: 12
+  max_seconds: 1200
+  reset: fresh
+  scenario:
+    - name: Submit one invalid value
+      goal: Open "<Name of the form to open>" and submit one obviously invalid value
+    - name: The form says what is wrong
+      check: {text: "<Validation message the form should show>", within: 20, severity: P2}
+    - name: And it is still the form in front
+      check: {screen: {contains: "<Screen name or path of the form>"}, within: 10}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

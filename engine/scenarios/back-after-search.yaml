@@ -1,0 +1,30 @@
+id: back-after-search
+name: Back after a search keeps the results
+about: >-
+  Searches, opens the first result, goes back, and checks the search is still there rather than an
+  empty box. It tests one back step from one result. It says nothing about a back press from deeper
+  in, or about the order of the results themselves.
+tags: [search, navigation, back]
+needs: []
+mission:
+  name: Back after a search keeps the results
+  goal: Search, open a result, go back, and check the search is still there
+  mode: journey
+  provider: codex
+  pillars: [functionality]
+  max_steps: 12
+  ai_budget: 12
+  max_seconds: 1200
+  reset: fresh
+  scenario:
+    - name: Search and open the first result
+      goal: Search for "<Search term to type>" and open the first result
+      until: {text: "<Text shown on a result page>"}
+    - name: The result is really open
+      check: {text: "<Text shown on a result page>", within: 20, severity: P2}
+    - name: Go back
+      event: {back: true}
+    - name: The search is still there
+      check: {text: "<Search term to type>", within: 15, severity: P2}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

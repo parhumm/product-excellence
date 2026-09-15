@@ -56,17 +56,19 @@ Write the goal the way the presets are written:
 Set `pillars` to what the goal actually judges. Raise `max_steps`, `max_seconds`
 and `ai_budget` only as far as the task needs, and tell the user what you chose.
 
-## 2b. Android journeys that need more than one goal
+## 2b. Journeys that need more than one goal
 
 A question about state rather than a single task becomes a `scenario`: an ordered
-list of steps on one device. Downloads that survive a weak link, a second account
-on the same phone, a notification opened an hour later, a shared link that
-survives a sign-in. Read `references/scenario-steps.md` for the five step kinds,
-the facts a check or hold may state, the device events and the three modifiers.
+list of steps on one device or in one browser page. Downloads that survive a weak
+link, a second account on the same phone, a notification opened an hour later, a
+filter that survives a restart. One vocabulary runs on both platforms; the target
+decides what each step acts on. Read `references/scenario-steps.md` for the five
+step kinds, the facts a check or hold may state, the events and the three
+modifiers, including the "On the web" column and the two web caveats.
 
 Start from the nearest shipped journey in `engine/scenarios/` rather than an
-empty list. There are five, and the console lists them with their display text at
-`/api/scenarios`:
+empty list. There are twelve, none of them tied to a platform, and the console
+lists them with their display text at `/api/scenarios`:
 
 | Journey | Answers |
 | --- | --- |
@@ -75,6 +77,13 @@ empty list. There are five, and the console lists them with their display text a
 | `profile-isolation` | Are downloads and search history separate per account? |
 | `stale-notification` | Does a notification opened much later land in the right place? |
 | `shared-link-login` | Does a shared link still reach its page after signing in? |
+| `playback-offline` | Does playback survive the connection being cut? |
+| `session-survives-restart` | Is the account still signed in after a restart? |
+| `sign-out-really-signs-out` | Does signing out really end the session? |
+| `filter-survives-restart` | Is a filter still on after a restart? |
+| `back-after-search` | Does going back from a result keep the search? |
+| `form-rejects-bad-input` | Does a form reject one invalid value before sending? |
+| `checkout-on-slow-link` | Does checkout reach payment on a slow link? |
 
 Keep the shape they set:
 
@@ -84,10 +93,14 @@ Keep the shape they set:
   while a person works, so every manual step costs coverage: use the fewest.
 - Mark a fact `policy: unknown` whenever nobody has confirmed what the app should
   do. It is then recorded as an observation, not held against the release.
-- Leave `<placeholders>` for real titles and accounts, and say in your summary
-  which ones the user has to replace before the mission can be saved.
+- Leave blanks for real titles and accounts, two to four of them, each phrased as
+  an instruction to the person filling it in (`<Text shown only when signed in>`,
+  not `<text>`). Say in your summary which ones the user has to replace before the
+  mission can be saved.
 - Set `reset: fresh` unless the journey needs what the last run left. `snapshot`
-  names a device state saved on that one Mac.
+  names a device state saved on that one Mac and is refused on a website mission.
+- On a website target, `speed`, `delay_ms` and `network: wifi | cellular` need
+  Chromium. Say so in `needs` rather than letting the save fail.
 - Budget for the waits: `max_seconds` has to cover every `within`, `for`, `wait`
   and operator timeout plus the app's own work. The presets start at 1800.
 

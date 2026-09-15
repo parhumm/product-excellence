@@ -162,7 +162,15 @@ function head(title,sub,actions=''){return `<div class="pagehead"><div><h1>${tit
 const scoreCell=r=>{const o=r.scores&&r.scores.overall;return o&&o.score!=null?`<strong>${o.score}</strong><small>${o.scored}/${o.of} pillars</small>`:'<span class="muted">—</span>'};
 function runTable(runs){return runs.length?`<div class="tablewrap"><table><thead><tr><th>Mission</th><th>Status</th><th>Environment</th><th>AI</th><th>Findings</th><th>Score</th><th>Started</th></tr></thead><tbody>${runs.map(r=>{const native=(r.platform||r.mission.platform)==='android',app=r.app||{};return `<tr><td><a href="#run/${r.id}"><strong>${esc(r.mission.name)}</strong></a><small>${esc(native?targetLabel(r.mission.target_id)+' · '+(app.version_name||app.sha256?.slice(0,10)||'build'):r.mission.url)}</small></td><td>${badge(r.status)}${uploadNote(r)?`<small>${uploadNote(r)}</small>`:''}</td><td>${native?`Android · ${esc(r.device?.avd||r.mission.device||'not selected')}<small>${esc(r.mission.network)}</small>`:`${esc(r.mission.browser)} · ${esc(r.mission.viewport)}<small>${esc(r.mission.network)}</small>`}</td><td>${aiCell(r)}</td><td>${r.finding_count}</td><td>${scoreCell(r)}</td><td>${date(r.created_at)}</td></tr>`}).join('')}</tbody></table></div>`:empty('Your first run starts here','Choose a saved mission to collect real evidence.','<a class="button primary" href="#missions">Choose a mission</a>')}
 function overview(){const runs=state.runs.filter(r=>!r.mission.url.includes('/demo'));return `<section class="welcome"><span class="eyebrow">${esc(String(project().name||'Workspace').toUpperCase())} / PHASE 1 WEB</span><h1 style="margin-top:12px">See the journey.<br>Understand what gets in the way.</h1><p class="muted">${esc(project().url||'')}<br>Give the engine a goal. Review the browser actions, measured signals and findings together.</p><div class="toolbar"><a class="button primary" href="#missions">Start a mission</a><a class="button" href="#settings">Check readiness</a></div><div class="factline"><span><strong>${state.missions.length}</strong> saved missions</span><span><strong>${runs.length}</strong> runs</span><span><strong>${runs.reduce((n,r)=>n+r.finding_count,0)}</strong> recorded findings</span></div></section><div class="split"><section><div class="pagehead"><h2>Recent runs</h2><a href="#runs">View all →</a></div>${runTable(runs.slice(0,5))}</section><section><h2>From mission to evidence</h2><ol class="checklist"><li><span class="index">01</span><div><strong>Define a user goal</strong><small>Pick the website or Android app, then browser, viewport, persona and network.</small></div></li><li><span class="index">02</span><div><strong>Watch the engine work</strong><small>Follow actions and screenshots. Stop a run at any time.</small></div></li><li><span class="index">03</span><div><strong>Challenge each finding</strong><small>Inspect evidence, replay and compare releases.</small></div></li></ol><p class="muted" style="margin-top:20px;font-size:12px">Public browsing is enabled. Account and payment actions are blocked. Authenticated checks require an imported test session.</p></section></div>`}
-function missions(){return head('Missions',`Reusable goals for website and Android journeys. · ${esc(where(workspace))}`,'<label class="button">Import YAML<input type="file" id="mission-import" accept=".yaml,.yml,.json" hidden></label><a class="button primary" href="#new">New mission</a>')+`<div class="tablewrap"><table><thead><tr><th>Mission</th><th>Mode / AI</th><th>Target</th><th>Actions</th></tr></thead><tbody>${state.missions.map(m=>{const native=m.platform==='android';return `<tr><td><a href="#edit/${m.id}"><strong>${esc(m.name)}</strong></a><small style="max-width:460px">${esc(m.goal)}</small></td><td>${esc(m.mode)}<small>${esc(workerLabel(m))}</small></td><td>${esc(targetLabel(m.target_id))}<small>${native&&(m.scenario||[]).length?`Scenario · ${m.scenario.length} steps · up to ${Math.ceil(Math.min(scenarioBudget(m.scenario).ceiling,m.max_seconds)/60)} min<br>`:''}${native?`Android · ${esc(m.build?m.build.slice(0,10):'latest')} · ${esc(m.visibility||'team')}`:`${esc(m.browser)} · ${esc(m.viewport)} · ${esc(m.network)}`}</small></td><td><div class="actions"><button class="primary compact" data-start="${m.id}">Run</button><a class="button compact" href="#edit/${m.id}">Edit</a>${native?'':`<button class="compact" data-matrix="${m.id}">5 networks</button>`}<a class="button compact" href="/api/missions/${m.id}/export">YAML</a>${m.visibility==='local'&&shared(workspace)?`<button class="compact" data-share="missions/${m.id}">Share</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`}
+function missions(){return head('Missions',`Reusable goals for website and Android journeys. · ${esc(where(workspace))}`,'<label class="button">Import YAML<input type="file" id="mission-import" accept=".yaml,.yml,.json" hidden></label><a class="button" href="#journeys">Start from a journey</a><a class="button primary" href="#new">New mission</a>')+`<div class="tablewrap"><table><thead><tr><th>Mission</th><th>Mode / AI</th><th>Target</th><th>Actions</th></tr></thead><tbody>${state.missions.map(m=>{const native=m.platform==='android';return `<tr><td><a href="#edit/${m.id}"><strong>${esc(m.name)}</strong></a><small style="max-width:460px">${esc(m.goal)}</small></td><td>${esc(m.mode)}<small>${esc(workerLabel(m))}</small></td><td>${esc(targetLabel(m.target_id))}<small>${(m.scenario||[]).length?`Scenario · ${m.scenario.length} steps · up to ${Math.ceil(Math.min(scenarioBudget(m.scenario).ceiling,m.max_seconds)/60)} min<br>`:''}${native?`Android · ${esc(m.build?m.build.slice(0,10):'latest')} · ${esc(m.visibility||'team')}`:`${esc(m.browser)} · ${esc(m.viewport)} · ${esc(m.network)}`}</small></td><td><div class="actions"><button class="primary compact" data-start="${m.id}">Run</button><a class="button compact" href="#edit/${m.id}">Edit</a>${native?'':`<button class="compact" data-matrix="${m.id}">5 networks</button>`}<a class="button compact" href="/api/missions/${m.id}/export">YAML</a>${m.visibility==='local'&&shared(workspace)?`<button class="compact" data-share="missions/${m.id}">Share</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`}
+// --- journey gallery ----------------------------------------------------------
+// A journey carries no platform. The target chosen on the form decides whether its steps
+// run on a device or in a page, so nothing here is filtered by one.
+function journeys(){const found=scenarioPresets||[];
+return head('Journeys',`Ordered scenarios that run on an Android app or a website. Pick one, fill the blanks, run it. · ${esc(where(workspace))}`,'<a class="button" href="#missions">Back</a>')
++`<div class="field full"><label for="journey-search">Search</label><input id="journey-search" dir="auto" value="${esc(journeySearch)}" placeholder="playback, sign-in, offline, checkout…"></div>`
++`<div class="journeys">${found.map(p=>`<article class="journey" data-find="${esc([p.name,p.about,(p.tags||[]).join(' ')].join(' ').toLowerCase())}"><h3>${esc(p.name)}</h3><p class="muted" dir="auto">${esc(p.about)}</p><div class="findmeta"><span class="badge">${esc(journeySize(p))}</span>${(p.tags||[]).map(x=>`<span class="badge">${esc(x)}</span>`).join('')}</div>${(p.needs||[]).length?`<small class="caveat">Needs: ${esc(p.needs.join(' · '))}</small>`:''}<div class="toolbar"><a class="button compact primary" href="#new/${esc(p.id)}">Use this journey</a></div></article>`).join('')}</div>`
++`<p class="muted" id="journey-none" hidden>No journey matches that. Try a shorter word, or clear the search.</p>`}
 const option=(v,t,selected)=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(t)}</option>`;
 let fieldSerial=0;
 function field(name,title,value,type='text',help='',full=false){const id=name+'-'+(++fieldSerial);return `<div class="field ${full?'full':''}"><label for="${id}">${title}</label><input id="${id}" name="${name}" type="${type}" ${type==='number'?'step="any"':''} value="${esc(value)}" ${name==='name'?'required':''}>${help?`<small>${help}</small>`:''}</div>`}
@@ -198,18 +206,21 @@ return `<section class="section"><h2>AI usage <span class="muted">${u.length} ca
 function select(name,title,options,help=''){return `<div class="field"><label for="${name}">${title}</label><select id="${name}" name="${name}">${options}</select>${help?`<small>${help}</small>`:''}</div>`}
 // Where apps come from is the question every first Android mission asks; answer it under the picker.
 const targetHelp=available=>{const base='Websites and Android apps are managed under <a href="#settings">Settings</a>.';if(!available.some(t=>t.type==='android'))return base+' To test an app, add it there with its APK.';return health.android?.available?base:base+' Android runs are not ready: '+esc(health.android?.reason||'')};
-// --- Android scenario builder -------------------------------------------------
+// --- Scenario builder ---------------------------------------------------------
 // The rows and the YAML are two spellings of one normalized list of steps. The server
-// owns the spelling, so YAML is adopted only after it has parsed there.
-const STEP_KINDS={goal:'Goal for the AI worker',check:'Check a fact',hold:'Hold a fact',event:'Do something to the device',manual:'Ask the person at the device'};
-const EVENT_KINDS={network:'Switch transport',speed:'Shape link speed',delay_ms:'Add network delay',wait:'Wait',home:'Press Home',kill:'Background until the system reclaims it',relaunch:'Force-stop and start again',deep_link:'Open a deep link',open_notification:'Open a notification'};
-const ORACLE_KINDS={text:'Text is on screen',text_absent:'Text is not on screen',activity:'Focused activity',playing:'Playback',notification:'Notification posted',no_crash:'No crash or ANR'};
-const EVENT_DEFAULT={network:'wifi',speed:'edge',delay_ms:300,wait:10,home:true,kill:true,relaunch:true,deep_link:'https://',open_notification:''};
-const ORACLE_DEFAULT={text:'',text_absent:'',activity:{contains:''},playing:true,notification:{text:'',present:true},no_crash:true};
+// owns the spelling, so YAML is adopted only after it has parsed there. One vocabulary
+// runs on an Android device and in a browser page; the target decides which.
+const STEP_KINDS={goal:'Goal for the AI worker',check:'Check a fact',hold:'Hold a fact',event:'Do something to the app',manual:'Ask the operator'};
+const EVENT_KINDS={network:'Switch transport',speed:'Shape link speed',delay_ms:'Add network delay',wait:'Wait',home:'Send to the background',kill:'Kill the app / drop the page',back:'Go back',relaunch:'Start again',deep_link:'Open a link',open_notification:'Open a notification'};
+const ORACLE_KINDS={text:'Text is on screen',text_absent:'Text is not on screen',screen:'Screen (activity or page address)',playing:'Playback',notification:'Notification posted',no_crash:'No crash or ANR'};
+const EVENT_DEFAULT={network:'wifi',speed:'edge',delay_ms:300,wait:10,home:true,kill:true,back:true,relaunch:true,deep_link:'https://',open_notification:''};
+const ORACLE_DEFAULT={text:'',text_absent:'',screen:{contains:''},playing:true,notification:{text:'',present:true},no_crash:true};
 const NETWORKS={wifi:'Wi-Fi only',cellular:'Mobile data only',offline:'Nothing connected',restore:'Back to what it was'};
 const SPEED_NAMES={edge:'edge',gsm:'gsm',umts:'umts',lte:'lte',full:'full'};
 const PLACE=/<[^<>]{0,120}>/;
-let scenarioSteps=[],scenarioPresets=null;
+let scenarioSteps=[],scenarioPresets=null,pendingJourney='',journeySearch='';
+// What a card promises before it is opened: the work in it, and the blanks it asks for.
+const journeySize=p=>`${p.mission.scenario.length} steps · ${p.blanks.length} blank${p.blanks.length===1?'':'s'}`;
 const clone=v=>JSON.parse(JSON.stringify(v));
 // A step or oracle is named by the key it carries, even while that key is still blank.
 const stepKind=s=>Object.keys(STEP_KINDS).find(k=>s[k]!==undefined)||'goal';
@@ -228,10 +239,10 @@ return {committed,ceiling:committed+ceiling+60}}
 // One readable line per step, used in the draft preview and anywhere a scenario is summarised.
 function describeStep(s){const k=stepKind(s);
 if(k==='goal')return 'Goal: '+s.goal+(s.until&&s.until.text?' · stops early at "'+s.until.text+'"':'');
-if(k==='manual')return 'Person at the device: '+s.manual+' · up to '+(s.timeout||300)+' s';
+if(k==='manual')return 'Operator: '+s.manual+' · up to '+(s.timeout||300)+' s';
 if(k==='event'){const e=eventKind(s.event),v=s.event[e];
-return 'Device: '+EVENT_KINDS[e]+(typeof v==='boolean'?'':' · '+v)+(e==='speed'&&s.event.delay_ms?' · +'+s.event.delay_ms+' ms':'')}
-const o=s[k],f=oracleKind(o),v=f==='activity'?(o.activity.contains||o.activity.equals):f==='notification'?o.notification.text+(o.notification.present===false?' (must be absent)':''):typeof o[f]==='boolean'?(o[f]?'yes':'no'):o[f];
+return 'Event: '+EVENT_KINDS[e]+(typeof v==='boolean'?'':' · '+v)+(e==='speed'&&s.event.delay_ms?' · +'+s.event.delay_ms+' ms':'')}
+const o=s[k],f=oracleKind(o),v=f==='screen'?(o.screen.contains||o.screen.equals):f==='notification'?o.notification.text+(o.notification.present===false?' (must be absent)':''):typeof o[f]==='boolean'?(o[f]?'yes':'no'):o[f];
 return (k==='check'?'Check':'Hold')+' · '+ORACLE_KINDS[f]+': '+v+' · '+(k==='check'?(o.within||10)+' s window':(o.for||10)+' s throughout')+(o.policy==='unknown'?' · observation only':'')}
 function setPath(target,path,value){const parts=path.split('.');
 while(parts.length>1)target=(target[parts.shift()]??={});
@@ -255,13 +266,13 @@ if(k==='delay_ms')return kinds+inp(i,'event.delay_ms',v,'Delay in milliseconds',
 if(k==='wait')return kinds+inp(i,'event.wait',v,'Seconds to wait','','narrow','number');
 if(k==='deep_link')return kinds+inp(i,'event.deep_link',v,'HTTPS link','https://example.com/title/1');
 if(k==='open_notification')return kinds+inp(i,'event.open_notification',v,'Text on the notification this app posted','Download finished');
-return kinds+`<p class="cell wide muted">${esc({home:'Sends the device to the home screen.',kill:'Backgrounds the app and lets the system reclaim it. A foreground service can prevent this, which is reported as an execution failure.',relaunch:'Force-stops the app and starts it again. App data is untouched.'}[k])}</p>`}
+return kinds+`<p class="cell wide muted">${esc({home:'Sends the app to the home screen, or brings another tab in front of the page.',kill:'Lets the system reclaim the backgrounded app, or drops the page to a blank one. Stored data survives; whatever was only in memory does not.',back:'Presses the system back button, or takes the page back one entry in its history.',relaunch:'Force-stops the app and starts it again, or brings the page back and reloads it. Stored data is untouched.'}[k])}</p>`}
 function oracleBody(step,kind,i){const o=step[kind],f=oracleKind(o),p=kind+'.';
 const kinds=act(i,'oracle-kind','Fact',Object.entries(ORACLE_KINDS).map(([x,t])=>option(x,t,f)).join(''),'wide');
 let fact;
 if(f==='text'||f==='text_absent')fact=inp(i,p+f,o[f],f==='text'?'Text that must be readable':'Text that must not be there','Now playing');
-else if(f==='activity'){const mk=o.activity.equals?'equals':'contains';
-fact=act(i,'match-kind','Match',option('contains','contains',mk)+option('equals','equals',mk),'narrow')+inp(i,p+'activity.'+mk,o.activity[mk],'Package / activity','com.example.app/.PlayerActivity');}
+else if(f==='screen'){const mk=o.screen.equals?'equals':'contains';
+fact=act(i,'match-kind','Match',option('contains','contains',mk)+option('equals','equals',mk),'narrow')+inp(i,p+'screen.'+mk,o.screen[mk],'Activity name on a device, page address on the web','com.example.app/.PlayerActivity');}
 else if(f==='playing')fact=pick(i,p+'playing','MediaSession reports playback',BOOLS(o.playing),'',true);
 else if(f==='notification')fact=inp(i,p+'notification.text',o.notification.text,'Text on the notification','Download finished')+pick(i,p+'notification.present','Must be',option('true','Posted now',String(o.notification.present!==false))+option('false','Not posted',String(o.notification.present!==false)),'narrow',true);
 else fact=`<p class="cell wide muted">No fatal exception or ANR attributed to this app since the last goal or event.</p>`;
@@ -274,7 +285,7 @@ return kinds+fact
 +(unknown?`<p class="cell wide muted">An unconfirmed expectation is recorded as an observation: severity info, no score deduction, never release-blocking.</p>`:'')}
 function stepBody(step,kind,i){
 if(kind==='goal')return inp(i,'goal',step.goal,'What the AI worker should achieve on the screen','Open the downloads list and start the saved title')+inp(i,'until.text',step.until&&step.until.text,'Stop early when this text appears (optional)','Now playing');
-if(kind==='manual')return inp(i,'manual',step.manual,'What the person at the device should do','Sign in as the second account')+inp(i,'timeout',step.timeout,'Seconds they have','','narrow','number')+`<p class="cell wide muted">Recording stops and no screenshots are taken while this step waits, so credentials stay off the evidence.</p>`;
+if(kind==='manual')return inp(i,'manual',step.manual,'What the operator should do','Sign in as the second account')+inp(i,'timeout',step.timeout,'Seconds they have','','narrow','number')+`<p class="cell wide muted">No screenshots are taken while this step waits. On a device the screen recording stops too, so credentials stay off the evidence.</p>`;
 if(kind==='event')return eventBody(step,i);
 return oracleBody(step,kind,i)}
 function stepRow(step,i,total){const kind=stepKind(step);
@@ -285,17 +296,18 @@ return `<li class="step" data-index="${i}"><div class="stephead"><span class="st
 <div class="stepbody">${stepBody(step,kind,i)}</div></li>`}
 function scenarioSection(m){scenarioSteps=clone(m.scenario||[]);
 const start=m.snapshot?'snapshot':m.reset==='keep'?'keep':'fresh';
-const radio=(v,t,help)=>`<label><input type="radio" name="start_state" value="${v}" ${start===v?'checked':''}><span>${t}<small>${help}</small></span></label>`;
+const radio=(v,t,help)=>`<label id="start-${v}"><input type="radio" name="start_state" value="${v}" ${start===v?'checked':''}><span>${t}<small>${help}</small></span></label>`;
 return `<section class="field full scenario" id="scenario-section"><label>Stateful scenario</label>
-<small>Ordered steps one tester would carry out on one device, run after the app starts. The goal above still says why. Leave this empty to run the goal on its own.</small>
+<small>Ordered steps one tester would carry out, in order, once the app or the page is open. The goal above still says why. Leave this empty to run the goal on its own.</small>
 <div class="scenariotools"><details id="scenario-presets"><summary><strong>Start from a shipped journey</strong></summary><div id="preset-body">Loading the shipped journeys…</div></details>
 <details id="scenario-draft"><summary><strong>Describe it and let the AI worker draft the steps</strong></summary><div class="draftbody">
 <textarea id="scenario-describe" dir="auto" placeholder="Download a title on a shaped connection, pause and resume it twice, then play it with the device offline."></textarea>
 <input id="scenario-texts" dir="auto" placeholder="Text that really appears in your app, separated by commas">
 <div class="toolbar"><button type="button" class="compact" id="draft-steps">Draft the steps</button><small>Nothing runs and no device is touched. Every drafted step is checked against the same contract as the rows.</small></div>
 <div id="draft-result" aria-live="polite"></div></div></details></div>
-<fieldset class="startstate"><legend>Start state</legend><div class="checks">${radio('fresh','Fresh app data','App data is cleared first. This is not a reinstall and changes nothing on the server.')}${radio('keep','Keep previous app data','Whatever the last run left behind stays. Replays cannot confirm a reproduction from it.')}${radio('snapshot','Load a saved device state','Same saved device state. Account and server preconditions are still checked by the steps.')}</div>
+<fieldset class="startstate"><legend>Start state</legend><div class="checks">${radio('fresh','Fresh app data','App data or browser storage is cleared first. This is not a reinstall and changes nothing on the server.')}${radio('keep','Keep previous app data','Whatever the last run left behind stays. Replays cannot confirm a reproduction from it.')}${radio('snapshot','Load a saved device state','Same saved device state. Account and server preconditions are still checked by the steps.')}</div>
 <div class="field" id="snapshot-field"><label for="snapshot_id">Saved device state</label><select id="snapshot_id" name="snapshot_id"></select><small id="snapshot-note">Reading what is saved on this Mac…</small></div></fieldset>
+<div class="blanks" id="scenario-blanks" hidden></div>
 <ol class="steps" id="scenario-steps"></ol>
 <div class="toolbar" id="step-tools"><button type="button" class="compact" id="add-step">Add a step</button><span id="scenario-summary" class="muted"></span></div>
 <details id="scenario-yaml-box"><summary>Advanced: edit as YAML</summary><textarea id="scenario-yaml" spellcheck="false" aria-describedby="scenario-yaml-error"></textarea><div class="toolbar"><button type="button" class="compact primary" id="yaml-apply">Apply YAML</button><small>Comments are not kept. The rows come back only once this parses.</small></div><p class="error" id="scenario-yaml-error" role="alert"></p></details></section>`}
@@ -303,17 +315,38 @@ function scenarioBind(mf,sync){const box=$('#scenario-section');if(!box)return;
 const list=$('#scenario-steps'),summary=$('#scenario-summary'),tools=$('#step-tools'),runButton=mf.querySelector('[name=run]');
 const yamlBox=$('#scenario-yaml-box'),yamlArea=$('#scenario-yaml'),yamlError=$('#scenario-yaml-error');let appliedYaml='';
 const limit=()=>+mf.querySelector('[name=max_seconds]').value||0;
-const summarise=()=>{const b=scenarioBudget(scenarioSteps),over=b.committed>=limit();
-summary.innerHTML=scenarioSteps.length
+const blanksBox=$('#scenario-blanks'),nameField=mf.querySelector('[name=name]'),goalField=mf.querySelector('[name=goal]');
+// A blank is <angle-bracketed> text anywhere the author can still read it: the name, the goal, the steps.
+const written=()=>[nameField,goalField].filter(Boolean).map(f=>f.value).join(' ')+' '+JSON.stringify(scenarioSteps);
+const blanksLeft=()=>[...new Set(written().match(/<[^<>]{0,120}>/g)||[])];
+const fill=(blank,value)=>{
+// The steps are JSON here, so the replacement is escaped the way JSON spells it.
+scenarioSteps=JSON.parse(JSON.stringify(scenarioSteps).split(blank).join(JSON.stringify(value).slice(1,-1)));
+for(const f of [nameField,goalField])if(f)f.value=f.value.split(blank).join(value);
+draw()};
+const drawBlanks=()=>{const left=blanksLeft();blanksBox.hidden=!left.length;
+if(!left.length){blanksBox.innerHTML='';return left}
+blanksBox.innerHTML=`<strong>${left.length} blank${left.length===1?'':'s'} to fill</strong><small>Each one is replaced everywhere it appears: the mission name, the goal and every step.</small>`
++left.map(b=>cell(b.slice(1,-1),`<input dir="auto" data-blank="${esc(b)}" placeholder="What it is in your product">`,'wide')).join('');
+blanksBox.querySelectorAll('[data-blank]').forEach(el=>el.onchange=()=>{const v=el.value.trim();if(v)fill(el.dataset.blank,v)});
+return left};
+// A journey is worth no less time than its own windows need, and never more than the ceiling.
+const fitLimit=()=>{const f=mf.querySelector('[name=max_seconds]');
+f.value=Math.min(3600,Math.max(+f.value||0,Math.ceil(scenarioBudget(scenarioSteps).ceiling/60)*60))};
+const summarise=()=>{const b=scenarioBudget(scenarioSteps),over=b.committed>=limit(),left=blanksLeft().length;
+// The server refuses a mission that still has a blank; this only says so sooner.
+mf.querySelectorAll('button[type=submit]').forEach(x=>x.disabled=left>0);
+summary.innerHTML=(left?`<strong class="error">${left} blank${left===1?'':'s'} left</strong> · `:'')+(scenarioSteps.length
 ?`${scenarioSteps.length} step${scenarioSteps.length===1?'':'s'} · waits and holds commit ${b.committed} s · up to about ${b.ceiling} s if every window runs out, against a ${limit()} s limit`
 +(b.ceiling>limit()?` <button type="button" class="compact" id="raise-limit">Raise the limit to ${Math.min(3600,Math.ceil(b.ceiling/60)*60)} s</button>`:'')
 +(over?'<br><strong class="error">The waits and holds alone need more time than the limit allows. This mission cannot be saved until the limit is higher.</strong>':'')
-:'';
+:'');
 const raise=$('#raise-limit');
 if(raise)raise.onclick=()=>{mf.querySelector('[name=max_seconds]').value=Math.min(3600,Math.ceil(scenarioBudget(scenarioSteps).ceiling/60)*60);summarise();$('#add-step').focus()};
 if(runButton)runButton.textContent=scenarioSteps.length?`Save and run ${scenarioSteps.length} steps`:'Save and run'};
 const draw=()=>{list.innerHTML=scenarioSteps.map((s,i)=>stepRow(s,i,scenarioSteps.length)).join('')
-||'<li class="nosteps muted">No steps yet. Add one, start from a shipped journey, or describe what you want.</li>';summarise()};
+||'<li class="nosteps muted">No steps yet. Add one, start from a shipped journey, or describe what you want.</li>';drawBlanks();summarise()};
+for(const f of [nameField,goalField])if(f)f.addEventListener('input',()=>{drawBlanks();summarise()});
 // A value edit changes one field; anything that changes which fields exist redraws the rows.
 list.onchange=e=>{const el=e.target,i=+el.dataset.index;if(!Number.isInteger(i)||!scenarioSteps[i])return;
 const step=scenarioSteps[i];
@@ -324,7 +357,7 @@ if(el.dataset.act==='kind')scenarioSteps[i]=pruneStep({...(step.name?{name:step.
 if(el.dataset.act==='event-kind')step.event={[el.value]:EVENT_DEFAULT[el.value]};
 if(el.dataset.act==='oracle-kind'){const kind=stepKind(step),o=step[kind];
 for(const f of Object.keys(ORACLE_KINDS))delete o[f];o[el.value]=clone(ORACLE_DEFAULT[el.value])}
-if(el.dataset.act==='match-kind'){const o=step[stepKind(step)].activity,kept=o.contains||o.equals;step[stepKind(step)].activity={[el.value]:kept}}
+if(el.dataset.act==='match-kind'){const o=step[stepKind(step)].screen,kept=o.contains||o.equals;step[stepKind(step)].screen={[el.value]:kept}}
 draw()};
 list.onclick=e=>{const button=e.target.closest('button[data-act]');if(!button)return;
 const i=+button.dataset.index,what=button.dataset.act;
@@ -347,12 +380,20 @@ for(const key of ['mode','max_seconds','ai_budget','provider']){const input=mf.q
 mf.querySelectorAll('[name=pillars]').forEach(c=>c.checked=(mission.pillars||[]).includes(c.value));
 const start=mission.snapshot?'snapshot':mission.reset==='keep'?'keep':'fresh';
 mf.querySelectorAll('[name=start_state]').forEach(r=>r.checked=r.value===start);
-sync();startState();draw();$('#scenario-presets').open=false;
-toast('Journey loaded. Replace every <placeholder> before saving.');
-list.querySelector('input,select')?.focus()};
+sync();startState();fitLimit();draw();$('#scenario-presets').open=false;
+const left=blanksLeft().length;
+toast(left?`Journey loaded. Fill ${left} blank${left===1?'':'s'} before saving.`:'Journey loaded.');
+(blanksBox.querySelector('input')||list.querySelector('input,select'))?.focus()};
 const drawPresets=()=>{const body=$('#preset-body');
-body.innerHTML=scenarioPresets.map((p,i)=>`<div class="preset"><div><strong>${esc(p.name)}</strong><small dir="auto">${esc(p.about)}</small></div><div class="presetact"><span class="badge">${p.mission.scenario.length} steps</span><button type="button" class="compact" data-preset="${i}">Use this journey</button></div></div>`).join('');
-body.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>usePreset(scenarioPresets[+b.dataset.preset]))};
+body.innerHTML=scenarioPresets.map((p,i)=>`<div class="preset"><div><strong>${esc(p.name)}</strong><small dir="auto">${esc(p.about)}</small></div><div class="presetact"><span class="badge">${journeySize(p)}</span><button type="button" class="compact" data-preset="${i}">Use this journey</button></div></div>`).join('');
+body.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>usePreset(scenarioPresets[+b.dataset.preset]));
+// Arriving from the gallery: pick the target this journey suits, then load it.
+if(pendingJourney){const wanted=scenarioPresets.find(p=>p.id===pendingJourney);pendingJourney='';
+ if(wanted){const mine=(state.targets||[]).filter(t=>t.project_id===mf.querySelector('[name=project_id]').value);
+  const operator=(wanted.needs||[]).join(' ').toLowerCase().includes('operator');
+  const chosen=(operator&&mine.find(t=>t.type==='android'))||mine[0],picker=mf.querySelector('[name=target_id]');
+  if(chosen&&picker){picker.value=chosen.id;sync(true)}
+  usePreset(wanted)}}};
 if(scenarioPresets)drawPresets();
 else api('/scenarios').then(found=>{scenarioPresets=found;drawPresets()}).catch(e=>$('#preset-body').innerHTML=`<p class="error">${esc(e.message)}</p>`);
 // --- start state ------------------------------------------------------------
@@ -370,8 +411,8 @@ if(!usable.length&&chosen()==='snapshot'){mf.querySelector('[name=start_state][v
 .catch(e=>{[...mf.querySelectorAll('[name=start_state]')].find(r=>r.value==='snapshot').disabled=true;note.textContent=e.message});
 // --- drafting ---------------------------------------------------------------
 const draftButton=$('#draft-steps'),draftOut=$('#draft-result');
-draftButton.onclick=async()=>{const description=$('#scenario-describe').value.trim();
-if(description.length<10){draftOut.innerHTML='<p class="error">Describe the journey in a sentence or two first.</p>';$('#scenario-describe').focus();return}
+draftButton.onclick=async()=>{const description=$('#scenario-describe').value.trim()||(goalField?.value||'').trim();
+if(description.length<10){draftOut.innerHTML='<p class="error">Describe the journey in a sentence or two first, or write the goal above.</p>';$('#scenario-describe').focus();return}
 const original=draftButton.textContent;draftButton.disabled=true;draftButton.textContent='Asking the AI worker…';
 draftOut.innerHTML='<div class="skeleton"></div>';
 try{const answer=await api('/scenarios/draft',{method:'POST',body:JSON.stringify({
@@ -381,8 +422,8 @@ texts:$('#scenario-texts').value.split(',').map(s=>s.trim()).filter(Boolean),
 provider:mf.querySelector('[name=provider]').value,codex_account:mf.querySelector('[name=codex_account]')?.value||''})});
 const drafted=answer.steps;
 draftOut.innerHTML=`<p><strong>${drafted.length} drafted step${drafted.length===1?'':'s'}.</strong> Nothing has changed yet.</p><ol class="draftlines">${drafted.map(s=>`<li dir="auto">${esc(describeStep(s))}</li>`).join('')}</ol>${answer.rejected&&answer.rejected.length?`<p class="muted">${answer.rejected.length} suggestion${answer.rejected.length===1?'':'s'} did not fit the contract and ${answer.rejected.length===1?'was':'were'} dropped: ${esc(answer.rejected.join('; '))}</p>`:''}<div class="toolbar"><button type="button" class="compact primary" id="draft-replace">Replace the ${scenarioSteps.length} step${scenarioSteps.length===1?'':'s'} above</button><button type="button" class="compact" id="draft-append">Add these to the end</button></div>`;
-$('#draft-replace').onclick=()=>{scenarioSteps=clone(drafted);draw();toast('Steps replaced. Review every one before saving.');list.querySelector('input,select')?.focus()};
-$('#draft-append').onclick=()=>{scenarioSteps=scenarioSteps.concat(clone(drafted)).slice(0,40);draw();toast('Steps added. Review every one before saving.')};
+$('#draft-replace').onclick=()=>{scenarioSteps=clone(drafted);fitLimit();draw();toast('Steps replaced. Review every one before saving.');list.querySelector('input,select')?.focus()};
+$('#draft-append').onclick=()=>{scenarioSteps=scenarioSteps.concat(clone(drafted)).slice(0,40);fitLimit();draw();toast('Steps added. Review every one before saving.')};
 draftButton.textContent='Draft again'}
 catch(e){draftOut.innerHTML=`<p class="error">${esc(e.message)}</p>`;draftButton.textContent=original}
 finally{draftButton.disabled=false}};
@@ -574,11 +615,18 @@ const value=el.value,start=el.selectionStart,end=el.selectionEnd;
 return()=>{const back=key&&main.querySelector(key);if(!back)return;
 if(value!==undefined&&back.value!==undefined&&back.value!==value)back.value=value;
 back.focus({preventScroll:true});try{back.setSelectionRange(start,end)}catch(e){}}}
-async function render(){const generation=++renderGeneration;clearTimeout(refreshTimer);const route=(location.hash||'#overview').slice(1).split('/');document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash===`#${route[0]}`||route[0]==='run'&&a.hash==='#runs'));try{try{await reload()}catch(e){if(route[0]!=='settings')throw e;state={projects:[],missions:[],runs:[],schedules:[],networks:[],egresss:[],personas:[],loadError:e.message};const connection=await api('/hub/status');state.hub=connection;state.projects=Object.entries(connection.logins).map(([id,w])=>({id,name:w.name}));workspacePicker()}let html;if(route[0]==='overview')html=overview();else if(route[0]==='missions')html=missions();else if(['new','edit'].includes(route[0])){if(SERVER()){location.hash='#missions';return}health=await api('/health');html=missionForm(route[1])}else if(route[0]==='runs')html=head('Runs',`A complete record of browser execution and its outcome. · ${esc(where(workspace))}`)+runTable(state.runs);else if(route[0]==='run')html=detail(await api('/runs/'+route[1]));else if(route[0]==='findings')html=await findings();else if(route[0]==='benchmark')html=benchmarkView();else if(route[0]==='network')html=networks();else if(route[0]==='settings')html=state.loadError?head('Settings','Repair the connection to load workspace data.')+`<p class="error">${esc(state.loadError)}</p><section class="section" id="hub-settings"></section>`:await settings();else if(route[0]==='compare')html=comparison();else html=overview();if(generation!==renderGeneration)return;const resume=keepLive(),scroll=window.scrollY;const opened=[...main.querySelectorAll('details[open]')].map(e=>e.querySelector('summary')?.textContent);main.innerHTML=html;ding(route[0]==='run'?currentRun:null);main.querySelectorAll('details').forEach(e=>e.open=e.hasAttribute('open')||opened.includes(e.querySelector('summary')?.textContent));if(state.hub?.outage&&(shared(workspace)||state.loadError)){main.insertAdjacentHTML('afterbegin',outageNotice(state.hub.outage));$('#outage-retry').onclick=render}bind();readOnly();if(route[0]==='settings'){if(SERVER())$('#hub-settings').innerHTML=`<h2>Team server</h2><p class="muted">Signed in to <strong>${esc(project().name||'this workspace')}</strong>. Missions run in your local console with your own Claude and ChatGPT subscriptions; publishing a finished run shares it here.</p>`;else await renderHubSettings($('#hub-settings'),api,async()=>{workspace='';remember('pex.workspace','');await render()})}window.scrollTo(0,scroll);resume();$('#connection').innerHTML=state.loadError?'Connection needs attention':state.hub?.outage&&shared(workspace)?'Team server not responding · '+(state.hub.outage.synced_at?'last copy':'no copy yet'):SERVER()?'<span class="dot"></span>Connected · team server (read only)':shared(workspace)?'<span class="dot"></span>Connected · '+esc(host()):'<span class="dot"></span>Connected locally';if(route[0]==='run'&&['running','queued'].includes(currentRun.status))refreshTimer=setTimeout(render,4000)}catch(e){if(generation!==renderGeneration)return;// A view with no earlier copy cannot be shown during an outage; say which side is at fault.
+async function render(){const generation=++renderGeneration;clearTimeout(refreshTimer);const route=(location.hash||'#overview').slice(1).split('/');document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash===`#${route[0]}`||route[0]==='run'&&a.hash==='#runs'));try{try{await reload()}catch(e){if(route[0]!=='settings')throw e;state={projects:[],missions:[],runs:[],schedules:[],networks:[],egresss:[],personas:[],loadError:e.message};const connection=await api('/hub/status');state.hub=connection;state.projects=Object.entries(connection.logins).map(([id,w])=>({id,name:w.name}));workspacePicker()}let html;if(route[0]==='overview')html=overview();else if(route[0]==='missions')html=missions();else if(route[0]==='journeys'){if(!scenarioPresets)scenarioPresets=await api('/scenarios');html=journeys()}
+else if(['new','edit'].includes(route[0])){if(SERVER()){location.hash='#missions';return}health=await api('/health');
+// #new/<journey-id> opens the form already carrying that journey; scenarioBind picks it up.
+pendingJourney=route[0]==='new'?(route[1]||''):'';html=missionForm(route[0]==='edit'?route[1]:'')}else if(route[0]==='runs')html=head('Runs',`A complete record of browser execution and its outcome. · ${esc(where(workspace))}`)+runTable(state.runs);else if(route[0]==='run')html=detail(await api('/runs/'+route[1]));else if(route[0]==='findings')html=await findings();else if(route[0]==='benchmark')html=benchmarkView();else if(route[0]==='network')html=networks();else if(route[0]==='settings')html=state.loadError?head('Settings','Repair the connection to load workspace data.')+`<p class="error">${esc(state.loadError)}</p><section class="section" id="hub-settings"></section>`:await settings();else if(route[0]==='compare')html=comparison();else html=overview();if(generation!==renderGeneration)return;const resume=keepLive(),scroll=window.scrollY;const opened=[...main.querySelectorAll('details[open]')].map(e=>e.querySelector('summary')?.textContent);main.innerHTML=html;ding(route[0]==='run'?currentRun:null);main.querySelectorAll('details').forEach(e=>e.open=e.hasAttribute('open')||opened.includes(e.querySelector('summary')?.textContent));if(state.hub?.outage&&(shared(workspace)||state.loadError)){main.insertAdjacentHTML('afterbegin',outageNotice(state.hub.outage));$('#outage-retry').onclick=render}bind();readOnly();if(route[0]==='settings'){if(SERVER())$('#hub-settings').innerHTML=`<h2>Team server</h2><p class="muted">Signed in to <strong>${esc(project().name||'this workspace')}</strong>. Missions run in your local console with your own Claude and ChatGPT subscriptions; publishing a finished run shares it here.</p>`;else await renderHubSettings($('#hub-settings'),api,async()=>{workspace='';remember('pex.workspace','');await render()})}window.scrollTo(0,scroll);resume();$('#connection').innerHTML=state.loadError?'Connection needs attention':state.hub?.outage&&shared(workspace)?'Team server not responding · '+(state.hub.outage.synced_at?'last copy':'no copy yet'):SERVER()?'<span class="dot"></span>Connected · team server (read only)':shared(workspace)?'<span class="dot"></span>Connected · '+esc(host()):'<span class="dot"></span>Connected locally';if(route[0]==='run'&&['running','queued'].includes(currentRun.status))refreshTimer=setTimeout(render,4000)}catch(e){if(generation!==renderGeneration)return;// A view with no earlier copy cannot be shown during an outage; say which side is at fault.
 const down=String(e.message||'').startsWith('Team server unreachable');
 main.innerHTML=head(down?'The team server is not responding':'Could not load this view',down?'This view needs records the console has not received before, so there is no copy to show. The rest of the console still works.':'The service returned an error.')+`<p class="error">${esc(e.message)}</p><button id="retry">Try again</button><a class="button" href="#settings">Connection settings</a>`;$('#retry').onclick=render;$('#connection').textContent=down?'Team server not responding':'Connection needs attention'}}
 async function submitAction(button,fn){button.disabled=true;try{await fn()}catch(e){toast(e.message)}finally{button.disabled=false}}
 function bind(){const videos=[...main.querySelectorAll('video')],speed=$('#video-speed');
+const journeyBox=$('#journey-search');
+if(journeyBox)journeyBox.oninput=()=>{journeySearch=journeyBox.value;const q=journeySearch.trim().toLowerCase();let shown=0;
+main.querySelectorAll('.journey').forEach(el=>{const hit=!q||el.dataset.find.includes(q);el.hidden=!hit;if(hit)shown++});
+$('#journey-none').hidden=shown>0};
 if(videos.length&&speed){const apply=()=>{videos.forEach(v=>v.playbackRate=+speed.value);remember('pex.video-speed',speed.value)};apply();videos.forEach(v=>v.onloadedmetadata=apply);speed.onchange=apply}
 const onward=$('#continue-form');if(onward)onward.onsubmit=e=>{e.preventDefault();const b=onward.querySelector('[data-continue]');submitAction(b,async()=>{await api(`/runs/${b.dataset.continue}/continue`,{method:'POST',body:JSON.stringify({ai_calls:+onward.ai_calls.value||0,steps:+onward.steps.value||0})});toast('Continuing this run');await render()})};
 const releaseStep=(b,id,skip)=>submitAction(b,async()=>{
@@ -603,7 +651,12 @@ if(account)account.style.display=['codex','auto'].includes(worker?.value)?'':'no
 if(competitors&&mode)competitors.style.display=!native&&mode.value==='benchmark'?'':'none';
 if(buildPicker){buildPicker.closest('.field').hidden=!native;const selected=target(targetPicker?.value);if(changed)buildPicker.innerHTML=option('','Latest non-archived','')+(selected?.builds||[]).map(b=>option(b.sha256,`${b.version_name} · ${b.sha256.slice(0,10)}`,'')).join('')}
 if(deviceField)deviceField.hidden=!native;
-const scenarioBox=$('#scenario-section');if(scenarioBox)scenarioBox.hidden=!native;
+// One vocabulary, two targets: the builder shows for both. Only a saved device state is Android's.
+const scenarioBox=$('#scenario-section');if(scenarioBox)scenarioBox.hidden=!targetPicker?.value;
+const savedState=$('#start-snapshot'),savedRadio=mf.querySelector('[name=start_state][value=snapshot]');
+if(savedState){savedState.hidden=!native;
+if(!native&&savedRadio?.checked){mf.querySelector('[name=start_state][value=fresh]').checked=true;$('#snapshot-field').hidden=true}
+const note=$('#snapshot-note');if(note&&!native)note.textContent='A website mission loads a saved session through a persona instead.'}
 for(const name of ['browser','viewport','competitors','persona_id','login_identifier','login_password','egress_id']){const input=mf.querySelector(`[name="${name}"]`);if(input)input.disabled=native}
 const seo=mf.querySelector('[name=pillars][value=seo_aeo]');if(seo){seo.disabled=native;if(native)seo.checked=false}
 if(native){if(mode?.value==='benchmark')mode.value='audit';mf.querySelector('[name=network]').value='baseline'}
@@ -636,9 +689,11 @@ if(ask&&box&&panel)ask.onclick=async()=>{
  catch(e){panel.innerHTML=`<p class="error">${esc(e.message)}</p>`;ask.textContent=original}
  finally{ask.disabled=false;panel.removeAttribute('aria-busy')}}}
 if(mf)mf.onsubmit=async e=>{e.preventDefault();const fd=new FormData(mf),data=Object.fromEntries(fd);data.allowed_domains=data.allowed_domains.split(',').map(s=>s.trim()).filter(Boolean);data.competitors=(data.competitors||'').split(/[\n,]/).map(s=>s.trim()).filter(Boolean);data.model=data.model==='__custom__'?(data.model_custom||'').trim():data.model;delete data.model_custom;data.pillars=fd.getAll('pillars');for(const k of ['max_steps','max_seconds','ai_budget','observe_seconds'])data[k]=+data[k];delete data.run;
-// Start state and steps are Android facts; a website mission must not carry them at all.
+// Steps and the start state run on either platform; a saved device state is Android's alone.
 const start=data.start_state,snapshot=data.snapshot_id;delete data.start_state;delete data.snapshot_id;
-if(target(data.target_id)?.type==='android'){data.scenario=scenarioSteps;data.reset=start==='fresh'?'fresh':'keep';data.snapshot=start==='snapshot'?(snapshot||''):''}const button=e.submitter;await submitAction(button,async()=>{try{const id=mf.dataset.id,m=await api('/missions'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(data)});toast('Mission saved');if(button.name==='run'){const r=await api('/runs',{method:'POST',body:JSON.stringify({mission_id:m.id})});selectedStep=0;location.hash='#run/'+r.id}else location.hash='#missions'}catch(err){$('#form-error').textContent=err.message;throw err}})};
+if($('#scenario-section')){const native=target(data.target_id)?.type==='android';
+data.scenario=scenarioSteps;data.reset=start==='fresh'?'fresh':'keep';
+if(native)data.snapshot=start==='snapshot'?(snapshot||''):''}const button=e.submitter;await submitAction(button,async()=>{try{const id=mf.dataset.id,m=await api('/missions'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(data)});toast('Mission saved');if(button.name==='run'){const r=await api('/runs',{method:'POST',body:JSON.stringify({mission_id:m.id})});selectedStep=0;location.hash='#run/'+r.id}else location.hash='#missions'}catch(err){$('#form-error').textContent=err.message;throw err}})};
 for(const [sel,path] of [['#mission-import','/import'],['#persona-import','/personas']]){const input=$(sel);if(input)input.onchange=async()=>{if(!input.files[0])return;const fd=new FormData();fd.append('file',input.files[0]);try{await api(path,{method:'POST',body:fd});toast('Import complete');await render()}catch(e){toast(e.message)}}}
 const projectForm=$('#project-form');
 if(projectForm){

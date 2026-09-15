@@ -1,0 +1,36 @@
+id: playback-offline
+name: Playback across a dropped connection
+about: >-
+  Starts something playing, cuts the connection while it runs, watches what the player does over the
+  next fifteen seconds and what the screen says, then restores the connection and looks again. The
+  hold and the offline message are recorded as observations: a player that stops on a dropped link is
+  a design choice, not a defect, so read the timeline rather than a pass mark.
+tags: [playback, network, offline]
+needs: []
+mission:
+  name: Playback across a dropped connection
+  goal: Play a title, drop the connection while it plays, and see what the player does next
+  mode: journey
+  provider: codex
+  pillars: [functionality]
+  max_steps: 12
+  ai_budget: 12
+  max_seconds: 1800
+  reset: fresh
+  scenario:
+    - name: Start it playing
+      goal: Open "<Title of the thing that plays>" and start playing it
+    - name: Playback is really running
+      check: {playing: true, within: 30, severity: P1}
+    - name: Cut the connection
+      event: {network: offline}
+    - name: Playback while offline
+      hold: {playing: true, for: 15, policy: unknown, severity: info}
+    - name: What the screen says about it
+      check: {text: "<Message shown when the connection drops>", within: 20, policy: unknown}
+    - name: Put the connection back
+      event: {network: restore}
+    - name: Playback after the connection returns
+      check: {playing: true, within: 30, policy: unknown}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

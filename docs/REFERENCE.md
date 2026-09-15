@@ -119,11 +119,13 @@ Network scope is explicit: Linux netem shapes container **egress**, including co
 
 Use **Network & routes → Add a proxy route** for a real remote egress. Supply an HTTP(S) or SOCKS5 endpoint and credentials you control. Labels do not prove ISP/ASN identity; verify the provider and route independently. No ISP endpoints or credentials are bundled.
 
-## Android scenarios
+## Scenarios
 
-An Android mission may carry an ordered scenario of at most 40 steps. Without one, the mission runs as a single AI journey exactly as before.
+An Android or website mission may carry an ordered scenario of at most 40 steps. Without one, the mission runs as a single AI journey exactly as before. One vocabulary, one interpreter and one journey library serve both; the target decides what each step acts on.
 
-Build it in the mission form's **Scenario** section. Five shipped journeys fill the rows, **Draft the steps** asks the signed-in AI worker for a first draft from a sentence, and the advanced view shows the same steps as YAML. The rows and the YAML are one model: text that does not parse stays in the editor and never replaces working rows.
+Build it in the mission form's **Scenario** section, or start from the gallery at **Missions → Start from a journey**, which opens the form with a journey's target, name, goal, time limit and steps already set. Twelve shipped journeys fill the rows, **Draft the steps** asks the signed-in AI worker for a first draft from a sentence (or from the goal, when no sentence is given), and the advanced view shows the same steps as YAML. The rows and the YAML are one model: text that does not parse stays in the editor and never replaces working rows.
+
+A journey carries no platform and leaves two to four blanks where a real value belongs. The console lists every distinct blank above the step list, fills each occurrence across the name, goal and steps at once, and keeps both submit buttons disabled — saying how many are left — until none remain. The server refuses a mission that still holds one, which is the check that counts.
 
 Each step is exactly one of five keys, plus an optional `name` used only as a label:
 
@@ -138,12 +140,18 @@ Each step is exactly one of five keys, plus an optional `name` used only as a la
 - `goal` gives the AI worker one instruction, with an optional `until: {text: "…"}` early stop. Reaching it proves navigation, nothing later.
 - `check` requires a fact to become true once inside `within` seconds, default 10.
 - `hold` requires it to stay true across `for` seconds, sampled about every two seconds. The result reports how many samples were taken over how long, and gaps are recorded rather than smoothed over.
-- `event` acts on the device: `network`, `speed` with an optional `delay_ms`, a standalone `delay_ms`, `wait`, `home`, `kill`, `relaunch`, `deep_link` and `open_notification`.
-- `manual` hands the device to a person. Recording is stopped and confirmed stopped before the notice appears, so credentials are never recorded or sent to the AI worker. The run page offers **Continue**; the wait counts against the run's own budget and is shown as the shorter of the two.
+- `event` acts on the device or the page: `network`, `speed` with an optional `delay_ms`, a standalone `delay_ms`, `wait`, `home`, `back`, `kill`, `relaunch`, `deep_link` and `open_notification`.
+- `manual` hands the run to a person. On Android recording is stopped and confirmed stopped before the notice appears, so credentials are never recorded or sent to the AI worker; on the web it means acting outside the page, and the per-context video is not cut. The run page offers **Continue**; the wait counts against the run's own budget and is shown as the shorter of the two.
 
-A check or hold states exactly one fact: `text`, `text_absent`, `activity` (`contains` or `equals`), `playing`, `notification`, or `no_crash`. Three modifiers apply to any of them. `policy: unknown` marks a behaviour nobody has confirmed: it is recorded as an observation with severity `info`, deducts nothing, blocks nothing, and can never be required. `severity` defaults to P2. `required` defaults to true under confirmed policy; a required failure or a required measurement that could not be established stops the steps that depend on it.
+A check or hold states exactly one fact: `text`, `text_absent`, `screen` (`contains` or `equals`, the focused activity on Android and the page address on the web), `playing`, `notification`, or `no_crash`. Three modifiers apply to any of them. `policy: unknown` marks a behaviour nobody has confirmed: it is recorded as an observation with severity `info`, deducts nothing, blocks nothing, and can never be required. `severity` defaults to P2. `required` defaults to true under confirmed policy; a required failure or a required measurement that could not be established stops the steps that depend on it.
 
 Evidence that cannot be read is never read as a negative. An unreachable hierarchy, an unknown foreground package or a parser error makes a step **unavailable**, which is a coverage gap, not a defect. The run page lists those separately from findings, alongside the questions raised by unknown-policy steps.
+
+### What a step means in a browser
+
+`screen` is the page address. `notification` is a notification the page itself created through the Notification API, and `open_notification` fires that notification's own click handler. `playing` reads the first `<video>` or `<audio>` element that has loaded anything. `no_crash` means no uncaught page error since the last goal or event — not that nothing failed. `kill` drops the document to `about:blank`, so in-memory state is gone while cookies and storage stay; `home` brings another tab in front so the page goes hidden; `relaunch` brings the page back and reloads it; `back` is the browser's own back; `deep_link` opens a URL only on a host the mission is already allowed to visit.
+
+Two caveats, both refused at save time rather than discovered mid-run. Link shaping — `speed`, `delay_ms` and `network: wifi | cellular` — throttles the browser through Chromium's own emulation and is refused on any other browser; `offline` and `restore` work everywhere. A saved device state cannot be loaded into a browser: a website mission carries its signed-in session through a persona instead, and `Keep previous app data` reuses the session storage the mission's last run wrote.
 
 ### Start state and saved device states
 

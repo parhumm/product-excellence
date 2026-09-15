@@ -3,12 +3,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from typing import Literal
 from urllib.parse import urlsplit
 
-# --- Android scenario steps -------------------------------------------------
+# --- Scenario steps ---------------------------------------------------------
 # A scenario is an ordered list of steps stored as normalized objects. YAML is an
 # editing and exchange representation only; the mission never keeps the text.
+# The same vocabulary runs on an Android device and in a browser page.
 PLACEHOLDER=re.compile(r'<[^<>]{0,120}>')
-ORACLES=('text','text_absent','activity','playing','notification','no_crash')
-EVENTS=('network','speed','delay_ms','kill','home','wait','relaunch','deep_link','open_notification')
+ORACLES=('text','text_absent','screen','playing','notification','no_crash')
+EVENTS=('network','speed','delay_ms','kill','home','back','wait','relaunch','deep_link','open_notification')
 KINDS=('goal','manual','event','check','hold')
 STRICT=dict(extra='forbid',populate_by_name=True,serialize_by_alias=True)
 
@@ -19,28 +20,14 @@ def https_link(value):
     if u.scheme!='https' or not u.hostname or u.username or u.password:raise ValueError('Deep links need an HTTPS URL without credentials')
     return value
 
-def placeholder_in(value):
-    """The first unresolved <placeholder> anywhere in a step, so the author is told what to replace."""
-    if isinstance(value,str):
-        found=PLACEHOLDER.search(value);return found.group(0) if found else ''
-    if isinstance(value,dict):
-        for item in value.values():
-            found=placeholder_in(item)
-            if found:return found
-    if isinstance(value,list):
-        for item in value:
-            found=placeholder_in(item)
-            if found:return found
-    return ''
-
 class Match(BaseModel):
-    """Exact or substring match on package/activity. No author-supplied regular expression is executed."""
+    """Exact or substring match on a screen name or page address. No author-supplied regular expression is executed."""
     model_config=ConfigDict(**STRICT)
     contains: str = Field(default='', max_length=300)
     equals: str = Field(default='', max_length=300)
     @model_validator(mode='after')
     def one(self):
-        if bool(self.contains)==bool(self.equals):raise ValueError('Match an activity with exactly one of contains or equals')
+        if bool(self.contains)==bool(self.equals):raise ValueError('Match a screen with exactly one of contains or equals')
         return self
 
 class Notification(BaseModel):
@@ -57,7 +44,7 @@ class Oracle(BaseModel):
     model_config=ConfigDict(**STRICT)
     text: str = Field(default='', max_length=4000)
     text_absent: str = Field(default='', max_length=4000)
-    activity: Match | None = None
+    screen: Match | None = None
     playing: bool | None = None
     notification: Notification | None = None
     no_crash: bool | None = None
@@ -92,6 +79,7 @@ class Event(BaseModel):
     delay_ms: int | None = Field(default=None, ge=0, le=5000)
     kill: bool | None = None
     home: bool | None = None
+    back: bool | None = None
     wait: int | None = Field(default=None, ge=1, le=1800)
     relaunch: bool | None = None
     deep_link: str | None = Field(default=None, max_length=2000)
@@ -107,7 +95,7 @@ class Event(BaseModel):
         # A link speed may carry its own added delay; everything else stands alone.
         if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
         if len(chosen)!=1:raise ValueError('An event step performs exactly one of: '+', '.join(EVENTS))
-        for flag in ('kill','home','relaunch'):
+        for flag in ('kill','home','back','relaunch'):
             if getattr(self,flag) is False:raise ValueError(flag+' takes true, or leave the key out')
         if self.deep_link:https_link(self.deep_link)
         return self
@@ -214,24 +202,31 @@ class Mission(BaseModel):
         for v in values:
             if not v or any(c in v for c in '/:@* ') or v.startswith('.'): raise ValueError('Use plain exact domain names')
         return [v.lower() for v in values]
+    def blanks(self):
+        """Every distinct <placeholder> still in this mission, in the order a reader meets them."""
+        text=' '.join([self.name,self.goal]+[str(step.model_dump()) for step in self.scenario])
+        return list(dict.fromkeys(PLACEHOLDER.findall(text)))
     @model_validator(mode='after')
     def coherent(self):
         # An explicit target owns the platform; the request is validated again after
         # target resolution. Legacy web missions still need their own URL here.
         if self.platform=='web' and not self.url and not self.target_id:raise ValueError('Website missions require a URL')
-        if self.platform!='android' and (self.scenario or self.snapshot or self.reset!='fresh'):
-            raise ValueError('Scenarios and saved device state apply to Android missions')
+        if self.platform!='android' and self.snapshot:
+            raise ValueError('Website missions load a saved session through a persona')
         if self.snapshot:
             # The name of a saved state is not its identity; loading one always keeps the data it holds.
             if 'reset' in self.model_fields_set and self.reset=='fresh':raise ValueError('A saved device state keeps its data; choose Keep previous app data or remove the snapshot')
             self.reset='keep'
         if self.scenario:
             if 'functionality' not in self.pillars:raise ValueError('Scenario verdicts are recorded under Functionality; select that pillar')
-            committed=0
-            for number,step in enumerate(self.scenario,1):
-                found=placeholder_in(step.model_dump())
-                if found:raise ValueError(f'Step {number} still says {found}; replace it with the real value before saving')
-                committed+=step.seconds
+            left=self.blanks()
+            if left:raise ValueError(f'Fill in {len(left)} blank{"s" if len(left)>1 else ""}: '+', '.join(left))
+            if self.platform!='android' and self.browser!='chromium':
+                for number,step in enumerate(self.scenario,1):
+                    e=step.event
+                    if e and (e.speed or e.delay_ms is not None or e.network in ('wifi','cellular')):
+                        raise ValueError(f'Step {number}: link shaping in the browser needs Chromium')
+            committed=sum(step.seconds for step in self.scenario)
             if committed>=self.max_seconds:raise ValueError(f'The waits and holds in this scenario already need {committed} s; raise the run time limit above that')
         if self.platform=='android':
             if self.mode=='benchmark' or self.competitors or self.persona_id or self.egress_id or self.login_identifier or self.login_password:raise ValueError('Android missions do not support benchmark, competitors, personas, egress or sign-in')

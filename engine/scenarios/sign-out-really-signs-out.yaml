@@ -1,0 +1,35 @@
+id: sign-out-really-signs-out
+name: Sign-out really signs out
+about: >-
+  An operator signs in, the run signs out, goes back, and then opens an account-only screen by link to
+  see whether the session really ended. It checks what this client shows. It does not prove the server
+  revoked the token, so a screen that asks for a sign-in is evidence, not a guarantee.
+tags: [sign-in, sign-out, session, security]
+needs: ["An operator to sign in"]
+mission:
+  name: Sign-out really signs out
+  goal: Sign out and check an account-only screen can no longer be reached
+  mode: journey
+  provider: codex
+  pillars: [functionality]
+  max_steps: 14
+  ai_budget: 14
+  max_seconds: 1800
+  reset: fresh
+  scenario:
+    - name: Sign in
+      manual: Sign in with any account that has an account-only screen, then continue
+      timeout: 600
+    - name: Sign out
+      goal: Sign out of the current account
+      until: {text: "<Text shown only when signed out>"}
+    - name: Go back
+      event: {back: true}
+    - name: The signed-in text is gone
+      check: {text_absent: "<Text shown only when signed in>", within: 15, severity: P1}
+    - name: Open an account-only screen by link
+      event: {deep_link: "<Link to an account-only screen>"}
+    - name: It asks for a sign-in
+      check: {text: "<Text on the sign-in screen>", within: 30, severity: P1}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

@@ -105,7 +105,7 @@ class ScenarioDevice:
     text='Now playing'
     def __init__(self,*a,**k):
         self.folder=Path(a[2]);self.measurements={'start_state':'fresh'};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
-        self.app={'package':'dev.pex.app'};self.homed=0;self.recording=True
+        self.app={'package':'dev.pex.app'};self.homed=0;self.went_back=0;self.recording=True
     async def start(self):pass
     async def launch(self,url):self.measurements.update(launch_ms=400,launch_status='ok',api=34,abi='arm64-v8a',renderer='auto')
     async def observe(self,id):
@@ -115,15 +115,16 @@ class ScenarioDevice:
     def log_cursor(self):return 0
     def crash_since(self,cursor):return ''
     async def home(self):self.homed+=1
+    async def back(self):self.went_back+=1
     async def stop_recording(self):self.recording=False
     async def start_recording(self):self.recording=True
     async def stop(self):pass
 
-async def scenario_run(monkeypatch,tmp_path,steps):
+async def scenario_run(monkeypatch,tmp_path,steps,device_class=ScenarioDevice):
     monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
     async def write(kind,value):return value
     monkeypatch.setattr(runner_module,'write',write)
-    monkeypatch.setattr(runner_module.android,'Device',ScenarioDevice)
+    monkeypatch.setattr(runner_module.android,'Device',device_class)
     run=native_run(tmp_path);run['mission']['scenario']=steps
     await runner_module.Runner().execute_android('run',run)
     return run
@@ -138,6 +139,22 @@ async def test_scenario_verdicts_become_findings_coverage_gaps_and_skipped_steps
     assert run['mission_outcome']=='blocked' and run['status']=='blocked' and run['gate']=='warn'
     assert run['scenario_coverage']['status']=='partial' and run['coverage']['functionality']['status']=='not_evaluated'
     assert run['scenario_digest'] and finding['rule'].endswith('-3-text')  # rule names the scenario, the step and the oracle
+
+@pytest.mark.asyncio
+async def test_back_and_screen_run_on_a_device_through_the_shared_scenario_block(monkeypatch,tmp_path):
+    """The block both platforms share carries out `back` and reads `screen` off the same sample()."""
+    devices=[]
+    class Watched(ScenarioDevice):
+        def __init__(self,*a,**k):super().__init__(*a,**k);devices.append(self)
+    run=await scenario_run(monkeypatch,tmp_path,[{'event':{'back':True}},
+                                                 {'check':{'screen':{'contains':'Player'},'within':1}},
+                                                 {'check':{'screen':{'equals':'dev.pex.app/Settings'},'within':1}},
+                                                 {'check':{'no_crash':True,'within':1}}],Watched)
+    assert devices[0].went_back==1
+    assert [s['status'] for s in run['scenario']]==['passed','passed','failed','skipped']
+    finding=next(f for f in run['findings'] if f['rule'].startswith('scenario-'))
+    assert finding['rule'].endswith('-3-screen') and finding['classification']=='defect'
+    assert run['mission_outcome']=='blocked' and run['scenario_coverage']['status']=='partial'
 
 @pytest.mark.asyncio
 async def test_an_unknown_expectation_is_recorded_without_blocking_or_deducting(monkeypatch,tmp_path):

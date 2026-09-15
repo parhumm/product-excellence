@@ -35,10 +35,43 @@ async def play(steps,device):
 # --- contract ---------------------------------------------------------------
 
 def test_a_scenario_rejects_placeholders_unknown_keys_and_impossible_time():
-    for bad,words in [([{'check':{'text':'<Movie title>'}}],'Step 1 still says'),
+    for bad,words in [([{'check':{'text':'<Movie title>'}}],'Fill in 1 blank: <Movie title>'),
                       ([{'check':{'text':'a','after':3}}],'Extra inputs'),
                       ([{'event':{'wait':600}},{'event':{'wait':600}}],'already need 1200 s')]:
         with pytest.raises(ValueError,match=words):mission(scenario=bad,max_seconds=600)
+
+def web(**extra):
+    base=dict(platform='web',url='https://example.com',name='Scenario',goal='Play a downloaded movie',
+              mode='audit',provider='none',ai_budget=0,pillars=['functionality'])
+    return Mission(**{**base,**extra})
+
+def test_the_same_scenario_vocabulary_saves_against_a_website():
+    bound=web(scenario=[{'manual':'Sign in, then continue'},
+                        {'check':{'notification':{'text':'Saved'},'within':5}},
+                        {'event':{'kill':True}},
+                        {'event':{'relaunch':True}},
+                        {'check':{'screen':{'contains':'/library'},'within':5}},
+                        {'event':{'network':'offline'}},
+                        {'event':{'back':True}},
+                        {'check':{'no_crash':True,'within':5}}])
+    assert [s.kind for s in bound.scenario][:3]==['manual','check','event']
+
+def test_a_website_scenario_refuses_a_snapshot_and_needs_chromium_to_shape_the_link():
+    with pytest.raises(ValueError,match='through a persona'):web(snapshot='a'*12)
+    with pytest.raises(ValueError,match='Step 2: link shaping in the browser needs Chromium'):
+        web(browser='firefox',scenario=[{'event':{'network':'offline'}},{'event':{'speed':'edge'}}])
+    # Offline and restore need no shaping, so they run on any browser.
+    assert web(browser='firefox',scenario=[{'event':{'network':'offline'}},{'event':{'network':'restore'}}]).scenario
+
+def test_blanks_are_listed_once_each_in_the_order_a_reader_meets_them():
+    unbound=Mission.model_construct(name='<Movie title> on <Device>',goal='Play <Movie title>',
+                                    scenario=[Step.model_validate({'check':{'text':'<Text shown while playing>'}}),
+                                              Step.model_validate({'check':{'text':'<Movie title>'}})])
+    assert unbound.blanks()==['<Movie title>','<Device>','<Text shown while playing>']
+
+def test_the_screen_fact_replaced_the_android_activity_name():
+    with pytest.raises(ValueError,match='Extra inputs'):mission(scenario=[{'check':{'activity':{'contains':'Player'}}}])
+    assert mission(scenario=[{'check':{'screen':{'contains':'Player'},'within':5}}]).scenario
 
 def test_a_hold_keeps_its_yaml_spelling_and_an_unknown_expectation_cannot_be_required():
     held=Step.model_validate({'hold':{'playing':True,'for':20,'policy':'unknown'}}).model_dump()
@@ -174,19 +207,23 @@ async def test_a_notification_check_reads_only_this_package_and_survives_a_faile
 def resolve(value):
     """Stand in for the operator binding a preset: every <placeholder> gets a real value."""
     if isinstance(value,str):
-        return re.sub(r'<[^<>]+>','Real value',re.sub(r'<[^<>]*link[^<>]*>','https://example.com/title/1',value))
+        return re.sub(r'<[^<>]+>','Real value',re.sub(r'<[^<>]*link[^<>]*>','https://example.com/title/1',value,flags=re.I))
     if isinstance(value,dict):return {k:resolve(v) for k,v in value.items()}
     if isinstance(value,list):return [resolve(v) for v in value]
     return value
 
-def test_every_shipped_preset_binds_to_a_mission_and_survives_yaml():
+def test_every_shipped_preset_binds_to_a_mission_on_either_platform_and_survives_yaml():
     shipped=scenarios()
-    assert [p['id'] for p in shipped][:2]==['entitlement-switch','weak-network-download'] and len(shipped)==5
+    assert [p['id'] for p in shipped][:2]==['entitlement-switch','weak-network-download'] and len(shipped)==12
     for preset in shipped:
-        # Unbound, the placeholders are exactly what stops it being saved by accident.
-        with pytest.raises(ValueError,match='still says'):
+        # A blank is an instruction to the author, so it is never one bare word.
+        assert preset['blanks'] and all(' ' in blank for blank in preset['blanks']),preset['id']
+        # Unbound, the blanks are exactly what stops it being saved by accident.
+        with pytest.raises(ValueError,match='Fill in'):
             Mission(**preset['mission'],target_id='t',build='b'*64,device='pex-test')
-        bound=Mission(**resolve(preset['mission']),target_id='t',build='b'*64,device='pex-test')
-        again=Mission.model_validate(yaml.safe_load(yaml.safe_dump(bound.model_dump(by_alias=True),allow_unicode=True)))
-        assert again.model_dump()==bound.model_dump(),preset['id']
-        assert bound.platform=='android' and bound.pillars==['functionality'] and bound.scenario
+        for platform,rest in (('android',{'target_id':'t','build':'b'*64,'device':'pex-test'}),
+                              ('web',{'url':'https://example.com'})):
+            bound=Mission(**resolve(preset['mission']),platform=platform,**rest)
+            again=Mission.model_validate(yaml.safe_load(yaml.safe_dump(bound.model_dump(by_alias=True),allow_unicode=True)))
+            assert again.model_dump()==bound.model_dump(),preset['id']
+            assert bound.platform==platform and bound.pillars==['functionality'] and bound.scenario

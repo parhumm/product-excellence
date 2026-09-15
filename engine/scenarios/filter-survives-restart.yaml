@@ -1,0 +1,32 @@
+id: filter-survives-restart
+name: A filter that survives a restart
+about: >-
+  Applies one filter to a list, kills the app or drops the page, starts it again and checks that the
+  filter is still on and the same list is in front. It proves the filter was written down somewhere
+  that outlives the process. It does not prove the filtered results themselves are correct.
+tags: [state, restart, lists]
+needs: []
+mission:
+  name: A filter that survives a restart
+  goal: Apply a filter to a list, restart, and check the filter and the list are still there
+  mode: journey
+  provider: codex
+  pillars: [functionality]
+  max_steps: 12
+  ai_budget: 12
+  max_seconds: 1500
+  reset: fresh
+  scenario:
+    - name: Apply the filter
+      goal: Open the list and apply the filter "<Name of the filter to apply>"
+      until: {text: "<Text shown when the filter is on>"}
+    - name: End the process
+      event: {kill: true}
+    - name: Start again
+      event: {relaunch: true}
+    - name: The filter is still on
+      check: {text: "<Text shown when the filter is on>", within: 30, severity: P1}
+    - name: And it is the same list
+      check: {screen: {contains: "<Screen name or path of the filtered list>"}, within: 10, policy: unknown}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

@@ -63,6 +63,16 @@ abbr[title]{text-decoration:none;cursor:help;border-bottom:1px dotted var(--line
 p.cell{margin:0;align-self:center;font-size:12px}
 /* An unreplaced <placeholder> is the one thing that stops a template running, so it stays visible. */
 .step input.ph{background:oklch(96% .035 80);border-color:oklch(84% .05 80)}
+/* Every blank in one panel above the steps, so filling them in is the first thing an author does. */
+.blanks{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;border:1px solid oklch(84% .05 80);background:oklch(97.5% .02 80);border-radius:7px;padding:14px 16px;margin:10px 0}
+.blanks>strong,.blanks>small{flex:0 0 100%}
+.journeys{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px}
+.journey{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:16px 18px}
+.journey h3{margin:0}
+.journey p{margin:0;max-width:none;font-size:13px}
+.journey .findmeta{margin:2px 0 0}
+.journey .caveat{color:var(--warn)}
+.journey .toolbar{margin:auto 0 0}
 #scenario-summary{font-size:12px}
 #scenario-summary .compact{margin-left:8px}
 #scenario-yaml{min-height:280px;font-family:ui-monospace,monospace;font-size:12px}

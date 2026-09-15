@@ -192,11 +192,14 @@ def test_budget_stop_still_spends_one_call_on_the_review(tmp_path, monkeypatch):
     assert {o['part'] for o in final['observations']} == {1}
 
 
-def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission_goal='Sign in with a code'):
+def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission_goal='Sign in with a code',
+                      page_text=None, **mission_extra):
     """Run one web journey that pauses for the operator, and hand back everything it recorded.
 
     `controls` names the page's controls for whatever is currently in the field, `release` answers
-    the pause. Returns saved records, prompts, the values filled in, and the control ids clicked.
+    the pause. `page_text` is a mutable `{'value': …}` a scenario can change between steps; without
+    one the page reflects whatever is in the field. Returns saved records, prompts, the values
+    filled in, the control ids clicked, and the page, context and run the journey used.
     """
     from unittest.mock import Mock
     runtime = importlib.import_module('engine.runner')
@@ -204,7 +207,7 @@ def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission
     artifacts.mkdir()
     mission = Mission(name='Fixture', url='https://example.com', goal=mission_goal,
                       browser='firefox', mode='journey', provider='codex',
-                      ai_budget=5, max_steps=4).model_dump()
+                      ai_budget=5, max_steps=4, **mission_extra).model_dump()
     run = {'id': 'run-test', 'mission_id': 'mission-test', 'mission': mission,
            'status': 'queued', 'network_snapshot': NetworkProfile(name='Baseline').model_dump(),
            'observations': [], 'actions': [], 'events': [], 'findings': [], 'http': [],
@@ -218,14 +221,27 @@ def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission
         saved.append(copy.deepcopy(record))
         return record
 
-    async def evaluate(script):
+    def visible():
+        # The site reflects the number it was given, the way a "code sent to ..." line does.
+        if page_text is not None:
+            return page_text['value']
+        return 'Code sent to ' + box['value'] if box['value'] else 'Sign in'
+
+    async def evaluate(script, *args):
         if 'typeof window.axe' in script:
             return True
         if 'axe.run' in script:
             return {'violations': [], 'passes': [], 'incomplete': []}
-        # The site reflects the number it was given, the way a "code sent to ..." line does.
-        return {'url': 'https://example.com', 'title': 'Sign in',
-                'text': 'Code sent to ' + box['value'] if box['value'] else 'Sign in',
+        # The reads engine/web.py Browser makes of the live page, each answered as the page would.
+        if '()=>document.body?' in script:
+            return visible()
+        if "querySelector('video,audio')" in script:
+            return None
+        if 'notifications)||[]).map' in script:
+            return []
+        if 'dispatchEvent' in script:
+            return False
+        return {'url': page.url, 'title': 'Sign in', 'text': visible(),
                 'controls': controls(box['value']),
                 'metadata': {}, 'viewport': {}, 'metrics': {'lcp': 0, 'inp': None}}
 
@@ -254,10 +270,14 @@ def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission
             press_sequentially=AsyncMock(side_effect=lambda value: (filled.append(value), box.update(value=box['value'] + value))),
             click=AsyncMock(side_effect=lambda: clicked.append(cid)))
 
+    typed = []
     page = SimpleNamespace(url='https://example.com', video=None, set_default_timeout=Mock(),
         set_default_navigation_timeout=Mock(), on=Mock(), goto=goto, wait_for_load_state=AsyncMock(),
         wait_for_timeout=AsyncMock(), evaluate=evaluate, screenshot=screenshot,
-        content=AsyncMock(return_value='<p>Sign in</p>'), locator=locator)
+        content=AsyncMock(return_value='<p>Sign in</p>'), locator=locator,
+        # What engine/web.py Browser drives beyond observation: typing, history and the lifecycle.
+        keyboard=SimpleNamespace(type=AsyncMock(side_effect=typed.append)),
+        go_back=AsyncMock(), reload=AsyncMock(), bring_to_front=AsyncMock())
     context = SimpleNamespace(tracing=SimpleNamespace(start=AsyncMock(), stop=AsyncMock()),
         add_init_script=AsyncMock(), route=AsyncMock(), new_page=AsyncMock(return_value=page),
         on=Mock(), set_offline=AsyncMock(), close=AsyncMock(), storage_state=AsyncMock())
@@ -276,15 +296,18 @@ def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission
         task = asyncio.create_task(worker.execute('run-test'))
         for _ in range(600):
             await asyncio.sleep(0.01)
-            if run.get('waiting_for'):
+            if run.get('waiting_for') or task.done():
                 break
-        waiting = dict(run['waiting_for'])
-        await release(worker, waiting, saved)
+        # A journey with nothing to ask never pauses; it is simply run to the end.
+        waiting = dict(run['waiting_for']) if run.get('waiting_for') else {}
+        if waiting:
+            await release(worker, waiting, saved)
         await task
         return waiting
 
     return SimpleNamespace(waiting=asyncio.run(journey()), saved=saved, prompts=prompts,
-                           filled=filled, clicked=clicked, box=box)
+                           filled=filled, clicked=clicked, box=box, typed=typed,
+                           page=page, context=context, run=run)
 
 
 def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypatch):

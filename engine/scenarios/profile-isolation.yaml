@@ -6,8 +6,9 @@ about: >-
   This tests switching accounts, not switching profiles inside one account. Say which one you meant
   before reading the result, and remember that an operator sign-in is an attestation, not a verified
   server state.
+tags: [accounts, privacy, sign-in, downloads]
+needs: ["An operator to sign in"]
 mission:
-  platform: android
   name: Downloads and search history per account
   goal: Check that one account's downloads and search history do not appear under another account
   mode: journey

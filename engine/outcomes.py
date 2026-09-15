@@ -44,9 +44,14 @@ def coverage(run):
     observations=run.get('observations',[])
     axe_ok=bool(observations) and all('error' not in o.get('axe',{'error':'not run'}) for o in observations)
     result={}
+    # A scenario reports under Functionality on either platform.
+    scenario=run.get('scenario_coverage') or {}
+    def note_scenario(pillar):
+        if pillar!='functionality' or not scenario:return
+        if scenario['status']!='evaluated':result[pillar]['status']='not_evaluated'
+        result[pillar]['note']+=' · Scenario: '+scenario['note']
     if (run.get('platform') or run.get('mission',{}).get('platform'))=='android':
         checks=(observations[-1].get('checks',{}) if observations else {})
-        scenario=run.get('scenario_coverage') or {}
         # A device this run left shaped cannot be trusted to have measured itself, or the next run.
         unrestored=[e['setting'] for e in (run.get('network_restore') or []) if not e.get('restored')]
         for pillar in run['mission']['pillars']:
@@ -56,10 +61,7 @@ def coverage(run):
             else:done=bool(observations) and any((checks.get(k) or {}).get('status')=='supported' for k in ('gfxinfo','meminfo'))
             unavailable=[k for k,v in checks.items() if v.get('status')!='supported']
             result[pillar]={'status':'evaluated' if done else 'not_evaluated','method':'deterministic + AI' if ai_done else 'deterministic','note':'Android lab checks; unavailable: '+(', '.join(unavailable) if unavailable else 'none')}
-            # A scenario reports under Functionality; incomplete scenario evidence leaves that pillar unevaluated.
-            if pillar=='functionality' and scenario:
-                if scenario['status']!='evaluated':result[pillar]['status']='not_evaluated'
-                result[pillar]['note']+=' · Scenario: '+scenario['note']
+            note_scenario(pillar)
             if unrestored:
                 result[pillar]['status']='not_evaluated'
                 result[pillar]['note']+=' · Network settings left changed on the device: '+', '.join(unrestored)
@@ -69,6 +71,7 @@ def coverage(run):
         if pillar=='cro':done=ai_done
         if pillar=='ux_ui':done=done and axe_ok
         result[pillar]={'status':'evaluated' if done else 'not_evaluated','method':'deterministic + AI' if ai_done else 'deterministic','note':'Lab measurements only. Video metrics require observed playback.' if pillar=='performance' else 'Hypotheses, not measured conversion effects.' if pillar=='cro' else ''}
+        note_scenario(pillar)
     return result
 
 def actionable(run):

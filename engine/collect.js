@@ -24,9 +24,16 @@
       if(type==='error')s.error=v.error?.code??null;
     });
   });
+  // A notification the page creates is kept live, so a scenario can click it and the page's own handler runs.
+  const notes=[];window.__pex.notifications=notes;
+  const Native=window.Notification;
+  if(Native)try{
+    const Wrapped=function(title,options){const made=new Native(title,options||{});notes.push(made);return made};
+    Wrapped.prototype=Native.prototype;Object.setPrototypeOf(Wrapped,Native);window.Notification=Wrapped;
+  }catch{}
   window.__pexSnapshot=()=>{
     hook();const t=performance.now();
-    return {...window.__pex,video:players.map(([v,s])=>{const q=v.getVideoPlaybackQuality?.();const stall=s.stall_ms+(s.waiting_at===null?0:t-s.waiting_at);const elapsed=s.play_requested===null?null:t-s.play_requested;return {...s,width:v.videoWidth,height:v.videoHeight,current_time:v.currentTime,paused:v.paused,dropped_frames:q?.droppedVideoFrames??null,total_frames:q?.totalVideoFrames??null,stall_ms:stall,elapsed_ms:elapsed,stall_ratio:elapsed>0?stall/elapsed:null}})};
+    return {...window.__pex,notifications:notes.length,video:players.map(([v,s])=>{const q=v.getVideoPlaybackQuality?.();const stall=s.stall_ms+(s.waiting_at===null?0:t-s.waiting_at);const elapsed=s.play_requested===null?null:t-s.play_requested;return {...s,width:v.videoWidth,height:v.videoHeight,current_time:v.currentTime,paused:v.paused,dropped_frames:q?.droppedVideoFrames??null,total_frames:q?.totalVideoFrames??null,stall_ms:stall,elapsed_ms:elapsed,stall_ratio:elapsed>0?stall/elapsed:null}})};
   };
   const start=()=>{hook();new MutationObserver(hook).observe(document.documentElement,{childList:true,subtree:true})};
   if(document.readyState==='loading')addEventListener('DOMContentLoaded',start,{once:true});else start();

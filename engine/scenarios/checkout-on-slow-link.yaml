@@ -1,0 +1,30 @@
+id: checkout-on-slow-link
+name: Checkout up to payment on a slow link
+about: >-
+  Shapes the link down to a slow mobile profile, adds one item and walks to the payment step, then
+  checks the price that is about to be charged. Nothing is paid for: the run stops at the payment
+  step. The shaping is applied to the client, so it is configuration evidence, not measured throughput.
+tags: [checkout, pricing, network, slow]
+needs: ["Chromium when run on a website"]
+mission:
+  name: Checkout up to payment on a slow link
+  goal: Reach the payment step on a slow link and check the price shown there
+  mode: journey
+  provider: codex
+  pillars: [functionality]
+  max_steps: 16
+  ai_budget: 16
+  max_seconds: 1800
+  reset: fresh
+  scenario:
+    - name: Slow the link first
+      event: {speed: umts}
+    - name: Walk to the payment step
+      goal: Add "<Item to buy>" and continue until the payment step, without paying
+      until: {text: "<Text shown on the payment step>"}
+    - name: The price about to be charged
+      check: {text: "<Price that should be shown at checkout>", within: 30, severity: P1}
+    - name: Put the link back
+      event: {speed: full}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

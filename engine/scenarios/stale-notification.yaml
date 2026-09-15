@@ -5,8 +5,9 @@ about: >-
   checks where it lands. The notification is matched to this package before the shade is touched, so
   another app's notification with the same words is refused instead of tapped. If your build can delete
   the content behind a notification, run the same steps again after removing it.
+tags: [notifications, background, restart]
+needs: []
 mission:
-  platform: android
   name: A notification opened much later
   goal: Open a notification long after it arrived and check it returns to the right screen
   mode: journey

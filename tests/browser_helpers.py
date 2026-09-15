@@ -3,7 +3,7 @@ from playwright.async_api import expect
 
 HEADINGS = {
     'overview': 'See the journey.Understand what gets in the way.',
-    'missions': 'Missions', 'new': 'New mission', 'runs': 'Runs',
+    'missions': 'Missions', 'journeys': 'Journeys', 'new': 'New mission', 'runs': 'Runs',
     'findings': 'Findings', 'benchmark': 'Benchmark', 'compare': 'Compare releases',
     'network': 'Network & routes', 'settings': 'Settings',
 }

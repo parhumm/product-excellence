@@ -135,9 +135,11 @@ async def draft(req, project):
     if not provider: raise ValueError('No AI worker is signed in. Open Settings to sign in Codex or Claude.')
     target = project.get('_target') or {}
     known = [t.strip()[:200] for t in req.texts if t.strip()][:30]
-    ask = ('A tester described one journey to run on an Android device. Return the ordered steps that carry '
+    native = target.get('type') == 'android'
+    where = 'on an Android device' if native else 'in a web browser on ' + (target.get('url') or 'the site')
+    ask = (f'A tester described one journey to run {where}. Return the ordered steps that carry '
            'it out, using only the vocabulary below.\n\n'
-           f"App: {target.get('name','')} ({target.get('package','')})\n"
+           f"{'App' if native else 'Site'}: {target.get('name','')} ({target.get('package') or target.get('url','')})\n"
            f"Build: {project.get('_build',{}).get('version_name','')}\n"
            'Text the tester says appears in this app: ' + ('; '.join(known) or 'none given') + '\n\n'
            '--- The step vocabulary ---\n' + STEPS +

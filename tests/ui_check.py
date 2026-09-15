@@ -3,7 +3,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 from tests.browser_helpers import open_view
 async def scenario_builder(page):
- """The Android scenario section: every step kind, both spellings, and an unusable YAML that stays put."""
+ """The scenario section: every step kind, both spellings, and an unusable YAML that stays put."""
  assert await page.locator('#scenario-section').is_visible(),'The scenario builder is hidden for an Android mission'
  assert await page.locator('input[name=start_state][value=fresh]').is_checked(),'Fresh app data is not the default start state'
  assert not await page.locator('#snapshot-field').is_visible(),'The saved-state picker shows without that start state'
@@ -18,23 +18,33 @@ async def scenario_builder(page):
  # A shipped journey fills the rows, and every placeholder it leaves is visible as one.
  await page.locator('#scenario-presets summary').click()
  await page.wait_for_selector('#preset-body [data-preset]')
- assert await page.locator('#preset-body .preset').count()==5,'The five shipped journeys are not listed'
+ assert await page.locator('#preset-body .preset').count()==12,'The twelve shipped journeys are not listed'
  await page.locator('#preset-body [data-preset]').first.click()
  await page.wait_for_selector('#scenario-steps .step')
  assert await page.locator('#scenario-steps input.ph').count()>0,'Unreplaced placeholders are not marked'
  assert 'steps' in await page.locator('#scenario-summary').inner_text(),'The scenario summary reports no steps'
  assert 'Save and run' in await page.locator('#mission-form [name=run]').inner_text(),'The run button lost its label'
+ # Blanks are listed once each, they disable saving, and filling one replaces it everywhere.
+ await page.wait_for_selector('#scenario-blanks [data-blank]')
+ assert 'blanks left' in await page.locator('#scenario-summary').inner_text(),'The blanks still to fill are not counted'
+ assert await page.locator('#mission-form button[type=submit]').first.is_disabled(),'A mission with blanks can still be saved'
+ blank=page.locator('#scenario-blanks [data-blank]').first
+ name=await blank.get_attribute('data-blank')
+ before=await page.locator('#scenario-blanks [data-blank]').count()
+ await blank.fill('Filled by the check');await blank.blur()
+ await page.wait_for_function("n => document.querySelectorAll('#scenario-blanks [data-blank]').length === n - 1",arg=before)
+ assert name not in await page.locator('#scenario-steps').inner_html(),'A filled blank is still in the steps'
  # Every step kind, event operation and oracle is reachable from the first row.
  first=page.locator('#scenario-steps .step').first
  for kind in ['goal','manual','event','check','hold']:
   await first.locator('select[data-act=kind]').select_option(kind)
   assert await page.locator(f'#scenario-steps .step >> nth=0 >> select[data-act=kind]').input_value()==kind,f'Step kind {kind} did not stay selected'
  await first.locator('select[data-act=kind]').select_option('event')
- for operation in ['network','speed','delay_ms','wait','home','kill','relaunch','deep_link','open_notification']:
+ for operation in ['network','speed','delay_ms','wait','home','kill','back','relaunch','deep_link','open_notification']:
   await first.locator('select[data-act=event-kind]').select_option(operation)
   assert await first.locator('select[data-act=event-kind]').input_value()==operation,f'Event {operation} is not offered'
  await first.locator('select[data-act=kind]').select_option('check')
- for fact in ['text','text_absent','activity','playing','notification','no_crash']:
+ for fact in ['text','text_absent','screen','playing','notification','no_crash']:
   await first.locator('select[data-act=oracle-kind]').select_option(fact)
   assert await first.locator('select[data-act=oracle-kind]').input_value()==fact,f'Fact {fact} is not offered'
  await first.locator('select[data-act=oracle-kind]').select_option('text')
@@ -82,10 +92,18 @@ async def main():
    snapshot=httpx.get(base+'/api/state',timeout=10).json();native=next((t for t in snapshot.get('targets',[]) if t.get('type')=='android'),None)
    assert native,'Android smoke data is missing before the UI check'
    await page.goto(base);await page.evaluate("id => localStorage.setItem('pex.workspace', id)",native['project_id'])
-  for route in ['overview','missions','new','runs','findings','benchmark','compare','network','settings']:
+  for route in ['overview','missions','journeys','new','runs','findings','benchmark','compare','network','settings']:
    await open_view(page,route,base)
    # Every view belongs to one website, so the workspace picker is always usable.
    assert await page.locator('#workspace option').count()>0,f'Workspace picker is empty on {route}'
+   if route=='journeys':
+    await page.wait_for_selector('.journey')
+    assert await page.locator('.journey').count()==12,'The journey gallery does not list the twelve shipped journeys'
+    assert await page.locator('.journey .toolbar a[href^="#new/"]').count()==12,'A journey card has no way to open it'
+    await page.fill('#journey-search','checkout')
+    await page.wait_for_function("document.querySelectorAll('.journey:not([hidden])').length < 12")
+    assert await page.locator('.journey:not([hidden])').count()>0,'Searching hid every journey'
+    await page.fill('#journey-search','')
    if route=='new':
     # The model catalog and the escape hatch for an unlisted id must both be reachable.
     assert await page.locator('select[name=model] optgroup').count()>0,'Model catalog is empty'
@@ -108,7 +126,9 @@ async def main():
     assert await page.locator('select[name=mode] option[value=benchmark]').count()==1,'Benchmark mode missing'
     site_option=page.locator('select[name=target_id] option').filter(has_text='Website').first
     if await site_option.count():await page.select_option('select[name=target_id]',await site_option.get_attribute('value'))
-    assert not await page.locator('#scenario-section').is_visible(),'The scenario builder shows for a website mission'
+    # One vocabulary, two targets: the builder shows for a website too, minus the saved device state.
+    assert await page.locator('#scenario-section').is_visible(),'The scenario builder is hidden for a website mission'
+    assert not await page.locator('#start-snapshot').is_visible(),'A saved device state is offered for a website mission'
     native_option=page.locator('select[name=target_id] option').filter(has_text='Android app').first
     if await native_option.count():
      await page.select_option('select[name=target_id]',await native_option.get_attribute('value'))

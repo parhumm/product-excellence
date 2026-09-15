@@ -359,7 +359,7 @@ async def continue_run(id:str,req:ContinueRequest):
 @app.post('/api/runs/{id}/continue-step')
 async def continue_step(id:str,req:ContinueStepRequest):
     r=await hub.io(required,'run',id)
-    if store.remote('run',r):raise HTTPException(409,'Continue an operator step on the machine running this run')
+    if store.remote('run',r):raise HTTPException(409,'Continue an operator step on the machine running it')
     if r['status']!='running':raise HTTPException(409,'This run is not waiting for an operator')
     try:return await runner.continue_step(id,req.step,req.token,req.value,req.skip)
     except ValueError as e:raise HTTPException(409,str(e))
@@ -402,7 +402,7 @@ async def draft_scenario(req:DraftRequest):
     project=await hub.io(required,'project',req.project_id)
     target=await hub.io(store.get,'target',req.target_id,req.project_id) if req.target_id else None
     if req.target_id and not target:raise HTTPException(404,'Target not found in this workspace')
-    if not target or target['type']!='android':raise HTTPException(422,'Scenarios are drafted against an Android target')
+    if not target:raise HTTPException(422,'Scenarios are drafted against a target; pick one first')
     builds=target.get('builds',[]);build=next((b for b in builds if b['sha256']==req.build),None) if req.build else max((b for b in builds if not b.get('archived')),key=lambda b:(b['version_code'],b['uploaded_at'],b['sha256']),default=None)
     try:return await suggest.draft(req,{**project,'_target':target,'_build':build or {}})
     except ValueError as e:raise HTTPException(422,str(e))

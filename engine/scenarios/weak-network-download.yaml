@@ -5,8 +5,9 @@ about: >-
   requires the finished state, takes the device offline and opens the file. Offline playback here is
   evidence that the downloaded title is usable over the interval measured. It is not proof that every
   byte of the file is intact or that the whole title plays.
+tags: [download, network, offline]
+needs: ["Chromium when run on a website"]
 mission:
-  platform: android
   name: Download over a weak link with pauses
   goal: Download a title on a slow link with two pauses, then play it with the device offline
   mode: journey

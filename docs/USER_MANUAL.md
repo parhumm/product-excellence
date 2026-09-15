@@ -222,21 +222,25 @@ Four things to know about the numbers:
 A model with no published price shows `n/a` rather than a guess, and a run
 containing one is marked partial.
 
-### Android journeys with steps
+### Journeys with steps
 
-Some questions are about what the app remembers, not about one page. A download paused twice on a weak connection. A second account on the same phone. A notification opened an hour later. A link a friend sent, opened before signing in.
+Some questions are about what the app remembers, not about one page. A download paused twice on a weak connection. A second account on the same phone. A notification opened an hour later. A filter that has to survive a restart.
 
-Choose an Android target and the mission form grows a **Scenario** section. Open **Start from a shipped journey** and pick one of the five, or describe the journey in a sentence and press **Draft the steps** to have the AI worker write a first version. Either way you get ordered rows you can edit, reorder and remove. **Advanced: edit as YAML** shows the same steps as text for anyone who prefers it.
+The quickest way in is **Missions → Start from a journey**. The gallery shows the twelve shipped journeys with what each one answers, how many steps and blanks it has, and anything it needs — a person to sign in, or Chromium. Pick one and the mission form opens with the target, name, goal, time limit and steps already filled in.
+
+You can also build one by hand: choose any target, Android or website, and the mission form grows a **Scenario** section. Open **Start from a shipped journey** and pick one, or describe the journey in a sentence and press **Draft the steps** to have the AI worker write a first version — leave the box empty and it drafts from the goal you already wrote. Either way you get ordered rows you can edit, reorder and remove. **Advanced: edit as YAML** shows the same steps as text for anyone who prefers it.
 
 A row is one of five things:
 
 - **Goal** — one instruction the AI worker carries out, such as opening a film and starting it.
 - **Check** — a fact that has to become true within a number of seconds.
 - **Hold** — a fact that has to stay true across a number of seconds, sampled throughout.
-- **Event** — something done to the device: change the network, slow it down, wait, press home, kill the app, open a link, open a notification.
-- **Manual** — hand the phone to the person sitting at it. Use it for signing in, paying and one-time codes.
+- **Event** — something done to the device or the page: change the network, slow it down, wait, send it to the background, go back, kill the app, start it again, open a link, open a notification.
+- **Manual** — hand the run to the person sitting at it. Use it for signing in, paying and one-time codes, or for anything that has to happen outside the app: approving a request, revoking an entitlement.
 
-A shipped journey arrives with `<placeholders>` where your own film title or account belongs. The mission refuses to save while one is left, which is what stops a template running against the wrong content.
+A shipped journey arrives with blanks where your own film title or account belongs. They are listed above the steps, each one labelled with what to put in it. Fill a blank once and it is filled everywhere — in the name, the goal and every step that uses it. The run button says how many are left and stays disabled until none are, and the mission refuses to save while one remains, which is what stops a template running against the wrong content.
+
+**On a website**, every step works, with two differences. Slowing the link down (**Slow the link**, a delay, or switching to Wi-Fi or mobile data) throttles the browser and needs Chromium; taking it offline and restoring it work in any browser. And a saved device state cannot be loaded — a website mission carries a signed-in session through a persona instead. **Screen** means the page address, **kill** drops the page (what it held in memory is gone, cookies and storage stay), **send to the background** brings another tab in front, and a crash means an uncaught error in the page.
 
 If you do not know what the app is supposed to do, say so: set a check's policy to **Nobody has confirmed this yet**. It is then recorded as a question about intended behaviour rather than a defect, and it never lowers a score or blocks a release.
 

@@ -1,0 +1,34 @@
+id: session-survives-restart
+name: A signed-in session survives a restart
+about: >-
+  An operator signs in, the run kills the app or drops the page, starts it again and checks the
+  account is still signed in and the sign-in screen is gone. An operator sign-in is an attestation,
+  not a verified server state, and a session that survives says nothing about how long it will last.
+tags: [sign-in, session, restart]
+needs: ["An operator to sign in"]
+mission:
+  name: A signed-in session survives a restart
+  goal: Sign in, restart, and check the session is still signed in
+  mode: journey
+  provider: codex
+  pillars: [functionality]
+  max_steps: 12
+  ai_budget: 12
+  max_seconds: 1800
+  reset: fresh
+  scenario:
+    - name: Sign in
+      manual: Sign in as <Account identifier to sign in with>, then continue
+      timeout: 600
+    - name: The account is signed in
+      check: {text: "<Text shown only when signed in>", within: 30, severity: P1}
+    - name: End the process
+      event: {kill: true}
+    - name: Start again
+      event: {relaunch: true}
+    - name: Still signed in
+      check: {text: "<Text shown only when signed in>", within: 20, severity: P1}
+    - name: And not asked to sign in again
+      check: {text_absent: "<Text on the sign-in screen>", within: 10, severity: P1}
+    - name: Nothing crashed
+      check: {no_crash: true, within: 5, severity: P1}

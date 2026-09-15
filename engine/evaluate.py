@@ -80,7 +80,7 @@ def evaluate_android(observation,logs='',measurements=None):
 
 SCENARIO_ADVICE={'text':'Reproduce this step and fix the screen that did not show it',
  'text_absent':'Find what still carries the previous account or session state on this screen',
- 'activity':'Follow the same route and fix where the app lands',
+ 'screen':'Follow the same route and fix where the app lands',
  'playing':'Inspect the player and its media session at this point of the journey',
  'notification':'Inspect what the app posts and where opening it leads',
  'no_crash':'Fix the first application stack frame in the recorded block'}

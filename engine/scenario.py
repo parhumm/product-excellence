@@ -1,7 +1,7 @@
-"""Deterministic execution of one ordered Android scenario.
+"""Deterministic execution of one ordered scenario, on a device or in a browser page.
 
 Everything here is measurement: no AI, no storage and no release policy. The caller
-supplies the device, a goal callback, an operator pause callback and one absolute
+supplies the adapter, a goal callback, an operator pause callback and one absolute
 monotonic deadline that the whole run shares.
 """
 import asyncio, time
@@ -18,12 +18,12 @@ class ScenarioError(Exception):
     """The step could not be carried out. That is an execution failure, not an app defect."""
 
 def oracle_kind(oracle):
-    for key in ('text','text_absent','activity','playing','notification','no_crash'):
+    for key in ('text','text_absent','screen','playing','notification','no_crash'):
         if oracle.get(key) not in (None,''):return key
     raise ScenarioError('This check states no fact to establish')
 
 def event_kind(event):
-    chosen=[k for k in ('network','speed','delay_ms','kill','home','wait','relaunch','deep_link','open_notification') if event.get(k) is not None]
+    chosen=[k for k in ('network','speed','delay_ms','kill','home','back','wait','relaunch','deep_link','open_notification') if event.get(k) is not None]
     if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
     if not chosen:raise ScenarioError('This event performs no operation')
     return chosen[0]
@@ -54,13 +54,14 @@ def requested(step):
         if name=='wait':return f"Wait {event['wait']} s"
         if name=='kill':return 'Send the app to the background and let the system kill it'
         if name=='home':return 'Go to the home screen'
-        if name=='relaunch':return 'Force-stop and start the app again'
+        if name=='back':return 'Go back'
+        if name=='relaunch':return 'Start again'
         if name=='deep_link':return 'Open the link '+event['deep_link']
         return 'Open the notification saying '+quote(event['open_notification'])
     oracle=step[kind];name=oracle_kind(oracle)
     fact={'text':lambda:'the screen shows '+quote(oracle['text']),
           'text_absent':lambda:quote(oracle['text_absent'])+' is not on the screen',
-          'activity':lambda:'the screen is '+quote(oracle['activity'].get('equals') or oracle['activity'].get('contains')),
+          'screen':lambda:'the screen '+('is '+quote(oracle['screen']['equals']) if oracle['screen'].get('equals') else 'contains '+quote(oracle['screen']['contains'])),
           'playing':lambda:'playback is reported as '+('running' if oracle['playing'] else 'stopped'),
           'notification':lambda:'a notification saying '+quote(oracle['notification']['text'])+(' is posted' if oracle['notification'].get('present',True) else ' is gone'),
           'no_crash':lambda:'the app has not crashed'}[name]()
@@ -111,8 +112,8 @@ async def read(device,oracle,cursor,memo):
     screen=await device.sample()
     detail={'activity':screen.get('activity','')}
     if screen.get('error'):return None,{**detail,'observed':screen['error']}
-    if kind=='activity':
-        want=oracle['activity'];found=screen['activity']
+    if kind=='screen':
+        want=oracle['screen'];found=screen['activity']
         hit=(found==want['equals']) if want.get('equals') else (want['contains'] in found)
         return hit,{**detail,'observed':found}
     # Text lives in the app's own hierarchy. Another app in front means no evidence either way.
@@ -123,6 +124,12 @@ async def read(device,oracle,cursor,memo):
     wanted=oracle['text'] if kind=='text' else oracle['text_absent']
     present=wanted in haystack
     return (present if kind=='text' else not present),{**detail,'observed':screen['text'][:1500]}
+
+def outcome(results,count):
+    """The mission verdict a finished scenario earns, and the sentence that explains it."""
+    blocking=[s for s in results if s['status'] in ('skipped','error') or (s['required'] and s['status'] in ('failed','unavailable'))]
+    if blocking:return 'blocked',f"Step {blocking[0]['number']}: {blocking[0]['reason']}"
+    return 'success',f'All {count} scenario steps finished and every required check passed'
 
 class Scenario:
     def __init__(self,steps,device,*,notify,goal,deadline,pause=None):
@@ -190,6 +197,7 @@ class Scenario:
         elif name=='speed':await self.device.apply_speed(event['speed'],event.get('delay_ms'))
         elif name=='delay_ms':await self.device.apply_speed('',event['delay_ms'])
         elif name=='home':await self.device.home()
+        elif name=='back':await self.device.back()
         elif name=='wait':await self.sleep(event['wait'])
         elif name=='relaunch':await self.device.relaunch()
         elif name=='kill':await self.device.background_kill()

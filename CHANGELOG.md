@@ -13,15 +13,32 @@
   pauses and the run page asks for that value, with **Skip** and **Stop run**
   next to it. The value is filled into the field, masked in screenshots and
   scrubbed from the saved evidence, and never stored in the run.
-- **Android missions can carry an ordered scenario.** Up to 40 steps on one
-  device: goals for the AI worker, checks that a fact becomes true, holds that a
-  fact stays true, events done to the device, and manual steps handed to the
-  person sitting at it. A mission without a scenario runs exactly as before.
-- **Five shipped journeys** cover the questions that need state: playback across
-  a transport switch, a download over a weak link with pauses, downloads and
-  search history per account, a notification opened much later, and a shared
-  link opened while signed out. Each leaves placeholders where a real title or
-  account belongs, and refuses to save while one is left.
+- **Missions can carry an ordered scenario, on Android and on the web.** Up to 40
+  steps on one device or in one browser page: goals for the AI worker, checks
+  that a fact becomes true, holds that a fact stays true, events done to the
+  device or the page, and manual steps handed to the person sitting at it. One
+  vocabulary and one interpreter serve both platforms; the target decides what a
+  step acts on. A mission without a scenario runs exactly as before. Two things
+  differ on the web: link shaping needs Chromium, and a saved device state cannot
+  be loaded, because a website mission carries its session through a persona.
+- **Twelve shipped journeys**, none of them tied to a platform, cover the
+  questions that need state: playback across a transport switch or a dropped
+  connection, a download over a weak link with pauses, downloads and search
+  history per account, a notification opened much later, a shared link opened
+  while signed out, a session and a filter across a restart, sign-out that really
+  signs out, back after a search, a form rejecting bad input, and checkout up to
+  payment on a slow link.
+- **A journey gallery, and fill in the blanks.** **Missions → Start from a
+  journey** searches the twelve by name, description and tag, says what each one
+  needs, and opens the mission form with the target, name, goal, time limit and
+  steps already set. Every blank a journey leaves is listed above the steps with
+  its own labelled field; filling one fills every occurrence across the name, the
+  goal and the steps. The run button says how many are left and stays disabled
+  until none are, and the server still refuses a mission that holds one.
+- **`screen` replaces `activity`** as the fact for where the app is: the focused
+  activity on Android, the page address on the web. **A new `back` event** goes
+  back on either platform. Drafting works from the goal when no sentence is
+  given, and the time limit fits itself to the waits a journey commits to.
 - **A guided builder, and the same steps as YAML.** Ordered rows with native
   controls for every step kind, event and fact; move, duplicate and remove from
   the keyboard; a budget line that offers to raise the limit when the waits need

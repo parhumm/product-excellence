@@ -179,15 +179,122 @@ async def test_recording_rotates_into_parts_and_reports_the_blind_gap(monkeypatc
     assert [p['name'] for p in device.video_parts]==['journey.mp4','journey-2.mp4']
     assert device.gaps[0]['after_part']==1 and 2.5<device.gaps[0]['seconds']<4 and not device.videos
 
+STATUS=('Current network status:\n  download speed:          {down} bits/s (0.0 KB/s)\n'
+        '  upload speed:            {up} bits/s (0.0 KB/s)\n'
+        '  minimum latency:  {lo} ms\n  maximum latency:  {hi} ms\nOK')
+UNSHAPED=STATUS.format(down=0,up=0,lo=0,hi=0)
+
 def test_recorded_console_shaping_reads_back_as_console_arguments():
-    assert android.console_network('download speed: 0 bits/s\nminimum latency: 0 ms\nmaximum latency: 0 ms')==('full','none')
-    assert android.console_network('download speed: 240000 bits/s\nminimum latency: 150 ms\nmaximum latency: 400 ms')==('240:240','150:400')
+    """The console reports the two directions separately; it takes them back as up:down in kbps."""
+    assert android.console_network(UNSHAPED)==('full','none')
+    # A link that is slower up than down stays that way, and 14.4 kbit/s does not become 14.
+    assert android.console_network(STATUS.format(down=256000,up=14400,lo=150,hi=400))==('14.4:256','150:400')
+    # The old symmetric shape of this status is not what the emulator prints, and inventing the
+    # missing half would restore the device to a link nobody measured.
+    assert android.console_network('download speed: 240000 bits/s\nminimum latency: 150 ms\nmaximum latency: 400 ms') is None
+
+def test_a_stored_profile_becomes_the_same_console_arguments():
+    assert android.profile_console({'latency_ms':200,'down_mbps':1,'up_mbps':.5})==('500:1000','200:200')
+    assert android.profile_console({'latency_ms':0,'down_mbps':0,'up_mbps':0})==('','')
+    # A rate far below one kilobit is still a rate; rounding it away would report shaping that never happened.
+    assert android.profile_console({'down_mbps':.0005,'up_mbps':.0005})[0]=='0.5:0.5'
+
+def shaping_device(monkeypatch,tmp_path,wifi='0'):
+    """A device on mobile data, recording every console command instead of issuing one."""
+    device=device_for(monkeypatch,tmp_path);calls=[]
+    async def shell(*args,**kw):
+        if args[:3]==('settings','get','global'):return wifi if args[3]=='wifi_on' else '1'
+        calls.append(args);return ''
+    async def adb_call(*args,**kw):calls.append(args);return UNSHAPED
+    device.shell=shell;device.adb_call=adb_call
+    return device,calls
+
+async def test_the_mission_link_is_the_condition_this_run_ran_under_not_a_fault_in_it(monkeypatch,tmp_path):
+    device,calls=shaping_device(monkeypatch,tmp_path)
+    device.profile={'name':'Poor mobile','latency_ms':200,'down_mbps':1,'up_mbps':.5}
+    await device.apply_baseline()
+    # Shaping reaches the radio, so the baseline takes the device there before it shapes anything.
+    assert ('svc','data','enable') in calls and ('svc','wifi','disable') in calls
+    assert calls[-3:]==[('emu','network','speed','500:1000'),('emu','network','delay','200:200'),('emu','network','status')]
+    assert device.faults==[] and device.network_changed=={'wifi','data','speed','delay'}
+    assert device.network_applied['applied']=={'speed':'500:1000','delay':'200:200'}
+    assert device.network_applied['readback']==UNSHAPED and 'mobile radio only' in device.network_applied['scope']
+
+async def test_an_unshaped_profile_touches_nothing_and_says_so(monkeypatch,tmp_path):
+    device,calls=shaping_device(monkeypatch,tmp_path)
+    device.profile={'name':'Baseline'}
+    await device.apply_baseline()
+    assert not calls and not device.network_changed
+    assert device.network_applied['verification']=='Nothing applied'
+
+async def test_shaping_a_wifi_link_is_refused_because_the_console_cannot_change_it(monkeypatch,tmp_path):
+    """Measured on emulator 36.6.11.0: over Wi-Fi the console accepts the command, reads the new
+    value back, and the traffic is unchanged. Applying it there would report a link that is not real."""
+    device,calls=shaping_device(monkeypatch,tmp_path,wifi='1')
+    with pytest.raises(android.AndroidError,match='mobile radio only'):await device.apply_speed('edge')
+    assert not calls and device.faults==[]
+
+async def test_a_step_restore_goes_back_to_the_mission_link_and_the_final_one_to_the_device(monkeypatch,tmp_path):
+    """Two restoration targets. `network: restore` undoes the scenario's faults and leaves the run
+    standing on its own profile; only the final cleanup puts the device back where it was found."""
+    device,calls=shaping_device(monkeypatch,tmp_path)
+    device.profile={'name':'Poor mobile','latency_ms':200,'down_mbps':1,'up_mbps':.5}
+    device.network_before={'wifi':'0','data':'1','console':STATUS.format(down=8000,up=8000,lo=5,hi=5),'route':'MOBILE'}
+    device.network_changed={'speed','delay'}
+    await device.apply_network('restore')
+    assert [c for c in calls if c[:2]==('emu','network')][:4]==[
+        ('emu','network','speed','8:8'),('emu','network','delay','5:5'),
+        ('emu','network','speed','500:1000'),('emu','network','delay','200:200')]
+    assert device.faults==[{'network':'restore'}]
+    calls.clear()
+    problems=await device.restore_network()
+    assert not problems and [c for c in calls if c[:2]==('emu','network')]==[
+        ('emu','network','speed','8:8'),('emu','network','delay','5:5')]
+
+async def test_an_unreadable_capture_never_restores_the_device_to_an_invented_default(monkeypatch,tmp_path):
+    device,calls=shaping_device(monkeypatch,tmp_path)
+    device.network_before={'wifi':'1','data':'1','console':'error: device offline','route':''}
+    device.network_changed={'speed','delay'}
+    problems=await device.restore_network()
+    assert not calls and len(problems)==2 and all('No recorded emulator' in problem for problem in problems)
+    assert device.network_restore==[{'setting':'delay','restored':False},{'setting':'speed','restored':False}]
 
 def fake_avd(monkeypatch,tmp_path,name='pex-test'):
     home=tmp_path/'avd';(home/(name+'.avd')).mkdir(parents=True)
     monkeypatch.setenv('ANDROID_AVD_HOME',str(home));monkeypatch.setenv('PEX_ANDROID_AVD',name)
     monkeypatch.setattr(android.targets,'tool',lambda n:Path('/bin/true'))
     return name
+
+class Relayed:
+    """Stands in for the run's relay: all a device needs from it is the address to launch against."""
+    proxy='http://127.0.0.1:54321'
+
+async def test_an_emulator_that_routes_is_one_this_run_started_against_the_relay(monkeypatch,tmp_path):
+    fake_avd(monkeypatch,tmp_path)
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run',relay=Relayed())
+    launched=[]
+    class Stop(Exception):pass
+    async def spawn(*args,**kw):launched.extend(args);raise Stop
+    async def none(self=None):return ''
+    monkeypatch.setattr(android.asyncio,'create_subprocess_exec',spawn)
+    device._find_serial=none
+    with pytest.raises(Stop):await device.start()
+    # Host-side, so the guest keeps no proxy setting of its own and no app can opt out of it.
+    assert launched[launched.index('-http-proxy')+1]==Relayed.proxy and '-no-snapshot' in launched
+
+async def test_an_emulator_already_running_is_refused_before_this_run_touches_it(monkeypatch,tmp_path):
+    fake_avd(monkeypatch,tmp_path)
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run',relay=Relayed())
+    touched=[]
+    async def running(self=None):return 'emulator-5554'
+    async def shell(*args,**kw):touched.append(args);return ''
+    device._find_serial=running;device.shell=shell
+    with pytest.raises(android.AndroidError,match='stop the designated AVD first'):await device.start()
+    assert not touched
+
+async def test_a_device_without_a_relay_cannot_change_route(monkeypatch,tmp_path):
+    device=device_for(monkeypatch,tmp_path)
+    with pytest.raises(android.AndroidError,match='not started with a relay'):await device.apply_route('direct')
 
 def saving_emulator(avd):
     async def fake_run(*args,**kw):

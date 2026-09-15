@@ -175,8 +175,7 @@ def test_shaping_asked_for_alongside_a_route_cannot_undo_the_switch_it_rides_on(
     from types import SimpleNamespace
     web = importlib.import_module('engine.web')
     scenario = importlib.import_module('engine.scenario')
-    check = {'status': 'verified', 'route_name': 'Route A', 'observed_ip': '198.51.100.4', 'error': ''}
-    relay = SimpleNamespace(apply=AsyncMock(return_value=check), verify=AsyncMock())
+    relay = SimpleNamespace(switch=AsyncMock(return_value='Connections now exit through Route A from 198.51.100.4'))
     run = {'console': [], 'scenario': []}
     browser = web.Browser(None, None, None, {}, run, {}, str, [], [], relay)
     steps = scenario.Scenario([], browser, notify=None, goal='', deadline=time.monotonic() + 30)
@@ -184,5 +183,5 @@ def test_shaping_asked_for_alongside_a_route_cannot_undo_the_switch_it_rides_on(
     with pytest.raises(scenario.ScenarioError, match='Chromium'):
         asyncio.run(steps.apply({'route': ROUTE['id'], 'speed': 'edge'}))
     # The switch happened and is recorded; nothing rolled it back because the shaping failed.
-    assert relay.apply.await_args.args == (ROUTE['id'], None) and relay.verify.await_count == 1
+    assert relay.switch.await_args.args[:2] == (ROUTE['id'], None) and relay.switch.await_count == 1
     assert browser.faults == [{'route': ROUTE['id']}]

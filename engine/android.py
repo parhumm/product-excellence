@@ -233,13 +233,28 @@ PART_SECONDS=180
 MAX_PARTS=40
 POLL=1
 
+def kbps(bits):
+    """Kilobits the console will accept back. Dividing is not rounding: a rate set in this run is
+    restored as it was, and a positive rate never collapses to unlimited on the way through."""
+    return f'{bits/1000:g}'
+
 def console_network(status):
-    """The emulator shaping recorded before any fault, as arguments the console accepts again."""
-    down=re.search(r'download speed:\s*(\d+)',status);low=re.search(r'minimum latency:\s*(\d+)',status)
-    high=re.search(r'maximum latency:\s*(\d+)',status)
-    kbits=int(down.group(1))//1000 if down else 0
-    lo=int(low.group(1)) if low else 0;hi=int(high.group(1)) if high else lo
-    return ('full' if not kbits else f'{kbits}:{kbits}'),('none' if not (lo or hi) else f'{lo}:{hi}')
+    """The emulator shaping recorded before any fault, as arguments the console accepts again.
+
+    The console reports the two directions separately, in bits/s, and takes them back as up:down
+    in kbps. A status this cannot read returns nothing at all: the caller reports a setting it
+    could not restore rather than restoring the device to a default nobody measured.
+    """
+    down=re.search(r'download speed:\s*(\d+)',status);up=re.search(r'upload speed:\s*(\d+)',status)
+    low=re.search(r'minimum latency:\s*(-?\d+)',status);high=re.search(r'maximum latency:\s*(-?\d+)',status)
+    if not (down and up and low and high):return None
+    rates=(int(up.group(1)),int(down.group(1)));lo=max(0,int(low.group(1)));hi=max(0,int(high.group(1)))
+    return ('full' if not any(rates) else ':'.join(kbps(bits) for bits in rates)),('none' if not (lo or hi) else f'{lo}:{hi}')
+
+def profile_console(profile):
+    """A stored network profile as the same two console arguments, or empty ones for no shaping."""
+    down,up=profile.get('down_mbps') or 0,profile.get('up_mbps') or 0;latency=profile.get('latency_ms') or 0
+    return (':'.join(kbps(rate*1000000) for rate in (up,down)) if down or up else ''),(f'{latency}:{latency}' if latency else '')
 
 def health():
     avd=os.environ.get('PEX_ANDROID_AVD','');reason=''
@@ -253,8 +268,10 @@ def health():
     except (ValueError,AndroidError) as error:return {'available':False,'avd':avd,'reason':str(error),'window':window}
 
 class Device:
-    def __init__(self,mission,app,folder,run_id,*,avd=None):
+    def __init__(self,mission,app,folder,run_id,*,avd=None,profile=None,relay=None):
         self.mission=mission;self.app=app;self.folder=Path(folder);self.run_id=run_id
+        # The link this run is measured under, and the relay its traffic leaves through.
+        self.profile=profile or {};self.relay=relay;self.network_applied=None
         self.avd=avd or mission.get('device') or os.environ.get('PEX_ANDROID_AVD','')
         self.adb=targets.tool('adb');self.emulator=targets.tool('emulator');self.serial=''
         self.lock_file=None;self.owned=None;self.log_process=None;self.log_task=None;self.log_lines=[]
@@ -283,8 +300,13 @@ class Device:
         try:fcntl.flock(self.lock_file,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError as error:raise AndroidError('Designated AVD is already in use by another run') from error
         self.serial=await self._find_serial()
+        # An emulator already running was not started against this relay, and its transport cannot
+        # be changed now. Refuse it here, before this run has touched a single setting on it.
+        if self.serial and self.relay:raise AndroidError('Route switching needs an emulator this run starts itself; stop the designated AVD first')
         if not self.serial:
             args=[self.emulator,'-avd',self.avd,'-no-snapshot','-no-audio','-gpu','auto']
+            # Host-side, so the guest keeps no proxy setting of its own and apps cannot opt out of it.
+            if self.relay:args+=['-http-proxy',self.relay.proxy]
             if os.environ.get('PEX_ANDROID_WINDOW')!='1':args.append('-no-window')
             self.owned=await asyncio.create_subprocess_exec(*(str(x) for x in args),stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
             for _ in range(90):
@@ -317,10 +339,10 @@ class Device:
             cleared=await self.shell('pm','clear',self.app['package'])
             if cleared.strip()!='Success':raise AndroidError('Could not clear this package before the mission')
             self.measurements['start_state']='fresh'
-        network=self.mission.get('network','baseline')
-        if network!='baseline':raise AndroidError('Android 1.5 supports only baseline here; verified offline is not configured')
         self.folder.mkdir(parents=True,exist_ok=True)
+        # Capture before anything is applied: this is what the device goes back to at the end.
         await self.capture_network()
+        await self.apply_baseline()
         await self.start_recording()
 
     async def _read_logs(self):
@@ -487,12 +509,8 @@ class Device:
             await asyncio.sleep(POLL)
         raise AndroidError(f'{label} did not become {"on" if want else "off"}; the device still reports '+(value or 'nothing'))
 
-    async def apply_network(self,mode):
-        """Switch transports and prove the switch happened. `restore` puts back only what this run changed."""
-        if mode=='restore':
-            problems=await self.restore_network()
-            if problems:raise AndroidError('; '.join(problems))
-            return
+    async def _transport(self,mode):
+        """Switch transports and prove the switch happened, recording what will need putting back."""
         if mode not in TRANSPORTS:raise AndroidError('Unsupported network mode: '+str(mode))
         wifi,data=TRANSPORTS[mode]
         for label,key,service,want in (('Wi-Fi','wifi_on','wifi',wifi),('Mobile data','mobile_data','data',data)):
@@ -501,15 +519,54 @@ class Device:
             await self.shell('svc',service,'enable' if want else 'disable')
         for label,key,service,want in (('Wi-Fi','wifi_on','wifi',wifi),('Mobile data','mobile_data','data',data)):
             await self._settled(label,key,want)
+
+    async def _shape(self,speed='',delay=''):
+        """Console shaping, with no step fault of its own: the baseline and a step both arrive here.
+
+        Measured on emulator 36.6.11.0: these commands change traffic on the mobile radio and only
+        there. Over Wi-Fi the console accepts them and reads the new values back while the traffic
+        is unchanged, so shaping a Wi-Fi link is refused rather than reported as applied.
+        """
+        if not (speed or delay):return
+        if (await self.shell('settings','get','global','wifi_on',check=False)).strip()=='1':
+            raise AndroidError('Emulator link shaping reaches the mobile radio only; take the device to mobile data first')
+        if speed:self.network_changed.add('speed');await self.adb_call('emu','network','speed',speed)
+        if delay:self.network_changed.add('delay');await self.adb_call('emu','network','delay',delay)
+
+    async def apply_baseline(self):
+        """The mission's own link. It is the condition this run is measured under, not a fault in it."""
+        speed,delay=profile_console(self.profile)
+        self.network_applied={'name':self.profile.get('name','Baseline'),'backend':'emulator console','offline':False,
+                              'latency_ms':self.profile.get('latency_ms',0),'down_mbps':self.profile.get('down_mbps',0),
+                              'up_mbps':self.profile.get('up_mbps',0),'applied':{'speed':speed or 'full','delay':delay or 'none'},
+                              'scope':'Emulator console shaping, measured to change traffic on the mobile radio only; not an ISP change or packet-level shaping'
+                                      if (speed or delay) else 'Device default; no traffic probe',
+                              'verification':'Console readback' if (speed or delay) else 'Nothing applied'}
+        if not (speed or delay):return
+        # Shaping reaches the radio, so the link this profile describes is the mobile one.
+        await self._transport('cellular')
+        await self._shape(speed,delay)
+        self.network_applied['readback']=await self.adb_call('emu','network','status',check=False)
+
+    async def apply_network(self,mode):
+        """Switch transports and prove the switch happened. `restore` puts back only what this run changed."""
+        if mode=='restore':
+            problems=await self.restore_network()
+            if problems:raise AndroidError('; '.join(problems))
+            # Back to the run's own condition, not to the device's: the mission's link still applies.
+            await self.apply_baseline()
+        else:await self._transport(mode)
         self.faults.append({'network':mode})
+
+    async def apply_route(self,route_id,step=None,budget=None):
+        """Change the way out mid-run. The emulator was launched against this relay, not a route."""
+        if not self.relay:raise AndroidError('This run was not started with a relay, so it cannot change route')
+        self.faults.append({'route':route_id})
+        return await self.relay.switch(route_id,step,budget)
 
     async def apply_speed(self,speed='',delay_ms=None):
         """Shape the emulator link. The console acknowledgement is configuration evidence, not app throughput."""
-        if speed:
-            self.network_changed.add('speed');await self.adb_call('emu','network','speed',speed)
-        if delay_ms is not None:
-            value=max(0,min(5000,int(delay_ms)));self.network_changed.add('delay')
-            await self.adb_call('emu','network','delay',f'{value}:{value}')
+        await self._shape(speed,f'{max(0,min(5000,int(delay_ms)))}:{max(0,min(5000,int(delay_ms)))}' if delay_ms is not None else '')
         self.faults.append({'speed':speed,'delay_ms':delay_ms})
 
     async def restore_network(self):
@@ -523,11 +580,12 @@ class Device:
                 await self.shell('svc',service,'enable' if recorded=='1' else 'disable')
                 await self._settled(label,key,recorded=='1');self.network_changed.discard(service)
             except Exception as error:problems.append(f'Could not restore {label}: '+str(error)[:200])
-        speed,delay=console_network(self.network_before.get('console',''))
-        for name,command,value in (('speed',('speed',),speed),('delay',('delay',),delay)):
+        recorded=console_network(self.network_before.get('console',''))
+        for name,value in zip(('speed','delay'),recorded or ('','')):
             if name not in self.network_changed:continue
+            if not value:problems.append(f'No recorded emulator {name} to restore; the device keeps this run\'s setting');continue
             try:
-                await self.adb_call('emu','network',*command,value);self.network_changed.discard(name)
+                await self.adb_call('emu','network',name,value);self.network_changed.discard(name)
             except Exception as error:problems.append(f'Could not restore the emulator {name}: '+str(error)[:200])
         self.network_restore=[{'setting':name,'restored':name not in self.network_changed} for name in touched]
         for problem in problems:self.warnings.append(problem)

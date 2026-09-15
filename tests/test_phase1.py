@@ -1,4 +1,4 @@
-import asyncio,json,re
+import asyncio,hashlib,json,re
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -466,8 +466,14 @@ def web_target(project_id='default',url='https://shop.example.net',name='Shop'):
     return store.save('target',{'project_id':project_id,'type':'web','name':name,'url':url,
                                 'allowed_domains':['shop.example.net'],'package':'','builds':[],'visibility':'team'})
 
-def android_target(project_id='default'):
-    build={'sha256':'a'*64,'version_name':'9.1.0','version_code':91,'min_sdk':26,'target_sdk':34,
+def android_build(content=b'not a real apk'):
+    """An uploaded build this console can checksum, so a submit reaches the checks after it."""
+    digest=hashlib.sha256(content).hexdigest()
+    path=store.DATA/'apps'/f'{digest}.apk';path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(content)
+    return digest
+
+def android_target(project_id='default',sha='a'*64):
+    build={'sha256':sha,'version_name':'9.1.0','version_code':91,'min_sdk':26,'target_sdk':34,
            'launch_activity':'.Main','abis':['arm64-v8a'],'size':1024,'uploaded_at':'2026-01-01T00:00:00Z','archived':False}
     return store.save('target',{'project_id':project_id,'type':'android','name':'Player','url':'',
                                 'allowed_domains':[],'package':'com.example.player','builds':[build],'visibility':'team'})
@@ -657,14 +663,33 @@ def test_route_switching_needs_a_browser_on_this_machine(client):
     answer=client.post('/api/runs',json={'mission_id':m['id'],'network':'netem-poor'})
     assert answer.status_code==422 and 'netem' in answer.json()['detail']
 
-def test_android_route_steps_are_refused_until_android_can_route(client):
-    target=android_target()
-    # Asking for direct is still asking for a route: it needs the same relay Android has no way to use.
-    for route in ('a'*32,'direct'):
-        m=mission(client,platform='android',target_id=target['id'],build='a'*64,url='',pillars=['functionality'],
-                  scenario=[{'name':'Switch','event':{'route':route}}])
-        answer=client.post('/api/runs',json={'mission_id':m['id']})
-        assert answer.status_code==422 and 'not available on Android' in answer.json()['detail']
+def test_an_android_run_snapshots_the_routes_its_device_will_leave_through(client):
+    a=egress(client);sha=android_build();target=android_target(sha=sha)
+    m=mission(client,platform='android',target_id=target['id'],build=sha,url='',pillars=['functionality'],
+              egress_id=a['id'],scenario=[{'name':'Switch','event':{'route':'direct'}}])
+    answer=client.post('/api/runs',json={'mission_id':m['id']})
+    assert answer.status_code==200,answer.text
+    assert answer.json()['routes']==[{'id':a['id'],'name':'Route A','server':'http://127.0.0.1:9001'}]
+
+def test_an_android_proxy_is_a_relay_run_even_with_nothing_to_switch_to(client):
+    """The emulator has no proxy of its own to point at an upstream, so a selected route means a
+    relay or it means nothing at all. Recording the route is what stops it running silently direct."""
+    a=egress(client);sha=android_build();target=android_target(sha=sha)
+    m=mission(client,platform='android',target_id=target['id'],build=sha,url='',pillars=['functionality'],egress_id=a['id'])
+    answer=client.post('/api/runs',json={'mission_id':m['id']})
+    assert answer.status_code==200,answer.text
+    assert [route['id'] for route in answer.json()['routes']]==[a['id']]
+
+def test_an_android_run_shapes_latency_and_bandwidth_and_refuses_what_was_never_measured(client):
+    sha=android_build();target=android_target(sha=sha)
+    def submit(**profile):
+        network=client.post('/api/networks',json={'name':'Fixture','backend':'browser',**profile}).json()
+        m=mission(client,platform='android',target_id=target['id'],build=sha,url='',pillars=['functionality'])
+        return client.post('/api/runs',json={'mission_id':m['id'],'network':network['id']})
+    assert submit(latency_ms=200,down_mbps=1,up_mbps=.5).status_code==200
+    assert 'both link directions' in submit(down_mbps=1).json()['detail']
+    assert 'latency and bandwidth only' in submit(offline=True).json()['detail']
+    assert 'latency and bandwidth only' in submit(latency_ms=100,disconnect_every_seconds=30).json()['detail']
 
 def test_a_replay_matches_on_the_routes_it_used_not_on_what_it_observed():
     a={'id':'a','mission':{},'status':'completed','findings':[],'observations':[],'coverage':{},

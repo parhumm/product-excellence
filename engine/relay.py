@@ -178,6 +178,17 @@ class Relay:
                      finished_at=store.now())
         return check
 
+    async def switch(self,route_id,step=None,budget=None):
+        """One route change as a scenario step asks for it: recorded, attempted, then established.
+
+        A route that cannot be verified stops the run. Nothing is retried and nothing falls back to
+        a direct connection, so a step that passes here really did change the way out.
+        """
+        check=await self.verify(await self.apply(route_id,step),budget)
+        if check['status']!='verified':
+            raise ScenarioError('The route could not be established: '+(check['error'] or 'no probe answered'))
+        return f"Connections now exit through {check['route_name']} from {check['observed_ip']}"
+
     async def verify(self,check=None,budget=None):
         """Probe this relay through itself and record the address this generation exits from.
 

@@ -241,7 +241,8 @@ class Mission(BaseModel):
             committed=sum(step.seconds for step in self.scenario)
             if committed>=self.max_seconds:raise ValueError(f'The waits and holds in this scenario already need {committed} s; raise the run time limit above that')
         if self.platform=='android':
-            if self.mode=='benchmark' or self.competitors or self.persona_id or self.egress_id or self.login_identifier or self.login_password:raise ValueError('Android missions do not support benchmark, competitors, personas, egress or sign-in')
+            # Egress is allowed here now: the run owns a relay and the emulator is launched against it.
+            if self.mode=='benchmark' or self.competitors or self.persona_id or self.login_identifier or self.login_password:raise ValueError('Android missions do not support benchmark, competitors, personas or sign-in')
             if 'seo_aeo' in self.pillars:raise ValueError('Android missions do not support SEO/AEO')
             if self.url and urlsplit(self.url).scheme!='https':raise ValueError('Android deep links require HTTPS')
         if self.mode!='audit' and (self.provider=='none' or self.ai_budget==0):

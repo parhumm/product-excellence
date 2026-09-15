@@ -188,9 +188,10 @@ class Runner:
         asked=[(step.get('event') or {}).get('route') for step in (mission.get('scenario') or [])]
         switches=[route for route in asked if route not in (None,'direct')]
         routes=[]
-        if any(route is not None for route in asked):
-            if mission['platform']=='android':raise ValueError('Route switching is not available on Android runs yet; remove the route steps or run this mission on the web')
-            if profile['backend']=='netem':raise ValueError('Route switching needs a browser on this machine; the Linux netem runner cannot switch routes')
+        # An Android run reaches its proxy the same way, so a route selected there is a relay run too;
+        # without one the emulator would have gone out directly while the console claimed otherwise.
+        if any(route is not None for route in asked) or (mission['platform']=='android' and mission['egress_id']):
+            if any(route is not None for route in asked) and profile['backend']=='netem':raise ValueError('Route switching needs a browser on this machine; the Linux netem runner cannot switch routes')
             for id in dict.fromkeys(([mission['egress_id']] if mission['egress_id'] else [])+switches):
                 record=await read('egress',id)
                 if not record:raise ValueError('A route this scenario switches to does not exist')
@@ -200,7 +201,10 @@ class Runner:
                 routes.append({'id':id,'name':record['name'],'server':record['server']})
         target=app=None
         if mission['platform']=='android':
-            if profile.get('id',mission['network'])!='baseline' or any(profile.get(k) for k in ('offline','latency_ms','down_mbps','up_mbps','jitter_ms','loss_pct','disconnect_every_seconds')):raise ValueError('Android runs currently support baseline only; verified offline is not configured')
+            # What the emulator console was measured to do: latency and bandwidth on the mobile radio.
+            if profile['backend']=='netem':raise ValueError('Android runs shape the link with the emulator console; a Linux netem profile cannot be applied to a device')
+            if profile.get('offline') or any(profile.get(k) for k in ('jitter_ms','loss_pct','reorder_pct','duplicate_pct','disconnect_every_seconds')):raise ValueError('Android runs shape latency and bandwidth only; verified offline, jitter, loss, reordering and periodic disconnects are not configured')
+            if bool(profile['down_mbps'])!=bool(profile['up_mbps']):raise ValueError('The emulator console sets both link directions or neither; give this profile a download and an upload rate')
             target=await read('target',mission['target_id'],ws)
             app=next((b for b in target.get('builds',[]) if b['sha256']==mission['build']),None) if target else None
             if not app:raise ValueError('Selected Android build metadata is unavailable')
@@ -451,23 +455,9 @@ class Runner:
                 options['proxy']={'server':eg['server'],**sec}
                 r['egress']={'name':eg['name'],'server':eg['server'],'verification':'Proxy configured; ISP/ASN identity not independently verified'}
             else:r['egress']={'name':'Direct connection','verification':'No alternate ISP configured'}
-            if any((step.get('event') or {}).get('route') is not None for step in (m.get('scenario') or [])):
-                # One run-owned relay carries every hop out, so a route step changes the way out
-                # without a new browser session. Playwright is pointed at it and never at an upstream.
-                configured={}
-                for snapshot in r.get('routes') or []:
-                    record=await read('egress',snapshot['id'])
-                    secret=DATA/'secrets'/f"{snapshot['id']}.json"
-                    if not record or not secret.is_file():raise StopRun('This route is no longer usable on this machine: '+snapshot['name'])
-                    configured[snapshot['id']]={'name':record['name'],'server':record['server'],**json.loads(secret.read_text())}
-                relay=routing.Relay(configured)
-                # The run page shows each switch as it happens, and a later part appends to this list.
-                relay.checks=r.setdefault('route_checks',[])
-                options['proxy']={'server':await relay.start(m['egress_id'] or routing.DIRECT)}
-                check=await relay.verify(budget=m['max_seconds']-(time.monotonic()-start))
-                if check['status']!='verified':raise StopRun('The route this run starts on could not be established: '+(check['error'] or 'no probe answered'))
-                r['egress']={**r['egress'],'observed_ip':check['observed_ip'],'verification':routing.EVIDENCE}
-                await event(f"Routing through {check['route_name']}; connections exit from {check['observed_ip']}")
+            relay=await self.open_relay(r,m,event,m['max_seconds']-(time.monotonic()-start))
+            # Playwright is pointed at the relay and never at an upstream, so credentials stay here.
+            if relay:options['proxy']={'server':relay.proxy}
             if m['persona_id']:
                 persona=DATA/'personas'/f"{m['persona_id']}.json"
                 if not persona.exists():raise StopRun('Persona session is missing')
@@ -880,11 +870,7 @@ class Runner:
                 except Exception:pass
             # Whatever the run managed to request is evidence, including a switch that never verified.
             if faults:r['faults']=faults
-            if relay:
-                try:r['route_traffic']=[{'generation':g,**c} for g,c in sorted(relay.stats.items())]
-                finally:
-                    try:await relay.stop()
-                    except Exception as e:r.setdefault('artifact_warnings',[]).append('Relay shutdown: '+hide(str(e))[:150])
+            await self.close_relay(r,relay,hide)
             if not remote:
                 recordings=[p for p in (folder/'video').glob('*.webm') if p.name not in recorded_before] or list((folder/'video').glob('*.webm'))
                 if recordings:
@@ -982,6 +968,41 @@ class Runner:
             image=folder/(observation['id']+'.png');evidence.append(observation['id'])
             await note(observation['id']+': screen captured after action '+str(step+1))
 
+    async def open_relay(self,r,m,event,budget):
+        """The one relay this run owns, started and established before any traffic goes through it.
+
+        Nothing else knows which upstream is current: the browser or the emulator is pointed at a
+        single local address once, and a later step changes what stands behind it.
+        """
+        if not r.get('routes'):return None
+        configured={}
+        for snapshot in r['routes']:
+            record=await read('egress',snapshot['id'])
+            secret=DATA/'secrets'/f"{snapshot['id']}.json"
+            if not record or not secret.is_file():raise StopRun('This route is no longer usable on this machine: '+snapshot['name'])
+            configured[snapshot['id']]={'name':record['name'],'server':record['server'],**json.loads(secret.read_text())}
+        relay=routing.Relay(configured)
+        # The run page shows each switch as it happens, and a later part appends to this list.
+        relay.checks=r.setdefault('route_checks',[])
+        await relay.start(m['egress_id'] or routing.DIRECT)
+        check=await relay.verify(budget=budget)
+        if check['status']!='verified':
+            # Its own probe is the only traffic it carried, and that count is still the evidence.
+            await self.close_relay(r,relay)
+            raise StopRun('The route this run starts on could not be established: '+(check['error'] or 'no probe answered'))
+        r['egress']={'name':check['route_name'],'server':relay.route['server'],
+                     'observed_ip':check['observed_ip'],'verification':routing.EVIDENCE}
+        await event(f"Routing through {check['route_name']}; connections exit from {check['observed_ip']}")
+        return relay
+
+    async def close_relay(self,r,relay,hide=str):
+        """What the relay carried is evidence even when it cannot be shut down cleanly, so it is kept first."""
+        if not relay:return
+        try:r['route_traffic']=[{'generation':g,**c} for g,c in sorted(relay.stats.items())]
+        finally:
+            try:await relay.stop()
+            except Exception as error:r.setdefault('artifact_warnings',[]).append('Relay shutdown: '+hide(str(error))[:150])
+
     async def finalize_replay(self,r,event):
         """Compare a replay with its original once findings, outcome and coverage are known.
 
@@ -1040,14 +1061,17 @@ class Runner:
     async def execute_android(self,id,r):
         """Native fallback branch; the web lifecycle stays untouched until extraction is low-risk."""
         self.snapshots[id]=r;m=r['mission'];folder=ARTIFACTS/id;folder.mkdir(exist_ok=True)
-        device=android.Device(m,{**r['app'],'package':r['target']['package']},folder,id)
-        start=time.monotonic();deadline=start+m['max_seconds'];steps=m.get('scenario') or []
-        r.update(status='running',started_at=now(),prompt_version='2026-09-13.2',network_applied={'name':'Baseline','offline':False,'scope':'Device default; no traffic probe'})
+        device=android.Device(m,{**r['app'],'package':r['target']['package']},folder,id,profile=r.get('network_snapshot'))
+        start=time.monotonic();deadline=start+m['max_seconds'];steps=m.get('scenario') or [];relay=None
+        r.update(status='running',started_at=now(),prompt_version='2026-09-13.2',network_applied=None)
         async def event(message,kind='info'):
             # Persist after every event so the run page shows the log and timeline while the device is still working.
             r['events'].append({'at':now(),'kind':kind,'message':message});await write('run',r)
         try:
             await event('Preparing designated Android device, package reset and evidence collectors')
+            # The relay listens before the emulator exists: the address it launches against is fixed
+            # at launch, and only what stands behind that address changes later.
+            relay=device.relay=await self.open_relay(r,m,event,m['max_seconds']-(time.monotonic()-start))
             await device.start();await event(f"Device ready: {device.measurements.get('avd')} · API {device.measurements.get('api')}");await device.launch(m.get('url',''))
             r['measurements']=device.measurements;r['device']=dict(device.measurements)
             await event(f"App launched in {device.measurements.get('launch_ms','?')} ms")
@@ -1087,6 +1111,8 @@ class Runner:
             r['logs']=device.logs;r.setdefault('artifact_warnings',[]).extend(device.warnings)
             r['video_parts']=device.video_parts;r['video_gaps']=device.gaps
             r['faults']=device.faults;r['network_restore']=device.network_restore
+            if device.network_applied:r['network_applied']=device.network_applied
+            await self.close_relay(r,relay)
             logs=''.join((folder/name.rsplit('/',1)[-1]).read_text(errors='replace') for name in device.logs)
             if r['observations']:
                 found=evaluate_android(r['observations'][-1],logs,r['measurements'])

@@ -14,7 +14,7 @@ async def test_native_audit_final_log_changes_gate(monkeypatch,tmp_path):
     async def write(kind,value):saved.append(value.copy());return value
     monkeypatch.setattr(runner_module,'write',write)
     class FakeDevice:
-        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
+        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[];self.network_applied=None
         async def start(self):pass
         async def launch(self,url):self.measurements={'launch_ms':400,'launch_status':'ok','api':34,'abi':'arm64-v8a','renderer':'auto'}
         async def observe(self,id):
@@ -42,7 +42,7 @@ async def test_stop_failure_still_publishes_terminal(monkeypatch,tmp_path):
     async def write(kind,value):saved.append(value.copy());return value
     monkeypatch.setattr(runner_module,'write',write)
     class Broken:
-        def __init__(self,*a,**k):self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
+        def __init__(self,*a,**k):self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[];self.network_applied=None
         async def start(self):raise ValueError('setup failed')
         async def stop(self):raise ValueError('cleanup failed')
     monkeypatch.setattr(runner_module.android,'Device',Broken)
@@ -55,7 +55,7 @@ async def test_native_journey_resolves_dynamic_model_before_the_cli_call(monkeyp
     async def write(kind,value):return value
     monkeypatch.setattr(runner_module,'write',write)
     class FakeDevice:
-        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
+        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[];self.network_applied=None
         async def start(self):pass
         async def launch(self,url):pass
         async def observe(self,id):
@@ -79,7 +79,7 @@ async def test_native_journey_refuses_a_blocked_finish_before_any_tap(monkeypatc
     async def write(kind,value):return value
     monkeypatch.setattr(runner_module,'write',write)
     class FakeDevice:
-        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[];self.taps=[]
+        def __init__(self,*a,**k):self.folder=Path(a[2]);self.measurements={};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[];self.network_applied=None;self.taps=[]
         async def start(self):pass
         async def launch(self,url):pass
         async def observe(self,id):
@@ -104,7 +104,7 @@ class ScenarioDevice:
     """A device that answers the scenario interpreter without adb, used by both scenario runs below."""
     text='Now playing'
     def __init__(self,*a,**k):
-        self.folder=Path(a[2]);self.measurements={'start_state':'fresh'};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[]
+        self.folder=Path(a[2]);self.measurements={'start_state':'fresh'};self.videos=[];self.logs=[];self.warnings=[];self.video_parts=[];self.gaps=[];self.faults=[];self.network_restore=[];self.network_applied=None
         self.app={'package':'dev.pex.app'};self.homed=0;self.went_back=0;self.recording=True
     async def start(self):pass
     async def launch(self,url):self.measurements.update(launch_ms=400,launch_status='ok',api=34,abi='arm64-v8a',renderer='auto')

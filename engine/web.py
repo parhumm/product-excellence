@@ -60,20 +60,12 @@ class Browser:
         return {'offline':offline,'latency':latency,
                 'downloadThroughput':down*125000 if down else -1,'uploadThroughput':up*125000 if up else -1}
 
-    async def apply_route(self,route_id,budget=None):
-        """Change the way out mid-run, then read back the address this run now exits from.
-
-        The switch is requested evidence whatever comes of it, so it is recorded first. A route
-        that cannot be verified stops the run: nothing falls back to direct and nothing is retried.
-        """
+    async def apply_route(self,route_id,step=None,budget=None):
+        """Change the way out mid-run. The context was pointed at the relay, never at a route."""
         if not self.relay:raise ScenarioError('This run was not started with a relay, so it cannot change route')
+        # Requested evidence whatever comes of it, so the switch is recorded before it is attempted.
         self.faults.append({'route':route_id})
-        # The step already stands in the run's own scenario results, so its number names this check.
-        check=await self.relay.apply(route_id,len(self.run.get('scenario') or []) or None)
-        await self.relay.verify(check,budget)
-        if check['status']!='verified':
-            raise ScenarioError('The route could not be established: '+(check['error'] or 'no probe answered'))
-        return f"Connections now exit through {check['route_name']} from {check['observed_ip']}"
+        return await self.relay.switch(route_id,step,budget)
 
     async def apply_speed(self,speed='',delay_ms=None,record=True):
         if not self.cdp:raise ScenarioError('Link shaping in the browser needs Chromium')

@@ -190,18 +190,18 @@ class Scenario:
         if kind=='event':
             self.cursor=self.device.log_cursor()
             # An operation that established something says so; the rest only say it was applied.
-            result.update(status='passed',reason=await self.apply(step['event']) or 'Applied')
+            result.update(status='passed',reason=await self.apply(step['event'],result['number']) or 'Applied')
             return
         oracle=step[kind]
         if kind=='check':status,reason=await self.establish(oracle,oracle.get('within',10),result)
         else:status,reason=await self.maintain(oracle,oracle['for'],result)
         result.update(status=status,reason=reason)
 
-    async def apply(self,event):
+    async def apply(self,event,number=None):
         name=event_kind(event)
         if name=='route':
             # The route first: shaping asked for alongside it describes the link this route runs over.
-            established=await self.device.apply_route(event['route'],self.remaining())
+            established=await self.device.apply_route(event['route'],number,self.remaining())
             if event.get('speed') or event.get('delay_ms') is not None:
                 await self.device.apply_speed(event.get('speed') or '',event.get('delay_ms'))
             return established

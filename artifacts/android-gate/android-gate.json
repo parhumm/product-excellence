@@ -1,0 +1,2639 @@
+{
+  "notes": {
+    "emulator": "Android emulator version 36.6.11.0 (build_id 15507667) (CL:N/A)",
+    "serial": "emulator-5554",
+    "launch_args": "/opt/homebrew/share/android-commandlinetools/emulator/emulator -avd pex-test -http-proxy http://127.0.0.1:55517 -no-snapshot -no-audio -gpu auto -verbose -no-window",
+    "api": "34",
+    "abi": "arm64-v8a",
+    "network_before": {
+      "console": "Current network status:\n  download speed:          0 bits/s (0.0 KB/s)\n  upload speed:            0 bits/s (0.0 KB/s)\n  minimum latency:  0 ms\n  maximum latency:  0 ms\nOK",
+      "wifi": "0",
+      "data": "1"
+    },
+    "guest_http_proxy": "null",
+    "wifi_active_route": "101",
+    "cellular_active_route": "102",
+    "proxy_requests": [
+      {
+        "at": 1789474688.091512,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.091516,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.0940092,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.095026,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.098444,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.09847,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.098784,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.0993311,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1004329,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.100687,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.101726,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1138291,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.113847,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.114079,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.11628,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1162932,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.121181,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.121537,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.122473,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.122782,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1232262,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.127817,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.128281,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.128509,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.129687,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.130124,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1320908,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.132343,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.134976,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.13499,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1366642,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.139105,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.139123,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1413782,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.142022,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1425312,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.143317,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.14489,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.149878,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.15092,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.151838,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.151925,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.152123,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.153752,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.156422,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.157714,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1606688,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.160807,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.161685,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.165993,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.166322,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.166668,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.1709728,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474688.262002,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "f7451c4eaa7f:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474688.738466,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "317f12f181d1:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474689.120942,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.122206,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1240551,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.125087,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.125901,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.126716,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1277251,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.128685,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1296608,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.130753,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1323001,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1333609,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.134155,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.135159,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.135954,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1368608,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.144045,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1453729,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.146361,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.147388,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.148512,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1485188,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.149636,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1508312,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1512032,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1517818,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.152382,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.153727,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1543949,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.154966,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.156062,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.156399,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.15731,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.157857,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.158583,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.159111,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1600661,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.160429,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1617532,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.16215,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1630259,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.163341,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1643221,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.165289,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.166417,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.166817,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.168045,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.168849,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.169704,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.169943,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.170601,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1712441,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.172677,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.173912,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.175242,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.176346,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.177595,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.178611,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1797812,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.1806028,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.182205,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.183389,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.184354,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.185554,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.212647,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.218005,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.2205272,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.2232242,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.226447,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.228482,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.232694,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.235297,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.23784,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.240221,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.241844,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.243346,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.244406,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.245495,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.2466292,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474689.246958,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "d95c36cfc39e:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474689.247825,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474690.374944,
+        "line": "CONNECT [2001:4188:2:600:10:10:34:36]:443 HTTP/1.1",
+        "authority": "[2001:4188:2:600:10:10:34:36]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474690.376516,
+        "line": "CONNECT 10.10.34.36:443 HTTP/1.1",
+        "authority": "10.10.34.36:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474690.7648041,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "de1c3385f57b:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474691.2295492,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "b6159fd6d474:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474691.736386,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "074fec4e4316:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474692.228873,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "77970a35aff5:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474692.731207,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "8c68f168a2b0:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474694.261313,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "75bc854df9ac:DOWN",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474694.56685,
+        "line": "CONNECT 172.253.157.188:5228 HTTP/1.1",
+        "authority": "172.253.157.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474694.5684328,
+        "line": "CONNECT [2a00:1450:400c:c02::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c02::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474694.718227,
+        "line": "CONNECT 173.194.41.188:5228 HTTP/1.1",
+        "authority": "173.194.41.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474694.722977,
+        "line": "CONNECT [2404:6800:400b:c017::bc]:5228 HTTP/1.1",
+        "authority": "[2404:6800:400b:c017::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474694.7483032,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "79ad426dabc9:UP",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474695.105487,
+        "line": "CONNECT [2001:4188:2:600:10:10:34:36]:443 HTTP/1.1",
+        "authority": "[2001:4188:2:600:10:10:34:36]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474695.106327,
+        "line": "CONNECT 10.10.34.36:443 HTTP/1.1",
+        "authority": "10.10.34.36:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474696.2374349,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474696.24025,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474696.240405,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474696.263629,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "fe404cc63645:DOWN",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474696.715274,
+        "line": "GET http://www.google.com/gen_204 HTTP/1.1",
+        "authority": "http://www.google.com/gen_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474696.740223,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "dc02b755ab30:UP",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474697.355495,
+        "line": "CONNECT 172.20.10.1:853 HTTP/1.1",
+        "authority": "172.20.10.1:853",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474697.391216,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474697.39218,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474697.3939672,
+        "line": "GET http://www.google.com/gen_204 HTTP/1.1",
+        "authority": "http://www.google.com/gen_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474697.586205,
+        "line": "CONNECT 64.233.184.188:5228 HTTP/1.1",
+        "authority": "64.233.184.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474697.6233,
+        "line": "CONNECT 172.253.148.188:443 HTTP/1.1",
+        "authority": "172.253.148.188:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474698.4104698,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474698.4105558,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474698.418853,
+        "line": "GET http://www.google.com/gen_204 HTTP/1.1",
+        "authority": "http://www.google.com/gen_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474700.442382,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474700.4443798,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474700.444624,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474700.448958,
+        "line": "GET http://www.google.com/gen_204 HTTP/1.1",
+        "authority": "http://www.google.com/gen_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474702.391837,
+        "line": "CONNECT [2a00:1450:400c:c02::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c02::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474704.4778419,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474704.479764,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474704.483168,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474704.542448,
+        "line": "GET http://play.googleapis.com/generate_204 HTTP/1.1",
+        "authority": "http://play.googleapis.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474705.474474,
+        "line": "CONNECT 64.233.184.188:5228 HTTP/1.1",
+        "authority": "64.233.184.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474705.478108,
+        "line": "CONNECT [2a00:1450:400c:c02::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c02::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474705.611882,
+        "line": "CONNECT 172.253.152.188:443 HTTP/1.1",
+        "authority": "172.253.152.188:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474712.343728,
+        "line": "GET http://192.0.2.10/pex/7f78f7258ce9 HTTP/1.1",
+        "authority": "http://192.0.2.10/pex/7f78f7258ce9",
+        "fixture": true,
+        "served": "answered",
+        "verbs_seen": "7f78f7258ce9:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474712.367311,
+        "line": "CONNECT 192.0.2.10:443 HTTP/1.1",
+        "authority": "192.0.2.10:443",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "10979d8336b0:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474712.389652,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "2334ecb72c47:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474712.6125062,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474712.613864,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474712.623551,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474712.6270201,
+        "line": "GET http://play.googleapis.com/generate_204 HTTP/1.1",
+        "authority": "http://play.googleapis.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474713.424918,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "6bf3fe67d9a4:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474713.447723,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "64c403f38f21:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474713.471466,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "29e0297b2dc1:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474713.4957309,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "a63b3aaa1fde:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474713.517951,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "242835355107:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474714.766525,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "1abfe90424bb:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474714.993574,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "97445a83de19:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474715.2192278,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "2d8b87749291:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474715.442765,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "042748813cbf:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474715.665474,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "915cc822b568:GET",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474716.714844,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "c80750818d18:DOWN",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474716.7411652,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "f10ad0cdcb61:UP",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474717.790098,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "729b5715f4c6:DOWN",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474721.306357,
+        "line": "CONNECT 64.233.184.188:5228 HTTP/1.1",
+        "authority": "64.233.184.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474721.3094022,
+        "line": "CONNECT [2a00:1450:400c:c02::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c02::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474721.473108,
+        "line": "CONNECT 142.250.147.188:443 HTTP/1.1",
+        "authority": "142.250.147.188:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474724.075711,
+        "line": "CONNECT 64.233.184.188:5228 HTTP/1.1",
+        "authority": "64.233.184.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474724.088089,
+        "line": "CONNECT [2a00:1450:400c:c02::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c02::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474724.193755,
+        "line": "CONNECT 172.253.148.188:443 HTTP/1.1",
+        "authority": "172.253.148.188:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474724.207734,
+        "line": "CONNECT [2404:6800:4013:813::bc]:443 HTTP/1.1",
+        "authority": "[2404:6800:4013:813::bc]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474728.6537259,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474728.65545,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474728.657401,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474728.871839,
+        "line": "GET http://play.googleapis.com/generate_204 HTTP/1.1",
+        "authority": "http://play.googleapis.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474752.814019,
+        "line": "CONNECT 64.233.184.188:5228 HTTP/1.1",
+        "authority": "64.233.184.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474752.821686,
+        "line": "CONNECT [2a00:1450:400c:c02::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c02::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474752.8504808,
+        "line": "CONNECT 173.194.41.188:5228 HTTP/1.1",
+        "authority": "173.194.41.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474752.856419,
+        "line": "CONNECT [2404:6800:400b:c017::bc]:5228 HTTP/1.1",
+        "authority": "[2404:6800:400b:c017::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474761.105161,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474761.1077309,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474761.137847,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474761.351583,
+        "line": "GET http://www.google.com/gen_204 HTTP/1.1",
+        "authority": "http://www.google.com/gen_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.4793,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.479329,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.4805691,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.4821792,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.484443,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.484451,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.4853709,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.487521,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.489577,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.49041,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.492608,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.493598,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.495847,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.496723,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.4990778,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.499934,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.502211,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.503187,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.505415,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.7003899,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.702914,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.703891,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.706233,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.707922,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.7098281,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.712783,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.714497,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.716106,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.719142,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.720507,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.722038,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.724687,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.725995,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.728944,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.730159,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.749975,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.7522728,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.753015,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.755307,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.756246,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.7584152,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.759393,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474773.761547,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474774.489743,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474774.4919732,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474774.495028,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474774.497986,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474774.499655,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474774.501471,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474815.506121,
+        "line": "CONNECT 142.251.127.188:5228 HTTP/1.1",
+        "authority": "142.251.127.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474815.513609,
+        "line": "CONNECT [2a00:1450:400c:c0c::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c0c::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474815.65846,
+        "line": "CONNECT 192.178.158.188:5228 HTTP/1.1",
+        "authority": "192.178.158.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474825.066227,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnel ended: TimeoutError",
+        "verbs_seen": "47c921e13e8c:UP",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474825.3763862,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474825.3779871,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474825.4063518,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474826.0516238,
+        "line": "GET http://play.googleapis.com/generate_204 HTTP/1.1",
+        "authority": "http://play.googleapis.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474940.867,
+        "line": "CONNECT 142.251.127.188:5228 HTTP/1.1",
+        "authority": "142.251.127.188:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474940.870265,
+        "line": "CONNECT [2a00:1450:400c:c0c::bc]:5228 HTTP/1.1",
+        "authority": "[2a00:1450:400c:c0c::bc]:5228",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474940.940992,
+        "line": "CONNECT 142.250.147.188:443 HTTP/1.1",
+        "authority": "142.250.147.188:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474940.943512,
+        "line": "CONNECT [2a00:1450:4013:c1e::bc]:443 HTTP/1.1",
+        "authority": "[2a00:1450:4013:c1e::bc]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.6515222,
+        "line": "CONNECT [2001:4860:4845:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4845:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.652763,
+        "line": "CONNECT [2001:4860:4846:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4846:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.65396,
+        "line": "CONNECT [2001:4860:4841:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4841:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.6562822,
+        "line": "CONNECT [2001:4860:4842:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4842:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.657324,
+        "line": "CONNECT [2001:4860:4843:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4843:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.659847,
+        "line": "CONNECT [2001:4860:4844:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4844:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.660635,
+        "line": "CONNECT [2001:4860:4840:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4840:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.6627269,
+        "line": "CONNECT [2001:4860:4847:400::]:443 HTTP/1.1",
+        "authority": "[2001:4860:4847:400::]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.663719,
+        "line": "CONNECT 172.217.115.4:443 HTTP/1.1",
+        "authority": "172.217.115.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.665992,
+        "line": "CONNECT 172.217.113.4:443 HTTP/1.1",
+        "authority": "172.217.113.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.666788,
+        "line": "CONNECT 172.217.117.4:443 HTTP/1.1",
+        "authority": "172.217.117.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.669012,
+        "line": "CONNECT 172.217.118.4:443 HTTP/1.1",
+        "authority": "172.217.118.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.6699278,
+        "line": "CONNECT 172.217.114.4:443 HTTP/1.1",
+        "authority": "172.217.114.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.672184,
+        "line": "CONNECT 172.217.119.4:443 HTTP/1.1",
+        "authority": "172.217.119.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.673109,
+        "line": "CONNECT 172.217.112.4:443 HTTP/1.1",
+        "authority": "172.217.112.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474951.675193,
+        "line": "CONNECT 172.217.116.4:443 HTTP/1.1",
+        "authority": "172.217.116.4:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474954.287141,
+        "line": "CONNECT 216.239.38.120:443 HTTP/1.1",
+        "authority": "216.239.38.120:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474954.289262,
+        "line": "CONNECT [2001:4860:4802:32::78]:443 HTTP/1.1",
+        "authority": "[2001:4860:4802:32::78]:443",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474954.317247,
+        "line": "GET http://connectivitycheck.gstatic.com/generate_204 HTTP/1.1",
+        "authority": "http://connectivitycheck.gstatic.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474954.5944052,
+        "line": "GET http://play.googleapis.com/generate_204 HTTP/1.1",
+        "authority": "http://play.googleapis.com/generate_204",
+        "fixture": false,
+        "served": "refused",
+        "verbs_seen": ""
+      },
+      {
+        "at": 1789474992.826907,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "c19057c9f98f:HOLD",
+        "generation": 1,
+        "tag": "A"
+      },
+      {
+        "at": 1789474993.8414888,
+        "line": "CONNECT 192.0.2.10:9101 HTTP/1.1",
+        "authority": "192.0.2.10:9101",
+        "fixture": true,
+        "served": "tunnelled",
+        "verbs_seen": "9ecbbcac34ed:GET",
+        "generation": 2,
+        "tag": "B"
+      }
+    ]
+  },
+  "rows": [
+    {
+      "interface": "device",
+      "capability": "host-side proxy",
+      "status": "pass",
+      "detail": "guest global http_proxy reads 'null'; routing is the host-side Emulator Proxy"
+    },
+    {
+      "interface": "wifi",
+      "capability": "route tcp/80",
+      "status": "pass",
+      "detail": "guest reply 'HTTP/1.1 200 OK\\nContent-Type: text/plain\\nContent-Length: 23\\n' correlated with proxy log",
+      "ms": 391,
+      "nonce": "d45967bae46a"
+    },
+    {
+      "interface": "wifi",
+      "capability": "route tcp/443",
+      "status": "pass",
+      "detail": "guest reply 'PEXOK 5714f4278ed1 A 1' correlated with proxy log",
+      "ms": 822,
+      "nonce": "5714f4278ed1"
+    },
+    {
+      "interface": "wifi",
+      "capability": "route tcp/9101",
+      "status": "pass",
+      "detail": "guest reply 'PEXOK e45b7816370b A 1' correlated with proxy log",
+      "ms": 744,
+      "nonce": "e45b7816370b"
+    },
+    {
+      "interface": "wifi",
+      "capability": "shape delay",
+      "status": "absent",
+      "detail": "baseline median 500 ms, with delay 200:200 median 499 ms (-1 ms); console readback reports 200 ms — accepted and read back, traffic unchanged",
+      "baseline_ms": 500,
+      "shaped_ms": 499,
+      "shift_ms": -1,
+      "samples": [
+        476,
+        489,
+        501,
+        500,
+        500,
+        464,
+        502,
+        498,
+        502,
+        499
+      ],
+      "console_status": "Current network status:\n  download speed:          0 bits/s (0.0 KB/s)\n  upload speed:            0 bits/s (0.0 KB/s)\n  minimum latency:  200 ms\n  maximum latency:  200 ms\nOK",
+      "command": "emu network delay 200:200"
+    },
+    {
+      "interface": "wifi",
+      "capability": "shape bandwidth",
+      "status": "absent",
+      "detail": "32768 B down took 487 ms at full (539 kbit/s) and 474 ms at 512:256 (553 kbit/s); console readback down=256000 up=512000 bits/s — accepted and read back, traffic unchanged",
+      "full": {
+        "down_ms": 487,
+        "down_bytes": 32791,
+        "up_ms": 492,
+        "up_ok": true,
+        "up_reply": "PEXOK 79ad426dabc9 A 1 32768"
+      },
+      "shaped": {
+        "down_ms": 474,
+        "down_bytes": 32791,
+        "up_ms": 495,
+        "up_ok": true,
+        "up_reply": "PEXOK dc02b755ab30 A 1 32768"
+      },
+      "full_kbit": 539,
+      "shaped_kbit": 553,
+      "console_status": "Current network status:\n  download speed:     256000 bits/s (31.2 KB/s)\n  upload speed:       512000 bits/s (62.5 KB/s)\n  minimum latency:  0 ms\n  maximum latency:  0 ms\nOK",
+      "command": "emu network speed 512:256"
+    },
+    {
+      "interface": "cellular",
+      "capability": "route tcp/80",
+      "status": "pass",
+      "detail": "guest reply 'HTTP/1.1 200 OK\\nContent-Type: text/plain\\nContent-Length: 23\\n' correlated with proxy log",
+      "ms": 25,
+      "nonce": "7f78f7258ce9"
+    },
+    {
+      "interface": "cellular",
+      "capability": "route tcp/443",
+      "status": "pass",
+      "detail": "guest reply 'PEXOK 10979d8336b0 A 1' correlated with proxy log",
+      "ms": 23,
+      "nonce": "10979d8336b0"
+    },
+    {
+      "interface": "cellular",
+      "capability": "route tcp/9101",
+      "status": "pass",
+      "detail": "guest reply 'PEXOK 2334ecb72c47 A 1' correlated with proxy log",
+      "ms": 22,
+      "nonce": "2334ecb72c47"
+    },
+    {
+      "interface": "cellular",
+      "capability": "shape delay",
+      "status": "pass",
+      "detail": "baseline median 23 ms, with delay 200:200 median 224 ms (+201 ms); console readback reports 200 ms",
+      "baseline_ms": 23,
+      "shaped_ms": 224,
+      "shift_ms": 201,
+      "samples": [
+        22,
+        23,
+        25,
+        23,
+        22,
+        224,
+        226,
+        226,
+        224,
+        222
+      ],
+      "console_status": "Current network status:\n  download speed:          0 bits/s (0.0 KB/s)\n  upload speed:            0 bits/s (0.0 KB/s)\n  minimum latency:  200 ms\n  maximum latency:  200 ms\nOK",
+      "command": "emu network delay 200:200"
+    },
+    {
+      "interface": "cellular",
+      "capability": "shape bandwidth",
+      "status": "pass",
+      "detail": "32768 B down took 25 ms at full (10493 kbit/s) and 107263 ms at 512:256 (2 kbit/s); console readback down=256000 up=512000 bits/s",
+      "full": {
+        "down_ms": 25,
+        "down_bytes": 32791,
+        "up_ms": 27,
+        "up_ok": true,
+        "up_reply": "PEXOK f10ad0cdcb61 A 1 32768"
+      },
+      "shaped": {
+        "down_ms": 107263,
+        "down_bytes": 32791,
+        "up_ms": 167741,
+        "up_ok": false,
+        "up_reply": ""
+      },
+      "full_kbit": 10493,
+      "shaped_kbit": 2,
+      "console_status": "Current network status:\n  download speed:     256000 bits/s (31.2 KB/s)\n  upload speed:       512000 bits/s (62.5 KB/s)\n  minimum latency:  0 ms\n  maximum latency:  0 ms\nOK",
+      "command": "emu network speed 512:256"
+    },
+    {
+      "interface": "switch",
+      "capability": "route switch",
+      "status": "pass",
+      "detail": "long-lived tunnel established, 1 connection(s) dropped on switch, next guest request answered by upstream B generation 2",
+      "disconnected": 1,
+      "reply": "PEXOK 9ecbbcac34ed B 2"
+    }
+  ]
+}

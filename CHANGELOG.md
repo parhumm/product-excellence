@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The landing page describes journeys, one-sentence missions, operator-assisted
+  runs, routes and network profiles.**
 - **A journey can change the way out mid-run.** A scenario step names a saved
   proxy route, or `direct`, and the connections that follow leave that way. The
   run owns a relay on its own machine and the browser or the emulator is pointed

@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Product Excellence · open-source website and Android app testing with evidence</title>
-<meta name="description" content="Run AI-guided website and Android app journeys on your Mac, keep the evidence locally, and share completed results from your own server. Open source under Apache 2.0.">
+<meta name="description" content="Run AI-guided website and Android app journeys on your Mac: ordered scenarios that carry state across a restart, a dropped link or a route switch, runs that ask the operator for a code and never store it, and evidence kept locally. Open source under Apache 2.0.">
 <meta name="theme-color" content="#0d3b29">
 <meta property="og:title" content="Product Excellence">
-<meta property="og:description" content="Open-source website and Android app testing that runs on your Mac and records evidence you can challenge.">
+<meta property="og:description" content="Open-source website and Android app testing that runs stateful journeys on your Mac and records evidence you can challenge.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="/static/intro/02-run.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -69,7 +69,7 @@ section{padding-block:clamp(4.5rem,9vw,8rem)}
 
 /* Product flow */
 .proof{background:var(--paper-strong);border-block:1px solid var(--line)}
-.flow{display:grid;grid-template-columns:repeat(4,1fr);margin:0;padding:0;list-style:none;counter-reset:flow}.flow li{counter-increment:flow;min-height:12rem;padding:1.3rem 1.5rem 1.5rem 0;border-top:1px solid var(--line)}.flow li+li{padding-left:1.5rem;border-left:1px solid var(--line)}.flow li::before{content:"0" counter(flow);display:block;margin-bottom:2.2rem;color:var(--green-soft);font:700 .72rem/1 var(--mono)}.flow h3{margin-bottom:.7rem;font-size:1.15rem}.flow p{margin:0;color:var(--muted);font-size:.86rem;line-height:1.55}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));margin:0;padding:0;list-style:none;counter-reset:flow}.flow li{counter-increment:flow;min-height:12rem;padding:1.3rem 1.5rem 1.5rem 0;border-top:1px solid var(--line)}.flow li+li{padding-left:1.5rem;border-left:1px solid var(--line)}.flow li::before{content:"0" counter(flow);display:block;margin-bottom:2.2rem;color:var(--green-soft);font:700 .72rem/1 var(--mono)}.flow h3{margin-bottom:.7rem;font-size:1.15rem}.flow p{margin:0;color:var(--muted);font-size:.86rem;line-height:1.55}
 .presets{margin-top:1.5rem;border-block:1px solid var(--line)}.presets summary{padding:1rem 0;cursor:pointer;font-weight:700}.presets ul{display:grid;grid-template-columns:1fr 1fr;gap:.55rem 2rem;margin:0 0 1.25rem;padding:0;list-style:none;color:var(--muted);font-size:.82rem}.presets li::before{content:"✓";margin-right:.5rem;color:var(--green-soft);font-weight:700}
 .evidence-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(18rem,.8fr);gap:clamp(2rem,6vw,6rem);margin-top:clamp(3rem,7vw,6rem);align-items:center}.evidence-grid figure{margin:0}.evidence-grid img{width:100%;border:1px solid var(--line);border-radius:6px;background:var(--paper)}.evidence-grid figcaption{margin-top:.75rem;color:var(--muted);font-size:.75rem}
 .evidence-copy h3{max-width:15ch;margin-bottom:1.2rem;font-size:clamp(2rem,3.5vw,3.6rem)}.evidence-copy p{max-width:35rem;color:var(--muted)}.pillars{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.5rem 0 0;padding:0;list-style:none}.pillars li{padding:.35rem .6rem;border:1px solid var(--line);border-radius:3px;font-size:.75rem;color:var(--green-soft)}
@@ -115,7 +115,7 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
       <div>
         <p class="status">Open source · Version {{version}}</p>
         <h1>Test like a user. <span>Keep the evidence.</span></h1>
-        <p class="hero-copy"><strong>Product Excellence</strong> sends a bounded AI worker through real website and Android app journeys, records what happened, and turns the evidence into findings you can verify.</p>
+        <p class="hero-copy"><strong>Product Excellence</strong> sends a bounded AI worker through real website and Android app journeys, records what happened, and turns the evidence into findings you can verify. Journeys are ordered steps that carry state across a restart, a dropped connection or a route switch, on the web and on Android alike.</p>
         <div class="actions">
           <a class="button button-primary" href="https://github.com/parhumm/product-excellence" rel="noopener">Get it on GitHub</a>
           <a class="button button-secondary" href="https://github.com/parhumm/product-excellence/releases" rel="noopener">View releases</a>
@@ -170,11 +170,11 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
     <div class="wrap">
       <div class="section-head">
         <div><p class="eyebrow">From goal to proof</p><h2>A test you can argue with.</h2></div>
-        <p>Describe a task in plain language. Product Excellence runs it in Chromium, Firefox or WebKit, captures the journey, and shows exactly why each finding exists.</p>
+        <p>Describe a task in plain language. Product Excellence runs it in Chromium, Firefox, WebKit or an Android emulator, as a free goal or an ordered journey, and shows exactly why each finding exists.</p>
       </div>
       <ol class="flow">
-        <li><h3>Define a mission</h3><p>Choose a website or Android target, then set the goal, safe boundaries and run budget.</p></li>
-        <li><h3>Watch the journey</h3><p>Follow each browser action beside the worker’s reason for taking it.</p></li>
+        <li><h3>Define a mission</h3><p>Choose a website or Android target and set the goal, boundaries and budget. Or write one sentence and pick from four drafted missions.</p></li>
+        <li><h3>Watch the journey</h3><p>Follow each action beside the worker’s reason for it. A run pauses to ask you which way to sign in or for a one-time code, and never stores the value.</p></li>
         <li><h3>Challenge findings</h3><p>Inspect screenshots, measurements, traces, video and critic verdicts.</p></li>
         <li><h3>Replay and compare</h3><p>Separate new, persisting and not-seen-again issues across releases.</p></li>
       </ol>
@@ -186,6 +186,17 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
           <li>Core features · detect and use</li><li>Pricing and checkout · up to payment</li>
           <li>Get the app · mobile app download</li><li>SEO and AEO · search and answer readiness</li>
           <li>UX, UI and accessibility · keyboard and screen</li><li>Slow mobile · core task on a poor connection</li>
+        </ul>
+      </details>
+      <details class="presets">
+        <summary>Twelve shipped journeys, none tied to a platform</summary>
+        <ul>
+          <li>Playback across a transport switch</li><li>Playback across a dropped connection</li>
+          <li>Download over a weak link with pauses</li><li>Downloads and search history per account</li>
+          <li>A notification opened much later</li><li>A shared link opened while signed out</li>
+          <li>A signed-in session survives a restart</li><li>A filter that survives a restart</li>
+          <li>Sign-out really signs out</li><li>Back after a search keeps the results</li>
+          <li>A form rejects bad input before sending</li><li>Checkout up to payment on a slow link</li>
         </ul>
       </details>
       <div class="evidence-grid">
@@ -202,14 +213,28 @@ pre{margin:0 0 1.25rem;padding:1.4rem;overflow:auto;border:1px solid var(--line-
     </div>
   </section>
 
+  <section id="conditions">
+    <div class="wrap">
+      <div class="section-head">
+        <div><p class="eyebrow">Conditions you control</p><h2>Measured under the conditions you name.</h2></div>
+        <p>A journey can change its route, its link and who is at the screen mid-run. What the run cannot establish it refuses, instead of reporting it as done.</p>
+      </div>
+      <ol class="flow">
+        <li><h3>Route</h3><p>A step names a saved HTTP(S) proxy route or <code>direct</code>. The run’s own relay switches the exit mid-journey, probes and records the exit address, and stops the run if the route cannot be established. Credentials stay in the relay. What it establishes is the exit address, not country or carrier.</p></li>
+        <li><h3>Network</h3><p>Link shaping in Chromium. On Android, latency and bandwidth go through the emulator on mobile data and are restored when the run ends. Shaping that was never measured there is refused.</p></li>
+        <li><h3>Operator</h3><p>A manual step pauses the recording before it asks you to act. When the run needs a value or a sign-in method, it asks and carries on; values are masked and scrubbed from the evidence.</p></li>
+      </ol>
+    </div>
+  </section>
+
   <section class="on-dark">
     <div class="wrap bounds-grid">
       <div><p class="eyebrow">Bounded by default</p><h2>The AI has no hands.</h2><p>It proposes one schema-validated browser action at a time. The engine decides whether that action is allowed and records refusals as part of the result.</p></div>
       <ul class="bounds">
         <li><strong>Your subscription</strong><span>Uses the Claude Code or Codex client you already sign in to. No API key is stored or required.</span></li>
         <li><strong>Read-only first</strong><span>Mutating network requests are blocked by default. Payments, deletion and publishing controls stay refused.</span></li>
-        <li><strong>Bounded targets</strong><span>The browser stays on explicit domains; Android runs use one designated disposable AVD and a pinned APK.</span></li>
-        <li><strong>Honest evidence</strong><span>Unmeasured signals are unavailable, not zero. Findings retain their source evidence and critic verdict.</span></li>
+        <li><strong>Bounded targets</strong><span>The browser stays on explicit domains; Android runs use one designated disposable AVD and a pinned APK, launched against the run’s relay so no app in the guest can opt out of the route.</span></li>
+        <li><strong>Honest evidence</strong><span>Unmeasured signals are unavailable, not zero. Findings retain their source evidence and critic verdict. A screen that cannot be read is a coverage gap, not a defect; unconfirmed behaviour is a question, not a finding.</span></li>
       </ul>
     </div>
   </section>

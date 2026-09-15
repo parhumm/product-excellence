@@ -48,7 +48,11 @@ def avd_dir(name):
 
 def parse_bounds(value):
     match=BOUNDS.fullmatch(value or '')
-    return tuple(map(int,match.groups())) if match else None
+    if not match:return None
+    # An off-screen node reports its corners the wrong way round. Left as read, one such box refuses
+    # to paint and takes the whole screenshot with it, so every screen after a supplied value is lost.
+    x1,y1,x2,y2=map(int,match.groups())
+    return (min(x1,x2),min(y1,y2),max(x1,x2),max(y1,y2))
 
 # MediaSession reports its own clock. `updated` is device uptime in ms, so only its movement,
 # never arithmetic on the host clock, says whether the reported position actually advanced.
@@ -585,6 +589,13 @@ class Device:
         for given in self.supplied:value=scrub(value,given,'{{supplied}}')
         return value
 
+    def _name(self,node):
+        """What this node calls itself, or the first thing said underneath it.
+        Compose builds a button as a clickable wrapper whose text lives in a child, so a map that
+        reads only the wrapper hands the worker three nameless buttons and a screen it cannot leave."""
+        own=lambda n:(n.get('content-desc') or n.get('text') or '').strip()
+        return self._hide(own(node) or next((text for child in node.iter('node') if (text:=own(child))),''))
+
     async def observe(self,id):
         xml,root,sensitive=await self._hierarchy();size=await self.shell('wm','size');density=await self.shell('wm','density')
         width,height=map(int,re.findall(r'(\d+)x(\d+)',size)[-1]);dpi=int(re.findall(r'(\d+)',density)[-1]);self.display=(width,height)
@@ -601,7 +612,7 @@ class Device:
             raw_identity=(self.app['package'],node.get('class',''),node.get('resource-id',''),node.get('content-desc',''),node.get('text',''),node.get('bounds',''))
             cid='pex-'+str(len(controls)+1);self.controls[cid]=raw_identity
             password=node.get('password')=='true'
-            label='Password field' if password else self._hide(node.get('content-desc') or node.get('text',''))
+            label='Password field' if password else self._name(node)
             controls.append({'id':cid,'tag':node.get('class',''),'role':'textbox' if node.get('class')=='android.widget.EditText' else 'button','text':'' if password else self._hide(node.get('text','')),'label':label,'labeled':bool(label),'filled':holds,'resource_id':node.get('resource-id',''),'input_type':'password' if password else 'text' if node.get('class')=='android.widget.EditText' else '','disabled':False,'checked':node.get('checked')=='true','href':'','options':[],'box':{'x':x1,'y':y1,'width':x2-x1,'height':y2-y1},'identity':hashlib.sha256(repr(raw_identity).encode()).hexdigest()[:24]})
         png=await self.adb_call('exec-out','screencap','-p',binary=True,limit=20*1024*1024)
         screenshot=self.folder/(id+'.png');screenshot.write_bytes(png)
@@ -636,6 +647,14 @@ class Device:
         box=parse_bounds(focused[0].get('bounds'));x=(box[0]+box[2])//2;y=(box[1]+box[3])//2
         self.supplied.append(value)
         await self.shell('input','tap',str(x),str(y));await self.shell('input','keycombination','KEYCODE_CTRL_LEFT','KEYCODE_A');await self.shell('input','text',value.replace(' ','%s'))
+        await self.dismiss_keyboard()
+
+    async def dismiss_keyboard(self):
+        """A soft keyboard reflows the web view under it, so the hierarchy and the screen stop agreeing
+        and the next tap lands where the control used to be. Back closes it, and only it while it shows."""
+        if 'mInputShown=true' in await self.shell('dumpsys','input_method',check=False,timeout=15):
+            await self.shell('input','keyevent','KEYCODE_BACK')
+
     async def act(self,action):
         kind=action.get('type');target=action.get('target') or ''
         if kind in ('wait',):await asyncio.sleep(2);return
@@ -668,7 +687,8 @@ class Device:
             if node.get('password')=='true':raise AndroidError('Android password and OTP entry is not supported')
             value=action.get('value','')
             if not value.isascii():raise AndroidError('Unicode input needs a preconfigured ADBKeyboard')
-            await self.shell('input','tap',str(x),str(y));await self.shell('input','keycombination','KEYCODE_CTRL_LEFT','KEYCODE_A');await self.shell('input','text',value.replace(' ','%s'));return
+            await self.shell('input','tap',str(x),str(y));await self.shell('input','keycombination','KEYCODE_CTRL_LEFT','KEYCODE_A');await self.shell('input','text',value.replace(' ','%s'))
+            await self.dismiss_keyboard();return
         if kind=='press' and action.get('value') in ('Tab','Escape'):await self.shell('input','keyevent','KEYCODE_TAB' if action['value']=='Tab' else 'KEYCODE_ESCAPE');return
         raise AndroidError('Unsupported Android action: '+str(kind))
 

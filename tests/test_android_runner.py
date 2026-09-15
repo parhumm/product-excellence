@@ -303,3 +303,84 @@ async def test_observe_hides_a_supplied_value_from_the_screen_the_hierarchy_and_
     painted=Image.open(tmp_path/'step-000.png').convert('RGB')
     # Both the field and the line echoing it are covered.
     assert painted.getpixel((50,20))==(0,0,0) and painted.getpixel((150,80))==(0,0,0)
+
+
+@pytest.mark.asyncio
+async def test_a_compose_button_borrows_the_name_of_the_text_inside_it(monkeypatch,tmp_path):
+    """Compose puts the caption in a child of the clickable node: without it the worker sees nameless buttons."""
+    from io import BytesIO
+    from PIL import Image
+    from engine import android
+    monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run',avd='pex-test')
+    xml=('<hierarchy rotation="0">'
+         '<node class="android.view.View" bounds="[0,0][300,60]" enabled="true" clickable="true" text="" '
+         'resource-id="" content-desc="" password="false" checked="false">'
+         '<node class="android.view.View" bounds="[0,0][300,60]" enabled="true" clickable="false" text="Sign in or register" '
+         'resource-id="" content-desc="" password="false" checked="false"/></node>'
+         '<node class="android.view.View" bounds="[0,80][300,140]" enabled="true" clickable="true" text="" '
+         'resource-id="" content-desc="Other links" password="false" checked="false"/></hierarchy>')
+    async def hierarchy():return android.sanitize_xml(xml)
+    async def shell(*args,**kw):
+        return {('wm','size'):'Physical size: 1080x2400',('wm','density'):'Physical density: 420'}.get(args[:2],'')
+    buffer=BytesIO();Image.new('RGB',(1080,2400),'white').save(buffer,'PNG')
+    async def adb_call(*args,**kw):return buffer.getvalue()
+    monkeypatch.setattr(device,'_hierarchy',hierarchy)
+    monkeypatch.setattr(device,'shell',shell)
+    monkeypatch.setattr(device,'adb_call',adb_call)
+
+    controls=(await device.observe('step-000'))['controls']
+    assert [c['label'] for c in controls]==['Sign in or register','Other links']
+    # A caption a screen reader reaches is a label, so the accessibility finding must not fire on it.
+    assert all(c['labeled'] for c in controls)
+
+
+@pytest.mark.asyncio
+async def test_an_off_screen_node_holding_the_value_does_not_cost_us_the_screenshot(monkeypatch,tmp_path):
+    """One node reports its corners the wrong way round; every screen after the ask must still be kept."""
+    from io import BytesIO
+    from PIL import Image
+    from engine import android
+    assert android.parse_bounds('[0,100][0,0]')==(0,0,0,100)
+    monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run',avd='pex-test')
+    device.supplied.append('0912 345 6789')
+    xml=('<hierarchy rotation="0"><node class="android.widget.TextView" bounds="[0,100][0,0]" enabled="true" '
+         'clickable="false" text="0912 345 6789" resource-id="" content-desc="" password="false" checked="false"/>'
+         '<node class="android.widget.EditText" bounds="[0,0][100,40]" enabled="true" clickable="true" '
+         'text="0912 345 6789" resource-id="" content-desc="" password="false" checked="false"/></hierarchy>')
+    async def hierarchy():return android.sanitize_xml(xml)
+    async def shell(*args,**kw):
+        return {('wm','size'):'Physical size: 1080x2400',('wm','density'):'Physical density: 420'}.get(args[:2],'')
+    buffer=BytesIO();Image.new('RGB',(1080,2400),'white').save(buffer,'PNG')
+    async def adb_call(*args,**kw):return buffer.getvalue()
+    monkeypatch.setattr(device,'_hierarchy',hierarchy)
+    monkeypatch.setattr(device,'shell',shell)
+    monkeypatch.setattr(device,'adb_call',adb_call)
+
+    screen=await device.observe('step-000')
+    assert screen['screenshot'].endswith('step-000.png') and (tmp_path/'step-000.png').is_file()
+    assert Image.open(tmp_path/'step-000.png').convert('RGB').getpixel((50,20))==(0,0,0)
+
+
+@pytest.mark.asyncio
+async def test_typing_closes_the_soft_keyboard_only_while_it_is_open(monkeypatch,tmp_path):
+    """Back closes the keyboard; sent when none is up it would leave the screen the mission is on."""
+    from engine import android
+    monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run',avd='pex-test')
+    calls=[];shown=['mInputShown=true']
+    xml=('<hierarchy rotation="0"><node class="android.widget.EditText" bounds="[0,0][100,40]" enabled="true" '
+         'clickable="true" text="" resource-id="" content-desc="" password="false" focused="true" checked="false"/></hierarchy>')
+    async def hierarchy():return android.sanitize_xml(xml)
+    async def shell(*args,**kw):
+        calls.append(args)
+        return shown[0] if args[0]=='dumpsys' else ''
+    monkeypatch.setattr(device,'_hierarchy',hierarchy)
+    monkeypatch.setattr(device,'shell',shell)
+
+    await device.type_focused('482913')
+    assert ('input','keyevent','KEYCODE_BACK') in calls
+    calls.clear();shown[0]='mInputShown=false'
+    await device.type_focused('482913')
+    assert ('input','keyevent','KEYCODE_BACK') not in calls

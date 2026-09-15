@@ -11,7 +11,7 @@ from .pricing import tokens as count
 from .evaluate import evaluate,evaluate_android,fingerprint,compare_runs,finding_identity,scenario_digest,scenario_findings
 from .outcomes import coverage,gate,scores,executive_summary,sync_findings,scenario_coverage
 from .contracts import Mission,ceiling
-from . import android,targets,web
+from . import android,relay as routing,targets,web
 from .scenario import Scenario,ScenarioError,outcome as scenario_outcome
 
 def cause(error):
@@ -182,6 +182,22 @@ class Runner:
         if mission['provider'] in ('codex','auto'):ai.codex_home(mission['codex_account_resolved'])
         profile=network_snapshot if network_snapshot is not None else await read('network',mission['network'])
         if not profile:raise ValueError('Network profile does not exist')
+        # Every route this scenario switches to, plus the one it starts on. The relay resolves them
+        # all before the run, so a missing record or an unusable upstream is a submit error here
+        # rather than a step that dies mid-journey.
+        asked=[(step.get('event') or {}).get('route') for step in (mission.get('scenario') or [])]
+        switches=[route for route in asked if route not in (None,'direct')]
+        routes=[]
+        if any(route is not None for route in asked):
+            if mission['platform']=='android':raise ValueError('Route switching is not available on Android runs yet; remove the route steps or run this mission on the web')
+            if profile['backend']=='netem':raise ValueError('Route switching needs a browser on this machine; the Linux netem runner cannot switch routes')
+            for id in dict.fromkeys(([mission['egress_id']] if mission['egress_id'] else [])+switches):
+                record=await read('egress',id)
+                if not record:raise ValueError('A route this scenario switches to does not exist')
+                if urlsplit(record['server']).scheme not in ('http','https'):raise ValueError('Route switching forwards through HTTP or HTTPS proxies only: '+record['name'])
+                if not (store.DATA/'secrets'/f'{id}.json').is_file():raise ValueError('Configure proxy credentials on this machine before running: '+record['name'])
+                # Non-secret and stable: what a later run must match to be comparable with this one.
+                routes.append({'id':id,'name':record['name'],'server':record['server']})
         target=app=None
         if mission['platform']=='android':
             if profile.get('id',mission['network'])!='baseline' or any(profile.get(k) for k in ('offline','latency_ms','down_mbps','up_mbps','jitter_ms','loss_pct','disconnect_every_seconds')):raise ValueError('Android runs currently support baseline only; verified offline is not configured')
@@ -201,7 +217,7 @@ class Runner:
             if mission.get('login_identifier') and not (store.DATA/'secrets'/f"{mission.get('id','')}.json").is_file():raise ValueError('Add this mission password on this machine before running')
             if mission.get('persona_id') and not (store.DATA/'personas'/f"{mission['persona_id']}.json").is_file():raise ValueError('Import the test persona on this machine before running')
             if mission.get('egress_id') and not (store.DATA/'secrets'/f"{mission['egress_id']}.json").is_file():raise ValueError('Configure proxy credentials on this machine before running')
-        run=await write('run',{'origin':hub.origin(),'project_id':mission['project_id'],'visibility':mission.get('visibility','team'),'platform':mission['platform'],'target':store.clean(target) if target else None,'app':dict(app) if app else None,'hub_url':hub.CONFIG.get('url','') if hub.shared(ws) and mission.get('visibility')!='local' else '', 'network_snapshot':profile,'mission':dict(mission),'mission_id':mission.get('id'),'status':'queued','observations':[],'actions':[],'events':[],'findings':[],'http':[],'console':[],'coverage':{},'ai_calls':0,'ai_usage':[],'ai_totals':{},'baseline_id':baseline,'replay_of':replay,'error':'','gate':'not_evaluated'})
+        run=await write('run',{'origin':hub.origin(),'project_id':mission['project_id'],'visibility':mission.get('visibility','team'),'platform':mission['platform'],'target':store.clean(target) if target else None,'app':dict(app) if app else None,'hub_url':hub.CONFIG.get('url','') if hub.shared(ws) and mission.get('visibility')!='local' else '', 'network_snapshot':profile,'routes':routes,'mission':dict(mission),'mission_id':mission.get('id'),'status':'queued','observations':[],'actions':[],'events':[],'findings':[],'http':[],'console':[],'coverage':{},'ai_calls':0,'ai_usage':[],'ai_totals':{},'baseline_id':baseline,'replay_of':replay,'error':'','gate':'not_evaluated'})
         self.owned.add(run['id']);await self.queue.put(run['id']);return run
     async def after_run(self,id):
         if (store.DATA/'pending-publication'/f'{id}.json').exists():return
@@ -336,7 +352,9 @@ class Runner:
         part=r.get('continuations',0)+1
         r.update(status='running',prompt_version='2026-09-06.8',network_applied=None)
         r['resumed_at' if resuming else 'started_at']=now()
-        start=time.monotonic();context=None;browser=None;pw=None;cdp=None;last_image_hash=None;remote=False;disconnect_task=None;finalizing=False
+        start=time.monotonic();context=None;browser=None;pw=None;cdp=None;last_image_hash=None;remote=False;disconnect_task=None;finalizing=False;relay=None
+        # A continued part adds to the faults its earlier parts requested rather than replacing them.
+        faults=list(r.get('faults') or [])
         # Events recorded before this continuation already belong to their own observation.
         http_cursor=len(r['http']);console_cursor=len(r['console']);blocked_cursor=len(r.get('blocked_request_log',[]))
         rejections=0;raw_controls=[];observation_hosts={};supplied=[];masked=set()
@@ -433,6 +451,23 @@ class Runner:
                 options['proxy']={'server':eg['server'],**sec}
                 r['egress']={'name':eg['name'],'server':eg['server'],'verification':'Proxy configured; ISP/ASN identity not independently verified'}
             else:r['egress']={'name':'Direct connection','verification':'No alternate ISP configured'}
+            if any((step.get('event') or {}).get('route') is not None for step in (m.get('scenario') or [])):
+                # One run-owned relay carries every hop out, so a route step changes the way out
+                # without a new browser session. Playwright is pointed at it and never at an upstream.
+                configured={}
+                for snapshot in r.get('routes') or []:
+                    record=await read('egress',snapshot['id'])
+                    secret=DATA/'secrets'/f"{snapshot['id']}.json"
+                    if not record or not secret.is_file():raise StopRun('This route is no longer usable on this machine: '+snapshot['name'])
+                    configured[snapshot['id']]={'name':record['name'],'server':record['server'],**json.loads(secret.read_text())}
+                relay=routing.Relay(configured)
+                # The run page shows each switch as it happens, and a later part appends to this list.
+                relay.checks=r.setdefault('route_checks',[])
+                options['proxy']={'server':await relay.start(m['egress_id'] or routing.DIRECT)}
+                check=await relay.verify(budget=m['max_seconds']-(time.monotonic()-start))
+                if check['status']!='verified':raise StopRun('The route this run starts on could not be established: '+(check['error'] or 'no probe answered'))
+                r['egress']={**r['egress'],'observed_ip':check['observed_ip'],'verification':routing.EVIDENCE}
+                await event(f"Routing through {check['route_name']}; connections exit from {check['observed_ip']}")
             if m['persona_id']:
                 persona=DATA/'personas'/f"{m['persona_id']}.json"
                 if not persona.exists():raise StopRun('Persona session is missing')
@@ -725,7 +760,7 @@ class Runner:
                         return judgment['outcome'],judgment['reason'],evidence
                     return 'budget_stop','',evidence
             if m.get('scenario') and not reviewing_only:
-                await self._scenario(id,r,m,web.Browser(page,context,cdp,profile,r,m,hide,supplied,tabs),pursue,event,start+m['max_seconds'])
+                await self._scenario(id,r,m,web.Browser(page,context,cdp,profile,r,m,hide,supplied,tabs,relay,faults),pursue,event,start+m['max_seconds'])
             elif m['mode']!='audit' and not reviewing_only:
                 await event(('AI journey continued using ' if resuming else 'AI journey started using ')+r['provider'])
                 sites=[m['url']]+list(m.get('competitors',[])) if m['mode']=='benchmark' else [m['url']]
@@ -843,6 +878,13 @@ class Runner:
             if browser:
                 try:await asyncio.wait_for(browser.close(),20)
                 except Exception:pass
+            # Whatever the run managed to request is evidence, including a switch that never verified.
+            if faults:r['faults']=faults
+            if relay:
+                try:r['route_traffic']=[{'generation':g,**c} for g,c in sorted(relay.stats.items())]
+                finally:
+                    try:await relay.stop()
+                    except Exception as e:r.setdefault('artifact_warnings',[]).append('Relay shutdown: '+hide(str(e))[:150])
             if not remote:
                 recordings=[p for p in (folder/'video').glob('*.webm') if p.name not in recorded_before] or list((folder/'video').glob('*.webm'))
                 if recordings:

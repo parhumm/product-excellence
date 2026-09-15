@@ -12,9 +12,11 @@ from .scenario import ScenarioError
 SPEEDS={'gsm':(0.014,0.014,650),'edge':(0.24,0.2,420),'umts':(0.384,0.128,200),'lte':(50,10,20),'full':(0,0,0)}
 
 class Browser:
-    def __init__(self,page,context,cdp,profile,run,mission,hide,supplied,tabs):
+    def __init__(self,page,context,cdp,profile,run,mission,hide,supplied,tabs,relay=None,faults=None):
         self.page=page;self.context=context;self.cdp=cdp;self.profile=profile
         self.run=run;self.mission=mission;self.hide=hide;self.supplied=supplied;self.tabs=tabs
+        # The relay this context was pointed at, and the run's own list of requested faults.
+        self.relay=relay;self.faults=faults if faults is not None else []
         # A page belongs to no package; the text oracle's "another app in front" guard never fires.
         self.app={'package':''}
 
@@ -58,13 +60,31 @@ class Browser:
         return {'offline':offline,'latency':latency,
                 'downloadThroughput':down*125000 if down else -1,'uploadThroughput':up*125000 if up else -1}
 
-    async def apply_speed(self,speed='',delay_ms=None):
+    async def apply_route(self,route_id,budget=None):
+        """Change the way out mid-run, then read back the address this run now exits from.
+
+        The switch is requested evidence whatever comes of it, so it is recorded first. A route
+        that cannot be verified stops the run: nothing falls back to direct and nothing is retried.
+        """
+        if not self.relay:raise ScenarioError('This run was not started with a relay, so it cannot change route')
+        self.faults.append({'route':route_id})
+        # The step already stands in the run's own scenario results, so its number names this check.
+        check=await self.relay.apply(route_id,len(self.run.get('scenario') or []) or None)
+        await self.relay.verify(check,budget)
+        if check['status']!='verified':
+            raise ScenarioError('The route could not be established: '+(check['error'] or 'no probe answered'))
+        return f"Connections now exit through {check['route_name']} from {check['observed_ip']}"
+
+    async def apply_speed(self,speed='',delay_ms=None,record=True):
         if not self.cdp:raise ScenarioError('Link shaping in the browser needs Chromium')
         down,up,latency=SPEEDS[speed] if speed else (0,0,0)
+        if record:self.faults.append({'speed':speed,'delay_ms':delay_ms})
         await self.cdp.send('Network.emulateNetworkConditions',self.conditions(down,up,latency+(delay_ms or 0)))
 
     async def apply_network(self,mode):
         """offline/restore switch the whole context; wifi and cellular are link shapes."""
+        # One operation, one requested fault: the shape a transport switch applies is not a second one.
+        self.faults.append({'network':mode})
         if mode=='offline':
             await self.context.set_offline(True)
             if self.cdp:await self.cdp.send('Network.emulateNetworkConditions',self.conditions(0,0,0,offline=True))
@@ -74,7 +94,7 @@ class Browser:
             await self.context.set_offline(p['offline'])
             if self.cdp:await self.cdp.send('Network.emulateNetworkConditions',self.conditions(p['down_mbps'],p['up_mbps'],p['latency_ms'],offline=p['offline']))
             return
-        await self.apply_speed('full' if mode=='wifi' else 'lte')
+        await self.apply_speed('full' if mode=='wifi' else 'lte',record=False)
 
     async def home(self):
         """Another tab in front, so the page goes hidden the way a backgrounded app does."""

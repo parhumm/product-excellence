@@ -193,13 +193,15 @@ def test_budget_stop_still_spends_one_call_on_the_review(tmp_path, monkeypatch):
 
 
 def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission_goal='Sign in with a code',
-                      page_text=None, **mission_extra):
+                      page_text=None, records=None, run_extra=None, **mission_extra):
     """Run one web journey that pauses for the operator, and hand back everything it recorded.
 
     `controls` names the page's controls for whatever is currently in the field, `release` answers
     the pause. `page_text` is a mutable `{'value': …}` a scenario can change between steps; without
-    one the page reflects whatever is in the field. Returns saved records, prompts, the values
-    filled in, the control ids clicked, and the page, context and run the journey used.
+    one the page reflects whatever is in the field. `records` answers reads of other kinds (an
+    egress route, say) and `run_extra` puts fields on the run record the runner reads back.
+    Returns saved records, prompts, the values filled in, the control ids clicked, and the
+    browser, page, context and run the journey used.
     """
     from unittest.mock import Mock
     runtime = importlib.import_module('engine.runner')
@@ -212,7 +214,7 @@ def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission
            'status': 'queued', 'network_snapshot': NetworkProfile(name='Baseline').model_dump(),
            'observations': [], 'actions': [], 'events': [], 'findings': [], 'http': [],
            'console': [], 'coverage': {}, 'ai_calls': 0, 'ai_usage': [], 'ai_totals': {},
-           'replay_of': '', 'baseline_id': ''}
+           'replay_of': '', 'baseline_id': '', **(run_extra or {})}
     saved, filled, clicked, prompts = [], [], [], []
     # A real field keeps what is already in it: fill replaces, press_sequentially appends.
     box = {'value': ''}
@@ -285,7 +287,8 @@ def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission
     pw = SimpleNamespace(firefox=SimpleNamespace(launch=AsyncMock(return_value=browser)), stop=AsyncMock())
     monkeypatch.setattr(runtime, 'DATA', tmp_path)
     monkeypatch.setattr(runtime, 'ARTIFACTS', artifacts)
-    monkeypatch.setattr(runtime, 'read', AsyncMock(side_effect=lambda kind, id, *args: run if id else None))
+    monkeypatch.setattr(runtime, 'read',
+                        AsyncMock(side_effect=lambda kind, id, *args: (records or {}).get(kind, run) if id else None))
     monkeypatch.setattr(runtime, 'write', write)
     monkeypatch.setattr(runtime.hub, 'enabled', lambda: False)
     monkeypatch.setattr(runtime, 'async_playwright', lambda: SimpleNamespace(start=AsyncMock(return_value=pw)))
@@ -307,7 +310,7 @@ def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission
 
     return SimpleNamespace(waiting=asyncio.run(journey()), saved=saved, prompts=prompts,
                            filled=filled, clicked=clicked, box=box, typed=typed,
-                           page=page, context=context, run=run)
+                           page=page, context=context, browser=browser, run=run)
 
 
 def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypatch):

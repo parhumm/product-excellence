@@ -6,6 +6,7 @@ there: no Playwright, no AI, one fake page whose text the scenario changes under
 import asyncio
 import importlib
 import json
+import time
 
 import pytest
 
@@ -83,3 +84,105 @@ def test_a_scenario_run_cannot_be_continued(tmp_path, monkeypatch):
     runtime = importlib.import_module('engine.runner')
     with pytest.raises(ValueError, match='cannot be continued'):
         asyncio.run(runtime.Runner().resume('run-test', 5, 5))
+
+
+# --- a journey that changes its way out mid-run ------------------------------------------------
+
+ROUTE = {'id': 'route-alpha-01', 'name': 'Route A', 'server': 'http://127.0.0.1:9001'}
+
+
+def routed_journey(tmp_path, monkeypatch, exits, steps, **extra):
+    """One web journey wired to a real relay whose probe answers with `exits`, in order.
+
+    The relay itself is proved offline in tests/test_relay.py; what this exercises is the wiring:
+    which proxy the context is given, what the run records, and what a failed switch does.
+    """
+    from unittest.mock import AsyncMock
+    runtime = importlib.import_module('engine.runner')
+    monkeypatch.setattr(runtime.routing.Relay, '_probe', AsyncMock(side_effect=exits))
+    (tmp_path / 'secrets').mkdir()
+    (tmp_path / 'secrets' / (ROUTE['id'] + '.json')).write_text('{"username": "u", "password": "p"}')
+
+    async def release(worker, waiting, saved):
+        raise AssertionError('This scenario asks nobody for anything')
+
+    return web_pause_journey(tmp_path, monkeypatch, [], lambda value: [], release,
+                             mission_goal='Watch a title from another country',
+                             page_text={'value': 'Now playing'}, records={'egress': ROUTE},
+                             run_extra={'routes': [dict(ROUTE)]}, scenario=steps,
+                             pillars=['functionality'], max_seconds=120, **extra)
+
+
+def test_a_route_step_switches_the_way_out_and_records_what_it_established(tmp_path, monkeypatch):
+    out = routed_journey(tmp_path, monkeypatch, ['203.0.113.7', '198.51.100.4'],
+                         [{'event': {'route': ROUTE['id']}}, {'check': {'text': 'Now playing', 'within': 1}}])
+    run = out.run
+    # The browser is pointed at the local relay, never at the upstream and never at its credentials.
+    proxy = out.browser.new_context.await_args.kwargs['proxy']
+    assert proxy['server'].startswith('http://127.0.0.1:') and set(proxy) == {'server'}
+    assert [s['status'] for s in run['scenario']] == ['passed', 'passed']
+    assert run['scenario'][0]['reason'] == 'Connections now exit through Route A from 198.51.100.4'
+    # The initial route and the switch, each with the address it was seen to exit from.
+    assert [c['status'] for c in run['route_checks']] == ['verified', 'verified']
+    assert [c['observed_ip'] for c in run['route_checks']] == ['203.0.113.7', '198.51.100.4']
+    assert [c['step'] for c in run['route_checks']] == [None, 1]
+    assert run['faults'] == [{'route': ROUTE['id']}]
+    assert 'DNS is resolved on the host' in run['egress']['verification']
+    assert run['egress']['observed_ip'] == '203.0.113.7'
+    assert run['route_traffic'][0]['generation'] == 1
+    # The upstream's credentials stay in the relay: they reach neither the record nor the browser.
+    assert '"password"' not in json.dumps(out.saved)
+
+
+def test_a_switch_that_cannot_be_verified_stops_the_run_and_keeps_its_evidence(tmp_path, monkeypatch):
+    out = routed_journey(tmp_path, monkeypatch, ['203.0.113.7', OSError('refused'), OSError('refused')],
+                         [{'event': {'route': ROUTE['id']}}, {'check': {'text': 'Now playing', 'within': 1}}])
+    run = out.run
+    assert [s['status'] for s in run['scenario']] == ['error', 'skipped']
+    assert 'could not be established' in run['scenario'][0]['reason']
+    # The switch was requested and is recorded as such; nothing rolled back to direct.
+    assert run['faults'] == [{'route': ROUTE['id']}]
+    assert [c['status'] for c in run['route_checks']] == ['verified', 'unavailable']
+    assert run['mission_outcome'] == 'blocked'
+
+
+def test_a_run_with_no_route_steps_keeps_the_native_proxy(tmp_path, monkeypatch):
+    from unittest.mock import AsyncMock
+    runtime = importlib.import_module('engine.runner')
+    probe = AsyncMock()
+    monkeypatch.setattr(runtime.routing.Relay, '_probe', probe)
+    (tmp_path / 'secrets').mkdir()
+    (tmp_path / 'secrets' / (ROUTE['id'] + '.json')).write_text('{"username": "u", "password": "p"}')
+
+    async def release(worker, waiting, saved):
+        raise AssertionError('This scenario asks nobody for anything')
+
+    out = web_pause_journey(tmp_path, monkeypatch, [], lambda value: [], release,
+                            mission_goal='Watch a title', page_text={'value': 'Now playing'},
+                            records={'egress': ROUTE}, egress_id=ROUTE['id'],
+                            scenario=[{'check': {'text': 'Now playing', 'within': 1}}],
+                            pillars=['functionality'], max_seconds=120)
+    assert out.browser.new_context.await_args.kwargs['proxy'] == {'server': ROUTE['server'],
+                                                                  'username': 'u', 'password': 'p'}
+    assert not probe.await_count and 'route_checks' not in out.run and 'faults' not in out.run
+
+
+def test_shaping_asked_for_alongside_a_route_cannot_undo_the_switch_it_rides_on(tmp_path, monkeypatch):
+    """One event, two operations. The route goes first, stands on its own, and a shaping failure
+    after it still leaves the step un-passed. The mission contract rejects this pairing on a browser
+    without CDP, so what is exercised here is what happens when shaping fails at the moment of use."""
+    from unittest.mock import AsyncMock
+    from types import SimpleNamespace
+    web = importlib.import_module('engine.web')
+    scenario = importlib.import_module('engine.scenario')
+    check = {'status': 'verified', 'route_name': 'Route A', 'observed_ip': '198.51.100.4', 'error': ''}
+    relay = SimpleNamespace(apply=AsyncMock(return_value=check), verify=AsyncMock())
+    run = {'console': [], 'scenario': []}
+    browser = web.Browser(None, None, None, {}, run, {}, str, [], [], relay)
+    steps = scenario.Scenario([], browser, notify=None, goal='', deadline=time.monotonic() + 30)
+
+    with pytest.raises(scenario.ScenarioError, match='Chromium'):
+        asyncio.run(steps.apply({'route': ROUTE['id'], 'speed': 'edge'}))
+    # The switch happened and is recorded; nothing rolled it back because the shaping failed.
+    assert relay.apply.await_args.args == (ROUTE['id'], None) and relay.verify.await_count == 1
+    assert browser.faults == [{'route': ROUTE['id']}]

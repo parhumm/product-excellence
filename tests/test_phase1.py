@@ -613,3 +613,80 @@ def test_the_expanded_schema_stays_inside_the_strict_limitations(client,monkeypa
     for ref in set(re.findall(r'"#/\$defs/([A-Za-z]+)"',json.dumps(schema))):assert ref in schema['$defs'],f'{ref} does not resolve'
     assert set(item['required'])=={'title','why','caveat','goal','journey','mode','shape','pillars','steps'}
     assert item['additionalProperties'] is False
+
+# --- routes a scenario switches to -------------------------------------------
+
+def egress(client,name='Route A',server='http://127.0.0.1:9001'):
+    r=client.post('/api/egress',json={'name':name,'server':server,'username':'u','password':'SECRET_SENTINEL'})
+    assert r.status_code==200,r.text;return r.json()
+
+def routed(client,*route_ids,**kw):
+    steps=[{'name':'Switch','event':{'route':id}} for id in route_ids]
+    return mission(client,pillars=['functionality'],scenario=steps,**kw)
+
+def test_a_run_snapshots_every_route_its_scenario_switches_to(client):
+    a=egress(client);b=egress(client,'Route B','http://127.0.0.1:9002')
+    m=routed(client,a['id'],b['id'],'direct',egress_id=a['id'])
+    r=client.post('/api/runs',json={'mission_id':m['id']})
+    assert r.status_code==200,r.text
+    # The starting route and each switched-to route, once each, without their secrets.
+    assert r.json()['routes']==[{'id':a['id'],'name':'Route A','server':'http://127.0.0.1:9001'},
+                               {'id':b['id'],'name':'Route B','server':'http://127.0.0.1:9002'}]
+    assert 'SECRET_SENTINEL' not in r.text
+    # A mission with no route steps keeps its native proxy path and snapshots nothing.
+    plain=mission(client,egress_id=a['id'])
+    assert client.post('/api/runs',json={'mission_id':plain['id']}).json()['routes']==[]
+
+def test_a_route_a_run_cannot_take_is_refused_before_it_is_queued(client):
+    a=egress(client);socks=egress(client,'Socks','socks5://127.0.0.1:1080')
+    gone=egress(client,'Deleted');assert client.delete('/api/egress/'+gone['id']).status_code==200
+    for id,message in ((gone['id'],'does not exist'),(socks['id'],'HTTP or HTTPS')):
+        m=routed(client,id)
+        answer=client.post('/api/runs',json={'mission_id':m['id']})
+        assert answer.status_code==422 and message in answer.json()['detail'],answer.text
+    # The record survives its credentials being removed from this machine; the run does not.
+    (store.DATA/'secrets'/f"{a['id']}.json").unlink()
+    m=routed(client,a['id'])
+    answer=client.post('/api/runs',json={'mission_id':m['id']})
+    assert answer.status_code==422 and 'Configure proxy credentials' in answer.json()['detail']
+    assert not store.all_records('run')
+
+def test_route_switching_needs_a_browser_on_this_machine(client):
+    a=egress(client)
+    m=routed(client,a['id'])
+    answer=client.post('/api/runs',json={'mission_id':m['id'],'network':'netem-poor'})
+    assert answer.status_code==422 and 'netem' in answer.json()['detail']
+
+def test_android_route_steps_are_refused_until_android_can_route(client):
+    target=android_target()
+    # Asking for direct is still asking for a route: it needs the same relay Android has no way to use.
+    for route in ('a'*32,'direct'):
+        m=mission(client,platform='android',target_id=target['id'],build='a'*64,url='',pillars=['functionality'],
+                  scenario=[{'name':'Switch','event':{'route':route}}])
+        answer=client.post('/api/runs',json={'mission_id':m['id']})
+        assert answer.status_code==422 and 'not available on Android' in answer.json()['detail']
+
+def test_a_replay_matches_on_the_routes_it_used_not_on_what_it_observed():
+    a={'id':'a','mission':{},'status':'completed','findings':[],'observations':[],'coverage':{},
+       'routes':[{'id':'r1','name':'Route A','server':'http://127.0.0.1:9001'}],
+       'route_checks':[{'status':'verified','observed_ip':'203.0.113.7','generation':1}]}
+    b={**a,'id':'b','routes':[{'id':'r1','name':'Renamed since','server':'http://127.0.0.1:9001'}],
+       'route_checks':[{'status':'verified','observed_ip':'198.51.100.4','generation':1}]}
+    # A rotated exit address and a re-typed label are not new conditions.
+    assert compare_runs(a,b)['compatible']
+    moved={**b,'routes':[{'id':'r1','name':'Route A','server':'http://127.0.0.1:9999'}]}
+    assert 'routes' in compare_runs(a,moved)['mismatches']
+    swapped={**b,'routes':[{'id':'r2','name':'Route A','server':'http://127.0.0.1:9001'}]}
+    assert 'routes' in compare_runs(a,swapped)['mismatches']
+
+def test_an_unverified_route_assesses_nothing_as_resolved():
+    a={'id':'a','mission':{},'status':'completed','coverage':{},'observations':[],
+       'routes':[{'id':'r1','server':'http://127.0.0.1:9001'}],'route_checks':[{'status':'verified'}],
+       'findings':[{'fingerprint':'one','source':'engine'}]}
+    b={**a,'id':'b','findings':[]}
+    assert compare_runs(a,b)['resolved'] and not compare_runs(a,b)['not_assessed']
+    # The same run, unable to establish the route it switched to, resolves nothing.
+    for unverified in ({'status':'unavailable'},):
+        assert not compare_runs(a,{**b,'route_checks':[unverified]})['resolved']
+    # A run configured with routes that recorded no check at all never verified them either.
+    assert not compare_runs(a,{**b,'route_checks':[]})['resolved']

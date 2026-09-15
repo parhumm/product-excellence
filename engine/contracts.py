@@ -9,9 +9,23 @@ from urllib.parse import urlsplit
 # The same vocabulary runs on an Android device and in a browser page.
 PLACEHOLDER=re.compile(r'<[^<>]{0,120}>')
 ORACLES=('text','text_absent','screen','playing','notification','no_crash')
-EVENTS=('network','speed','delay_ms','kill','home','back','wait','relaunch','deep_link','open_notification')
+EVENTS=('route','network','speed','delay_ms','kill','home','back','wait','relaunch','deep_link','open_notification')
+# A stored egress record, or the absence of one. Never a path: the ID is looked up before any
+# secret file is opened.
+ROUTE=r'^(direct|[A-Za-z0-9_-]{8,64})$'
 KINDS=('goal','manual','event','check','hold')
 STRICT=dict(extra='forbid',populate_by_name=True,serialize_by_alias=True)
+
+def one_operation(chosen):
+    """What an event really performs, once the combinations that are one operation have collapsed.
+
+    A route change may carry the link speed it wants to be measured under, and a speed may carry
+    its own added delay. Everything else stands alone. `contracts.Event` and `scenario.event_kind`
+    both read this, so the vocabulary cannot drift between validation and execution.
+    """
+    if 'route' in chosen:return [k for k in chosen if k not in ('speed','delay_ms')]
+    if 'speed' in chosen and 'delay_ms' in chosen:return [k for k in chosen if k!='delay_ms']
+    return list(chosen)
 
 def https_link(value):
     # A template still carrying its <placeholder> is reported by step number later, not as a bad URL here.
@@ -74,6 +88,8 @@ class Hold(Oracle):
 
 class Event(BaseModel):
     model_config=ConfigDict(**STRICT)
+    # The way out this step selects: a stored egress record, or `direct` for no proxy at all.
+    route: str | None = Field(default=None, max_length=64, pattern=ROUTE)
     network: Literal['wifi','cellular','offline','restore'] | None = None
     speed: Literal['edge','gsm','umts','lte','full'] | None = None
     delay_ms: int | None = Field(default=None, ge=0, le=5000)
@@ -86,14 +102,10 @@ class Event(BaseModel):
     open_notification: str | None = Field(default=None, min_length=1, max_length=300)
     @property
     def kind(self):
-        chosen=[k for k in EVENTS if getattr(self,k) is not None]
-        if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
-        return chosen[0]
+        return one_operation([k for k in EVENTS if getattr(self,k) is not None])[0]
     @model_validator(mode='after')
-    def one_operation(self):
-        chosen=[k for k in EVENTS if getattr(self,k) is not None]
-        # A link speed may carry its own added delay; everything else stands alone.
-        if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
+    def one_event(self):
+        chosen=one_operation([k for k in EVENTS if getattr(self,k) is not None])
         if len(chosen)!=1:raise ValueError('An event step performs exactly one of: '+', '.join(EVENTS))
         for flag in ('kill','home','back','relaunch'):
             if getattr(self,flag) is False:raise ValueError(flag+' takes true, or leave the key out')

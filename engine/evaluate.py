@@ -134,6 +134,18 @@ def reproduction_eligibility(a,b):
     note='Local device state was restored; account and server conditions were still checked by the scenario' if state=='snapshot' else ''
     return {'eligible':True,'reason':note}
 
+def route_settings(run):
+    """What a route must match to be the same condition: the record and its server, never the
+    label an operator typed, the port the relay happened to listen on or the address it observed."""
+    return [{'id':r.get('id'),'server':r.get('server')} for r in run.get('routes') or []]
+
+def routes_verified(run):
+    """Whether this run established the routes it was configured with. A run that switched nothing
+    and recorded nothing has nothing to establish; a legacy run never verified new route conditions."""
+    if not run.get('routes') and not run.get('route_checks'):return True
+    checks=run.get('route_checks') or []
+    return bool(checks) and all(check.get('status')=='verified' for check in checks)
+
 def compare_runs(a,b):
     platform_a=a.get('platform') or a.get('mission',{}).get('platform') or 'web';platform_b=b.get('platform') or b.get('mission',{}).get('platform') or 'web'
     if platform_a=='android' or platform_b=='android':
@@ -150,6 +162,7 @@ def compare_runs(a,b):
         for key in ('api','abi','renderer','display','density_dpi','rotation','locale'):
             if a.get('device',{}).get(key)!=b.get('device',{}).get(key):mismatch.append('device_'+key)
         if a.get('network_applied')!=b.get('network_applied'):mismatch.append('network_settings')
+        if route_settings(a)!=route_settings(b):mismatch.append('routes')
         fa={finding_identity(f):f for f in a.get('findings',[]) if f.get('verifier_status')!='REJECTED'};fb={finding_identity(f):f for f in b.get('findings',[]) if f.get('verifier_status')!='REJECTED'}
         compatible=not mismatch;complete=compatible and b.get('status')=='completed' and not b.get('evaluation_error') and all(v.get('status')=='evaluated' for v in b.get('coverage',{}).values())
         delta={k:(b.get('measurements',{}).get(k)-a.get('measurements',{}).get(k)) if isinstance(a.get('measurements',{}).get(k),(int,float)) and isinstance(b.get('measurements',{}).get(k),(int,float)) else None for k in ('launch_ms','jank_pct','pss_kb')}
@@ -161,11 +174,14 @@ def compare_runs(a,b):
     def network_settings(r):
         return {k:v for k,v in r.get('network_snapshot',{}).items() if k not in ('id','name','created_at','updated_at')}
     if network_settings(a)!=network_settings(b):mismatch.append('network_settings')
+    if scenario_digest(a['mission'].get('scenario'))!=scenario_digest(b['mission'].get('scenario')):mismatch.append('scenario')
+    if route_settings(a)!=route_settings(b):mismatch.append('routes')
+    if a.get('faults')!=b.get('faults'):mismatch.append('fault_settings')
     fa={finding_identity(f):f for f in a.get('findings',[]) if f.get('verifier_status')!='REJECTED'}
     fb={finding_identity(f):f for f in b.get('findings',[]) if f.get('verifier_status')!='REJECTED'}
     am=(a.get('observations') or [{}])[-1].get('metrics',{});bm=(b.get('observations') or [{}])[-1].get('metrics',{})
     delta={k:(bm[k]-am[k]) if isinstance(am.get(k),(int,float)) and isinstance(bm.get(k),(int,float)) else None for k in ('lcp','cls','inp','ttfb_ms')}
-    assessed=not mismatch and b.get('status') in (None,'completed') and not b.get('evaluation_error') and not b.get('policy_blocked_requests') and all(v.get('status')=='evaluated' for v in b.get('coverage',{}).values())
+    assessed=not mismatch and b.get('status') in (None,'completed') and not b.get('evaluation_error') and not b.get('policy_blocked_requests') and routes_verified(b) and all(v.get('status')=='evaluated' for v in b.get('coverage',{}).values())
     missing=[fa[k] for k in fa.keys()-fb.keys()]
     added=[fb[k] for k in fb.keys()-fa.keys()]
     def legacy_ai(f):return f.get('source')=='ai' and not f.get('issue_key')

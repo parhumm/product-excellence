@@ -6,6 +6,7 @@ monotonic deadline that the whole run shares.
 """
 import asyncio, time
 from . import store
+from .contracts import EVENTS, one_operation
 
 # A hold aims for a sample every two seconds. Hierarchy dumps are slow on a busy device,
 # so the real sample times are recorded and a longer blind stretch makes the hold unavailable.
@@ -23,8 +24,7 @@ def oracle_kind(oracle):
     raise ScenarioError('This check states no fact to establish')
 
 def event_kind(event):
-    chosen=[k for k in ('network','speed','delay_ms','kill','home','back','wait','relaunch','deep_link','open_notification') if event.get(k) is not None]
-    if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
+    chosen=one_operation([k for k in EVENTS if event.get(k) is not None])
     if not chosen:raise ScenarioError('This event performs no operation')
     return chosen[0]
 
@@ -48,6 +48,11 @@ def requested(step):
     if kind=='manual':return 'Operator: '+step['manual']
     if kind=='event':
         event=step['event'];name=event_kind(event)
+        if name=='route':
+            change='Send connections directly' if event['route']=='direct' else 'Switch connections to the selected route'
+            if event.get('speed'):change+=' and set the link to '+event['speed']
+            if event.get('delay_ms') is not None:change+=f" with {event['delay_ms']} ms added delay"
+            return change
         if name=='network':return {'wifi':'Switch to Wi-Fi','cellular':'Switch to mobile data','offline':'Take the device offline','restore':'Restore the network as it was'}[event['network']]
         if name=='speed':return 'Set the mobile link to '+event['speed']+(f" with {event['delay_ms']} ms added delay" if event.get('delay_ms') else '')
         if name=='delay_ms':return f"Add {event['delay_ms']} ms of network delay"
@@ -184,7 +189,8 @@ class Scenario:
             return
         if kind=='event':
             self.cursor=self.device.log_cursor()
-            await self.apply(step['event']);result.update(status='passed',reason='Applied')
+            # An operation that established something says so; the rest only say it was applied.
+            result.update(status='passed',reason=await self.apply(step['event']) or 'Applied')
             return
         oracle=step[kind]
         if kind=='check':status,reason=await self.establish(oracle,oracle.get('within',10),result)
@@ -193,7 +199,13 @@ class Scenario:
 
     async def apply(self,event):
         name=event_kind(event)
-        if name=='network':await self.device.apply_network(event['network'])
+        if name=='route':
+            # The route first: shaping asked for alongside it describes the link this route runs over.
+            established=await self.device.apply_route(event['route'],self.remaining())
+            if event.get('speed') or event.get('delay_ms') is not None:
+                await self.device.apply_speed(event.get('speed') or '',event.get('delay_ms'))
+            return established
+        elif name=='network':await self.device.apply_network(event['network'])
         elif name=='speed':await self.device.apply_speed(event['speed'],event.get('delay_ms'))
         elif name=='delay_ms':await self.device.apply_speed('',event['delay_ms'])
         elif name=='home':await self.device.home()

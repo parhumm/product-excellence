@@ -12,10 +12,11 @@ What a client is told about a failure is one of a few fixed categories, never up
 A proxy label is operator metadata. Forwarding through it establishes no country, ISP, carrier
 or entitlement, and UDP/QUIC never reaches it at all.
 """
-import asyncio,base64,ssl
+import asyncio,base64,ipaddress,ssl
 from http import HTTPStatus
 from urllib.parse import urlsplit
-import h11
+import h11,httpx
+from . import store
 from .scenario import ScenarioError
 
 DIRECT='direct'
@@ -33,6 +34,18 @@ REFUSALS={400:'Malformed request',501:'Unsupported request form',502:'Upstream c
           503:'Relay connection limit reached',504:'Upstream timed out'}
 SWITCH_NOTE=('Switched route and disconnected existing proxied connections. In-flight requests may be '
              'interrupted; new connections use the selected route.')
+SETUP_NOTE='Initial route for this run, established before any traffic was proxied.'
+EVIDENCE=('Connections exit through this route; observed exit IP recorded per switch. UDP/QUIC not proxied. '
+          'DNS is resolved on the host, so CDN/geo may follow the host resolver\'s country rather than the '
+          'exit IP. ISP/ASN identity not independently verified.')
+# Two independent echoes, tried in order. Each answers with the exit address and nothing else.
+PROBES=('https://api.ipify.org','https://icanhazip.com')
+PROBE_SECONDS=15
+
+def counters():
+    """Per-generation transport diagnostics. The probe's own connection is counted twice: in the
+    totals, and again under its own name, so app traffic is never inferred from a probe."""
+    return {'accepted':0,'established':0,'bytes':0,'probe_accepted':0,'probe_established':0,'probe_bytes':0}
 
 class _Refuse(Exception):
     """Answer the client with one fixed category and close. Carries no upstream detail."""
@@ -86,10 +99,10 @@ def restate(headers,extra=()):
 
 class _Conn:
     """One accepted client connection, its upstream, and the route generation it belongs to."""
-    __slots__=('generation','reader','client','upstream','task','answered')
+    __slots__=('generation','reader','client','upstream','task','answered','probe')
     def __init__(self,generation,reader,client,task):
         self.generation=generation;self.reader=reader;self.client=client
-        self.upstream=None;self.task=task;self.answered=False
+        self.upstream=None;self.task=task;self.answered=False;self.probe=False
 
     def terminate(self,cancel=True):
         """Drop both sockets now. A switch means these bytes stop, not that they are recalled."""
@@ -118,6 +131,7 @@ class Relay:
     def __init__(self,routes=None,host='127.0.0.1'):
         self.routes=dict(routes or {});self.host=host;self.port=0;self.server=None
         self.generation=0;self.route=None;self.route_id='';self.live=set();self.stats={}
+        self.checks=[];self.expected_probe=None
 
     @property
     def proxy(self):
@@ -132,31 +146,83 @@ class Relay:
             raise ScenarioError('The relay forwards through HTTP or HTTPS proxies only: '+route['name'])
         return {'id':route_id,**route}
 
+    def _check(self,route,step,note):
+        """Evidence for one route change, appended before the change is attempted.
+
+        A switch that is cancelled or never verified still leaves this record behind, so the run
+        says which route it asked for and what it could establish about it.
+        """
+        check={'generation':self.generation+1,'route_id':route['id'],'route_name':route['name'],'step':step,
+               'requested_at':store.now(),'finished_at':'','status':'requested','probe':'','observed_ip':None,
+               'error':'','disconnected':None,'note':note,'verification':EVIDENCE}
+        self.checks.append(check);return check
+
     async def start(self,route_id=DIRECT):
-        self.route=self.resolve(route_id);self.route_id=self.route['id'];self.generation=1
-        self.stats[1]={'accepted':0,'established':0,'bytes':0}
+        self.route=self.resolve(route_id);self.route_id=self.route['id']
+        check=self._check(self.route,None,SETUP_NOTE)
+        self.generation=1;self.stats[1]=counters()
         self.server=await asyncio.start_server(self._accept,self.host,0,limit=HEADERS_MAX)
         self.port=self.server.sockets[0].getsockname()[1]
+        check.update(status='switched',disconnected=0,finished_at=store.now())
         return self.proxy
 
-    async def apply(self,route_id):
+    async def apply(self,route_id,step=None):
         """Validate the route first, advance the generation, then retire everything older."""
         route=self.resolve(route_id)
         if not self.server:raise ScenarioError('The relay is not listening')
+        check=self._check(route,step,SWITCH_NOTE)
         self.generation+=1;self.route=route;self.route_id=route['id']
-        self.stats[self.generation]={'accepted':0,'established':0,'bytes':0}
+        self.stats[self.generation]=counters()
         # Switching to the same route still retires: the operator asked for a fresh connection.
-        return {'generation':self.generation,'route_id':route['id'],'route_name':route['name'],
-                'disconnected':await self._retire(lambda c:c.generation!=self.generation),'note':SWITCH_NOTE}
+        check.update(status='switched',disconnected=await self._retire(lambda c:c.generation!=self.generation),
+                     finished_at=store.now())
+        return check
+
+    async def verify(self,check=None,budget=None):
+        """Probe this relay through itself and record the address this generation exits from.
+
+        Both endpoints failing means the route is unverified, not that it is dead: the caller stops
+        the run as an infrastructure failure rather than calling it an app defect or falling back.
+        """
+        check=check if check is not None else self.checks[-1]
+        try:
+            async with asyncio.timeout(max(1,min(PROBE_SECONDS,budget if budget is not None else PROBE_SECONDS))):
+                for url in PROBES:
+                    check['probe']=url
+                    try:
+                        check.update(observed_ip=await self._probe(url),status='verified',error='')
+                        break
+                    except asyncio.CancelledError:raise
+                    except Exception as error:check['error']=str(error)[:200] or type(error).__name__
+        except asyncio.CancelledError:
+            check.update(status='cancelled',finished_at=store.now());raise
+        except (asyncio.TimeoutError,TimeoutError):check['error']='Route verification timed out'
+        if check['status']!='verified':check.update(status='unavailable',error=check['error'] or 'No probe answered')
+        check['finished_at']=store.now()
+        return check
+
+    async def _probe(self,url):
+        """This relay's own exit address, read through this relay. An unparseable answer is no answer."""
+        split=urlsplit(url)
+        self.expected_probe=split_authority(split.netloc,443 if split.scheme=='https' else 80)
+        try:
+            async with httpx.AsyncClient(proxy=self.proxy,trust_env=False,follow_redirects=False,
+                                         timeout=PROBE_SECONDS) as client:
+                answer=await client.get(url)
+            answer.raise_for_status()
+            return str(ipaddress.ip_address(answer.text.strip()))
+        finally:
+            self.expected_probe=None
 
     async def stop(self):
         server,self.server=self.server,None
         self.port=0
+        if server:server.close()
+        # Retire first: waiting for handlers that are about to be terminated only delays the run.
+        await self._retire(lambda c:True)
         if server:
-            server.close()
             try:await asyncio.wait_for(server.wait_closed(),SHUTDOWN_SECONDS)
             except Exception:pass
-        await self._retire(lambda c:True)
 
     async def _retire(self,stale):
         """Terminate the matching connections and wait, bounded, for their handlers to finish."""
@@ -166,8 +232,15 @@ class Relay:
         if tasks:await asyncio.wait(tasks,timeout=SHUTDOWN_SECONDS)
         return len(going)
 
-    def _count(self,key,generation,amount=1):
-        self.stats.setdefault(generation,{'accepted':0,'established':0,'bytes':0})[key]+=amount
+    def _count(self,key,generation,amount=1,probe=False):
+        stat=self.stats.setdefault(generation,counters())
+        stat[key]+=amount
+        if probe:stat['probe_'+key]+=amount
+
+    def _claim(self,conn,host,port):
+        """The probe's own connection, claimed once. Later app traffic to that host is not the probe."""
+        if self.expected_probe!=(host,port):return
+        self.expected_probe=None;conn.probe=True;self._count('probe_accepted',conn.generation)
 
     def _fresh(self,conn):
         if conn.generation!=self.generation or not self.server:raise _Stale()
@@ -222,6 +295,7 @@ class Relay:
     async def _tunnel(self,reader,writer,conn,target):
         """CONNECT. The client's own proxy headers are dropped; only this route's travel with it."""
         host,port=split_authority(target)
+        self._claim(conn,host,port)
         route=self.route
         up_reader,up_writer=await self._dial_route(route,host,port)
         conn.upstream=up_writer
@@ -236,7 +310,7 @@ class Relay:
             if len(status)<2 or not status[1].startswith(b'2'):raise _Refuse(502)
         self._fresh(conn)
         writer.write(b'HTTP/1.1 200 Connection Established\r\n\r\n');conn.answered=True;await writer.drain()
-        self._count('established',conn.generation)
+        self._count('established',conn.generation,probe=conn.probe)
         # Bytes either side sent behind its head are already buffered in its reader, so they travel too.
         await self._both(reader,writer,up_reader,up_writer,conn)
 
@@ -254,6 +328,7 @@ class Relay:
         # interception, which this relay does not do.
         if url.scheme!='http' or not url.netloc:raise _Refuse(501)
         host,port=split_authority(url.netloc,80)
+        self._claim(conn,host,port)
         upgrade=[(b'Upgrade',v) for k,v in request.headers if k==b'upgrade'] if b'upgrade' in connection_named(request.headers) else []
         hop=[(b'Connection',b'upgrade')]+upgrade if upgrade else [(b'Connection',b'close')]
         body=framing(request.headers)
@@ -271,7 +346,7 @@ class Relay:
         async for event in self._events(server,reader):
             if isinstance(event,h11.Data):
                 up_writer.write(client.send(event));await up_writer.drain()
-                self._count('bytes',conn.generation,len(event.data))
+                self._count('bytes',conn.generation,len(event.data),conn.probe)
             elif isinstance(event,h11.EndOfMessage):
                 up_writer.write(client.send(h11.EndOfMessage(headers=event.headers if body==b'chunked' else [])))
                 await up_writer.drain()
@@ -299,7 +374,7 @@ class Relay:
                 writer.write(server.send(type(event)(status_code=event.status_code,
                     headers=restate(event.headers,hop),reason=reason(event.status_code))));conn.answered=True
                 await writer.drain()
-                if not established:established=True;self._count('established',conn.generation)
+                if not established:established=True;self._count('established',conn.generation,probe=conn.probe)
                 if event.status_code==101:
                     # h11 stops parsing at the switch; whatever it had already read is the new protocol's.
                     for source,sink in ((client,writer),(server,up_writer)):
@@ -308,7 +383,7 @@ class Relay:
                     return await self._both(reader,writer,up_reader,up_writer,conn)
             elif isinstance(event,h11.Data):
                 writer.write(server.send(event));await writer.drain()
-                self._count('bytes',conn.generation,len(event.data))
+                self._count('bytes',conn.generation,len(event.data),conn.probe)
             elif isinstance(event,h11.EndOfMessage):
                 writer.write(server.send(h11.EndOfMessage()));await writer.drain()
         if not established:raise _Refuse(502)
@@ -339,7 +414,7 @@ class Relay:
         try:
             while data:=await reader.read(CHUNK):
                 writer.write(data);await writer.drain()
-                self._count('bytes',conn.generation,len(data))
+                self._count('bytes',conn.generation,len(data),conn.probe)
         except (OSError,ssl.SSLError):pass
         finally:
             # TLS has no half-close to hand over; closing ends the sibling instead of stranding it.

@@ -62,7 +62,10 @@ class Origin(Service):
 
     `/plain` answers with a length, `/chunked` in two chunks, `/head` states a length it never
     sends, `/echo` counts the upload it read, `/upgrade` switches protocol and echoes in capitals.
+    `/ip` stands in for a public address echo, `/text` answers something no address can be read
+    from, `/broken` fails and `/slow` never answers.
     """
+    def __init__(self):super().__init__();self.ip='203.0.113.7'
 
     async def _client(self,reader,writer):
         conn=h11.Connection(h11.SERVER)
@@ -88,15 +91,19 @@ class Origin(Service):
                 if not data:break
                 writer.write(data.upper());await writer.drain()
             writer.close();return
-        if path=='/chunked':await self._answer(conn,writer,[(b'transfer-encoding',b'chunked')],[b'first ',b'second'])
+        if path=='/slow':await asyncio.sleep(3600)
+        if path=='/ip':await self._answer(conn,writer,None,[self.ip.encode()])
+        elif path=='/text':await self._answer(conn,writer,None,[b'no address here'])
+        elif path=='/broken':await self._answer(conn,writer,None,[b'upstream said no'],status=500)
+        elif path=='/chunked':await self._answer(conn,writer,[(b'transfer-encoding',b'chunked')],[b'first ',b'second'])
         elif path=='/head':await self._answer(conn,writer,[(b'content-length',b'12')],[])
         elif path=='/echo':await self._answer(conn,writer,None,[str(len(body)).encode()])
         else:await self._answer(conn,writer,None,[b'origin plain'])
         writer.close()
 
-    async def _answer(self,conn,writer,headers,chunks):
+    async def _answer(self,conn,writer,headers,chunks,status=200):
         body=b''.join(chunks)
-        writer.write(conn.send(h11.Response(status_code=200,headers=headers if headers is not None else [(b'content-length',str(len(body)).encode())])))
+        writer.write(conn.send(h11.Response(status_code=status,headers=headers if headers is not None else [(b'content-length',str(len(body)).encode())])))
         for chunk in chunks:writer.write(conn.send(h11.Data(data=chunk)))
         writer.write(conn.send(h11.EndOfMessage()));await writer.drain()
 
@@ -422,3 +429,87 @@ def test_authority_parsing_refuses_what_it_cannot_resolve():
     assert split_authority('example.test',80)==('example.test',80)
     for bad in ('example.test','[::1]','[::1]x:80','a:b','host:0','host:70000','user@host:80','host/x:80',':80'):
         with pytest.raises(ValueError):split_authority(bad)
+
+# --- verification ------------------------------------------------------------------------------
+
+def probing(monkeypatch,origin,*paths):
+    monkeypatch.setattr(module,'PROBES',tuple(f'http://{origin.authority}{path}' for path in paths))
+
+async def test_a_verified_switch_records_its_address_and_labels_only_its_own_connection(monkeypatch):
+    origin=Origin();await origin.start();probing(monkeypatch,origin,'/ip')
+    relay=await opened(None)
+    try:
+        # Opening the relay is itself a route change, so the run starts with one check.
+        assert len(relay.checks)==1 and relay.checks[0]['step'] is None and relay.checks[0]['status']=='switched'
+        check=await relay.verify()
+        assert check is relay.checks[0] and check['status']=='verified' and check['observed_ip']=='203.0.113.7'
+        assert check['probe'].endswith('/ip') and not check['error'] and check['finished_at']
+        assert 'DNS is resolved on the host' in check['verification']
+        assert relay.stats[1]['probe_accepted']==1 and relay.stats[1]['probe_established']==1 and relay.stats[1]['probe_bytes']>0
+        # App traffic to the same host afterwards is traffic, not another probe.
+        await raw(relay,get(origin.authority))
+        assert relay.stats[1]['accepted']==2 and relay.stats[1]['established']==2 and relay.stats[1]['probe_accepted']==1
+        assert relay.expected_probe is None
+    finally:
+        await relay.stop();await origin.stop()
+
+async def test_the_second_endpoint_answers_when_the_first_one_cannot(monkeypatch):
+    origin=Origin();await origin.start();probing(monkeypatch,origin,'/broken','/ip')
+    relay=await opened(None)
+    try:
+        check=await relay.verify()
+        assert check['status']=='verified' and check['probe'].endswith('/ip') and not check['error']
+    finally:
+        await relay.stop();await origin.stop()
+
+async def test_no_endpoint_answering_is_unverified_rather_than_a_dead_route(monkeypatch):
+    origin=Origin();await origin.start();probing(monkeypatch,origin,'/broken','/text')
+    relay=await opened(None)
+    try:
+        check=await relay.verify()
+        assert check['status']=='unavailable' and check['observed_ip'] is None and check['error']
+        # Nothing rolled back and nothing fell through to direct: the route stands, unverified.
+        assert relay.route_id==module.DIRECT and relay.generation==1
+    finally:
+        await relay.stop();await origin.stop()
+
+async def test_verification_stays_inside_the_budget_it_is_given(monkeypatch):
+    origin=Origin();await origin.start();probing(monkeypatch,origin,'/slow','/slow')
+    relay=await opened(None)
+    try:
+        check=await asyncio.wait_for(relay.verify(budget=1),10)
+        assert check['status']=='unavailable' and 'timed out' in check['error']
+    finally:
+        await relay.stop();await origin.stop()
+
+async def test_a_cancelled_verification_still_leaves_its_check(monkeypatch):
+    origin=Origin();await origin.start();probing(monkeypatch,origin,'/slow')
+    relay=await opened(None)
+    try:
+        pending=asyncio.create_task(relay.verify())
+        for _ in range(100):
+            if origin.seen:break
+            await asyncio.sleep(0.02)
+        pending.cancel()
+        with pytest.raises(asyncio.CancelledError):await pending
+        assert relay.checks[-1]['status']=='cancelled' and relay.checks[-1]['finished_at']
+        assert relay.expected_probe is None
+    finally:
+        await relay.stop();await origin.stop()
+
+async def test_two_switches_leave_three_checks_and_a_refused_one_leaves_none():
+    first=Upstream('A');await first.start();second=Upstream('B');await second.start()
+    routes={'a':{'name':'A','server':first.server_url},'b':{'name':'B','server':second.server_url},
+            'socks':{'name':'Socks','server':'socks5://127.0.0.1:1080'}}
+    relay=await opened(None,routes)
+    try:
+        await relay.apply('a',step=2);await relay.apply('b',step=5)
+        with pytest.raises(ScenarioError):await relay.apply('socks',step=7)
+        assert [c['step'] for c in relay.checks]==[None,2,5]
+        assert [c['generation'] for c in relay.checks]==[1,2,3]
+        assert [c['route_id'] for c in relay.checks]==[module.DIRECT,'a','b']
+        assert all(c['status']=='switched' and c['disconnected']==0 for c in relay.checks)
+        assert [c['observed_ip'] for c in relay.checks]==[None,None,None]
+        assert 'may be interrupted' in relay.checks[1]['note'] and 'Initial route' in relay.checks[0]['note']
+    finally:
+        await relay.stop();await first.stop();await second.stop()

@@ -24,7 +24,8 @@ STEPS = (store.ROOT / '.claude/skills/pex-mission-write/references/scenario-step
 # One copy of the step rules: the drafting tool and the mission suggestions must not drift apart.
 STEP_RULES = ('- One thing per step: a step is a goal or a manual or an event or a check or a hold, never two of '
               'them, and an event performs one operation. Never combine network with speed, or kill with relaunch, '
-              'or a goal with an event; write them as consecutive steps. A speed may carry its own delay_ms.\n'
+              'or a goal with an event; write them as consecutive steps. A speed may carry its own delay_ms, '
+              'and a route may carry the speed and delay_ms it is to be measured under.\n'
               '- Establish the screen with a goal before checking text on it, and before any absence check.\n'
               '- Use manual only for sign-in, payment or anything a password reaches. Never put a password in a goal.\n'
               '- An operator step may name one value it needs with ask, such as "one-time code". Name the value, '

@@ -18,6 +18,12 @@ A mission that names a saved device state runs only on the Mac that saved it;
 elsewhere it reports the missing prerequisite instead of quietly starting from
 whatever the device holds.
 
+Proxy routes are local in the same way. A run that changes route owns a relay on
+its own loopback interface for the length of that run; the route's credentials
+live on that Mac and reach neither the server nor the published run. A teammate
+who starts the same mission needs the same route configured on their machine, and
+is told which one is missing rather than going out directly.
+
 ## Upgrade to 1.5.0
 
 Upgrade the hub first, then every execution console in a workspace before anyone uses targets, Android or local/private items. Stop new submissions, let active runs finish, and drain `data/pending-publication` on every console before taking coordinated database and artifact checkpoints. Default web targets add records to the existing JSON store; there is no schema change and historical payloads or evidence are not rewritten. The supplementary pre-write export is `data/backups/records-before-targets-*.json`.

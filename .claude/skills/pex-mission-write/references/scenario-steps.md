@@ -44,10 +44,15 @@ Three modifiers apply to any of them:
 
 ## The operations an event may perform
 
-`network: wifi | cellular | offline | restore`, `speed: edge | gsm | umts | lte | full` with an optional
-`delay_ms`, a standalone `delay_ms`, `wait: N`, `home: true`, `back: true`, `kill: true`,
-`relaunch: true`, `deep_link: "https://…"`, and `open_notification: "…"` which opens the one
-notification posted with that text.
+`route: direct | <saved route id>`, which changes the way out mid-run and may carry the `speed` and
+`delay_ms` the route is to be measured under, `network: wifi | cellular | offline | restore`,
+`speed: edge | gsm | umts | lte | full` with an optional `delay_ms`, a standalone `delay_ms`,
+`wait: N`, `home: true`, `back: true`, `kill: true`, `relaunch: true`, `deep_link: "https://…"`, and
+`open_notification: "…"` which opens the one notification posted with that text.
+
+A `route` step needs a mission that runs through the local relay: connections in flight are dropped so
+the next request takes the new way out, and a route that cannot be established stops the run rather
+than falling back to a direct connection.
 
 On the web: `kill` drops the document to `about:blank` (in-memory state gone, cookies and storage
 kept), `home` brings another tab in front so the page goes hidden, `relaunch` brings the page back and

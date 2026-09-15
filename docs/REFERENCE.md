@@ -50,7 +50,7 @@ Android build metadata contains SHA-256, version name/code, SDK requirements, la
 
 The measured fixture ran on API 34 arm64 with usable hierarchy, safe text input, sensitive-field recognition, seekable MP4, PSS and attributable Java crash/ANR logs. Gfx/jank was unavailable. Without an operator probe URL, Android is baseline-only; shaping and periodic disconnects are rejected. Launch is `am start -W TotalTime`, PSS is KiB, touch targets use 48 dp, and unavailable measurements remain null. This is not full mobile accessibility, playback QoE, physical-device coverage or field performance.
 
-Mission fields `target_id`, `build`, `device`, `visibility` and resolved `platform` bind these facts. Android permits an optional HTTPS deep link only on the target's hosts and rejects benchmark, competitors, SEO/AEO, personas, proxy and sign-in. Raw MP4 cannot be masked; logs are attributable, bounded and best-effort redacted. Continue is web-only; Android replay requires the same SHA.
+Mission fields `target_id`, `build`, `device`, `visibility` and resolved `platform` bind these facts. Android permits an optional HTTPS deep link only on the target's hosts and rejects benchmark, competitors, SEO/AEO, personas and sign-in; it may name a proxy route, and its emulator is launched against the relay that serves it. Raw MP4 cannot be masked; logs are attributable, bounded and best-effort redacted. Continue is web-only; Android replay requires the same SHA.
 
 In a connected workspace, `visibility=local` keeps a target, mission or run on one Mac. Sharing is explicit and ordered: target, mission, terminal run. Run sharing uploads finalized ordinary evidence but not browser traces; local records remain authoritative until acknowledgement. Published items cannot be made local.
 
@@ -119,6 +119,16 @@ Network scope is explicit: Linux netem shapes container **egress**, including co
 
 Use **Network & routes → Add a proxy route** for a real remote egress. Supply an HTTP(S) or SOCKS5 endpoint and credentials you control. Labels do not prove ISP/ASN identity; verify the provider and route independently. No ISP endpoints or credentials are bundled.
 
+### Changing the route mid-journey
+
+A mission whose scenario contains a `route` step runs through a relay this run owns. The relay listens on loopback on an ephemeral port for the length of the run, and the browser or the emulator is pointed at that one local address. Upstream credentials stay in the relay: they never reach the browser, the page, the device or the run record, and inbound proxy credentials are stripped. Only HTTP(S) upstreams can be switched to; a SOCKS5 route is refused with its name rather than silently skipped, though a SOCKS5 route still works as a mission's fixed route, which is passed to the browser directly.
+
+A switch is a deliberate interruption. Every connection opened on the previous route is terminated so the next request takes the new way out, which means in-flight requests can fail — that is the point of the step, and a scenario that switches mid-download should expect it. Nothing is retried and nothing falls back to a direct connection: a route that cannot be established stops the run.
+
+What a switch proves is bounded. The relay probes itself through the new route with two independent public echoes and records the address they report; that address, and the per-generation connection counts, are the evidence. DNS is resolved on this machine, so a CDN may still answer from the host resolver's country rather than the exit IP's, and UDP/QUIC is never proxied at all. Two routes reporting the same exit IP is a valid result, not a failure.
+
+On Android the way out is fixed when the emulator launches, so the run starts the relay first and launches the designated AVD against it with `-http-proxy`. The guest keeps no proxy setting of its own and no app can opt out of it. An emulator that is already running was not launched against this relay, so a routed Android mission refuses to start until the designated AVD is stopped.
+
 ## Scenarios
 
 An Android or website mission may carry an ordered scenario of at most 40 steps. Without one, the mission runs as a single AI journey exactly as before. One vocabulary, one interpreter and one journey library serve both; the target decides what each step acts on.
@@ -140,7 +150,7 @@ Each step is exactly one of five keys, plus an optional `name` used only as a la
 - `goal` gives the AI worker one instruction, with an optional `until: {text: "…"}` early stop. Reaching it proves navigation, nothing later.
 - `check` requires a fact to become true once inside `within` seconds, default 10.
 - `hold` requires it to stay true across `for` seconds, sampled about every two seconds. The result reports how many samples were taken over how long, and gaps are recorded rather than smoothed over.
-- `event` acts on the device or the page: `network`, `speed` with an optional `delay_ms`, a standalone `delay_ms`, `wait`, `home`, `back`, `kill`, `relaunch`, `deep_link` and `open_notification`.
+- `event` acts on the device or the page: `route`, `network`, `speed` with an optional `delay_ms`, a standalone `delay_ms`, `wait`, `home`, `back`, `kill`, `relaunch`, `deep_link` and `open_notification`. A `route` may carry the `speed` and `delay_ms` it is to be measured under; that is one operation, not two.
 - `manual` hands the run to a person. On Android recording is stopped and confirmed stopped before the notice appears, so credentials are never recorded or sent to the AI worker; on the web it means acting outside the page, and the per-context video is not cut. The run page offers **Continue**; the wait counts against the run's own budget and is shown as the shorter of the two.
 
 A check or hold states exactly one fact: `text`, `text_absent`, `screen` (`contains` or `equals`, the focused activity on Android and the page address on the web), `playing`, `notification`, or `no_crash`. Three modifiers apply to any of them. `policy: unknown` marks a behaviour nobody has confirmed: it is recorded as an observation with severity `info`, deducts nothing, blocks nothing, and can never be required. `severity` defaults to P2. `required` defaults to true under confirmed policy; a required failure or a required measurement that could not be established stops the steps that depend on it.

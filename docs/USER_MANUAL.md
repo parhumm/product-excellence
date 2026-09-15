@@ -51,7 +51,7 @@ The **Workspace** selector chooses the product you are working on. A workspace c
 
 Each workspace website is listed under **Settings → Websites and Android apps** as a target; its URL and allowed domains come from the workspace. Add another website there: a name, its address, and the domains a test may visit.
 
-For an Android app, open **Settings → Websites and Android apps**, choose **Android app**, give it a name and pick the APK file in the same form. The first APK sets the package name; later builds are added with **Add APK build** on the app's row. New runs use the latest non-archived build or pin an exact SHA. The mission form's Target field links back here when the workspace has no app yet. The disposable AVD is cleared only for that package before each run; Android sign-in, benchmark, SEO/AEO, proxy and network matrices are unavailable.
+For an Android app, open **Settings → Websites and Android apps**, choose **Android app**, give it a name and pick the APK file in the same form. The first APK sets the package name; later builds are added with **Add APK build** on the app's row. New runs use the latest non-archived build or pin an exact SHA. The mission form's Target field links back here when the workspace has no app yet. The disposable AVD is cleared only for that package before each run; Android sign-in, benchmark, SEO/AEO and network matrices are unavailable. An Android mission may take a proxy route, which launches the emulator against it, so the designated AVD must not already be running.
 
 ### 3. Choose a mission
 

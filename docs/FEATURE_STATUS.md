@@ -22,6 +22,8 @@ historical run record.
 | Shared team server, revision conflicts and evidence upload recovery | Covered by offline and isolated integration tests |
 | Mission import, versions, schedules, CLI and reports | Covered offline |
 | Network profiles, disconnects and Linux netem controls | Implemented; packet-level controls require the Linux runner |
+| Proxy routes changed mid-journey through a run-owned relay | Implemented for web and Android; HTTP(S) upstreams only, exit IP observed per switch, DNS still resolved on the host |
+| Android link shaping through the emulator console | Latency and bandwidth only, and measured to change traffic on the mobile radio alone; over Wi-Fi the console accepts the command without changing traffic, so it is refused |
 | Test personas and mission credentials | Stored locally with restricted permissions; no credentials are bundled |
 | Payments, publishing and destructive browser actions | Refused by policy |
 | Full Schema.org validation | Not implemented; local vocabulary checks are narrower |

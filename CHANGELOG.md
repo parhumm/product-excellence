@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- **A journey can change the way out mid-run.** A scenario step names a saved
+  proxy route, or `direct`, and the connections that follow leave that way. The
+  run owns a relay on its own machine and the browser or the emulator is pointed
+  at it once, so the route behind it changes without a new session: the
+  connections opened on the previous route are dropped, the new exit address is
+  probed and recorded, and a route that cannot be established stops the run
+  instead of quietly going out directly. A route may carry the link speed it is to
+  be measured under. Upstream credentials stay in the relay and reach neither the
+  page, the device nor the record.
+  Only HTTP(S) upstreams can be switched to. What this establishes is the exit
+  address per switch, nothing about country, ISP or carrier: DNS is resolved on
+  this machine and UDP/QUIC is never proxied.
+- **An Android journey can take a route too.** The emulator is launched against
+  the run's relay with `-http-proxy`, so nothing in the guest holds a proxy
+  setting and no app can opt out of it. The designated AVD must not already be
+  running: one that is was never launched against this relay, and the run says so
+  before touching a single setting on it.
+- **An Android mission can name a network profile.** Its latency and bandwidth are
+  applied through the emulator console, which the transport gate measured to
+  change traffic on the mobile radio only — so a profile that shapes takes the
+  device to mobile data first, and shaping asked for over Wi-Fi is refused rather
+  than reported as applied. The profile is the condition the run is measured
+  under, not a fault in it; a `network: restore` step goes back to it, and the end
+  of the run goes back to the device's own settings. Offline, jitter, loss,
+  reordering and periodic disconnects were never measured there and are refused.
+  The full transport gate transcript is kept with the run artifacts.
+
 - **A mission starts from one sentence.** The new mission form opens on *What do
   you want to find out?*. Write it in your own words and four whole missions come
   back as cards, in two groups: two the worker works out for itself from the goal

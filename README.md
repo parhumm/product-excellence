@@ -95,6 +95,13 @@ Two things differ on the web. Link shaping (`speed`, `delay_ms`, `wifi`,
 saved device state cannot be loaded — a website mission carries its signed-in
 session through a persona instead.
 
+A `route` step changes the way out mid-journey, on the web and on Android both.
+The run owns a local relay and the browser or the emulator is pointed at it
+once, so switching a route drops the connections opened on the previous one and
+the next request leaves another way. The exit address is observed and recorded
+per switch; a route that cannot be established stops the run rather than
+quietly going out directly.
+
 Start state is explicit: fresh app data, keep whatever the last run left, or load
 a device state saved under **Settings → Android device**. A saved state restores
 this Mac's emulator only, never an account or a paid entitlement, so the steps

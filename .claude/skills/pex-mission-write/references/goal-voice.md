@@ -44,7 +44,8 @@ suits an audit that only measures.
 
 Android missions use baseline networking, no benchmark, competitors, SEO/AEO,
 persona, proxy or credentials, and an optional HTTPS deep link only on the app
-target's allowed hosts. They stop before sign-in, passwords and OTPs. Browser and
+target's allowed hosts. An operator can still be asked to sign in from a manual
+step during the run; nothing is stored for it. Browser and
 viewport fields do not describe the emulator; reports use its actual locale and display.
 
 ## Three goals to imitate

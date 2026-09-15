@@ -300,17 +300,20 @@ def delete_mission(id:str,revision:int|None=Header(None,alias='X-PEX-Revision'))
     return {'ok':True}
 @app.post('/api/missions/suggest')
 async def suggest_goal(req:GoalRequest):
-    """Two goals for the mission form. Nothing is saved; the user applies one and saves the mission."""
+    """Whole missions for the form: two from an idea, or one revised. Nothing is saved; the user applies one."""
     project=await hub.io(required,'project',req.project_id)
     target=await hub.io(store.get,'target',req.target_id,req.project_id) if req.target_id else None
     if req.target_id and not target:raise HTTPException(404,'Target not found in this workspace')
-    if target and target['type']=='android':
-        builds=target.get('builds',[]);build=next((b for b in builds if b['sha256']==req.build),None) if req.build else max((b for b in builds if not b.get('archived')),key=lambda b:(b['version_code'],b['uploaded_at'],b['sha256']),default=None)
-        if not build:raise HTTPException(422,'Upload or select an Android build')
-        project={**project,'_target':target,'_build':build}
+    # The selected target owns the mission, so a website target names the site the prompt describes.
+    if target:
+        project={**project,'_target':target}
+        if target['type']=='android':
+            builds=target.get('builds',[]);build=next((b for b in builds if b['sha256']==req.build),None) if req.build else max((b for b in builds if not b.get('archived')),key=lambda b:(b['version_code'],b['uploaded_at'],b['sha256']),default=None)
+            if not build:raise HTTPException(422,'Upload or select an Android build')
+            project={**project,'_build':build}
     try:return await suggest.suggest(req,project)
     except ValueError as e:raise HTTPException(422,str(e))
-    except Exception as e:raise HTTPException(502,'The AI worker could not suggest a goal: '+str(e)[:300])
+    except Exception as e:raise HTTPException(502,'The AI worker could not suggest a mission: '+str(e)[:300])
 @app.get('/api/missions/{id}/export')
 def mission_export(id:str):
     m=required('mission',id);clean={k:v for k,v in m.items() if k in Mission.model_fields}

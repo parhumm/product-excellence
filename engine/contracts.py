@@ -239,11 +239,20 @@ class Mission(BaseModel):
         if self.login_password and not self.login_identifier:raise ValueError('Sign-in needs an identifier as well as a password')
         if self.mode=='benchmark' and not self.competitors:raise ValueError('A benchmark needs at least one competitor URL')
         return self
+class DraftMission(BaseModel):
+    """The mission a revision starts from. It is being written, so a blank still counts as written."""
+    model_config=ConfigDict(extra='forbid')
+    name: str = Field(default='', max_length=200)
+    goal: str = Field(default='', max_length=4000)
+    steps: list[Step] = Field(default_factory=list, max_length=40)
+    mode: Literal['journey','explore','audit','benchmark'] = 'journey'
+    pillars: list[Literal['functionality','cro','seo_aeo','ux_ui','performance']] = Field(default_factory=list, max_length=5)
 class GoalRequest(BaseModel):
-    """One ask for goal suggestions on the mission form. Nothing here is stored."""
+    """One ask for missions on the mission form. Nothing here is stored."""
     project_id: str
     target_id: str = ''
     build: str = ''
+    # Suggesting, this is the rough idea. Revising, it is the change the person asked for.
     goal: str = Field(min_length=3, max_length=4000)
     url: str = ''
     mode: Literal['journey','explore','audit','benchmark'] = 'journey'
@@ -251,9 +260,17 @@ class GoalRequest(BaseModel):
     provider: Literal['codex','claude','auto','none'] = 'auto'
     codex_account: str = Field(default='', max_length=80)
     competitors: list[str] = Field(default_factory=list, max_length=10)
+    revise: bool = False
+    current: DraftMission | None = None
     @field_validator('codex_account')
     @classmethod
     def account_alias(cls,v):return Mission.account_alias(v)
+    @model_validator(mode='after')
+    def revision_carries_its_mission(self):
+        # A revision rewrites something; a suggestion has nothing to rewrite yet.
+        if self.revise and self.current is None:raise ValueError('A revision needs the mission it is changing')
+        if not self.revise and self.current is not None:raise ValueError('Only a revision carries a current mission')
+        return self
 def ceiling(field):
     """The highest value a mission may hold for this field, so callers need not repeat the number."""
     return next(c.le for c in Mission.model_fields[field].metadata if hasattr(c,'le'))

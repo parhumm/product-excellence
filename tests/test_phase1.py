@@ -1,4 +1,4 @@
-import asyncio,json
+import asyncio,json,re
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -387,7 +387,7 @@ def fake_worker(monkeypatch,logged_in=('codex',),suggestions=None):
     async def health():
         return {p:{'installed':True,'logged_in':p in logged_in,'subscription':'','models':[]} for p in ('codex','claude')}
     async def call(provider,prompt,schema,image=None,timeout=100,model='',effort='low',codex_account=''):
-        seen.update(provider=provider,prompt=prompt,model=model,effort=effort,codex_account=codex_account)
+        seen.update(provider=provider,prompt=prompt,schema=schema,timeout=timeout,model=model,effort=effort,codex_account=codex_account)
         return {'suggestions':suggestions if suggestions is not None else [
             {'title':'Pricing - renewal before payment','why':'Shows what a customer still does not know before paying.',
              'caveat':'','goal':'Find the plans and read the renewal terms. Stop before any payment control.',
@@ -428,3 +428,161 @@ def test_goal_suggestions_refuse_an_unknown_workspace(client,monkeypatch):
     fake_worker(monkeypatch)
     r=client.post('/api/missions/suggest',json={'project_id':'nope','goal':'check the pricing page'})
     assert r.status_code==404
+
+# --- Whole missions: a goal or a complete scenario, and revising one ---------
+
+SCENARIO={'title':'Downloads - survive going offline','why':'Shows whether a saved title still plays with no network.',
+          'caveat':'','goal':'Open the downloads list, start the saved title and keep it playing while the network '
+          'drops away and comes back. Report anything that stops playback. Nothing is purchased or deleted.',
+          'mode':'audit','pillars':['ux_ui'],'shape':'scenario','journey':'Play a downloaded title offline.',
+          'steps':[{'name':'Open downloads','goal':'Open the downloads list and start <Saved title>','until':None,
+                    'manual':'','ask':'','timeout':None,'event':None,'check':None,'hold':None},
+                   {'name':'Sign in','goal':'','until':None,'manual':'Sign in as the second account','ask':'one-time code',
+                    'timeout':120,'event':None,'check':None,'hold':None},
+                   {'name':'Go offline','goal':'','until':None,'manual':'','ask':'','timeout':None,
+                    'event':{'network':'offline','speed':None,'delay_ms':None,'kill':None,'home':None,'back':None,
+                             'wait':None,'relaunch':None,'deep_link':None,'open_notification':None},
+                    'check':None,'hold':None},
+                   {'name':'Still playing','goal':'','until':None,'manual':'','ask':'','timeout':None,'event':None,
+                    'check':None,'hold':{'text':'','text_absent':'','screen':None,'playing':True,'notification':None,
+                                         'no_crash':None,'policy':'confirmed','severity':'P1','required':None,'for':20}}]}
+GOAL_ONLY={'title':'Pricing - renewal before payment','why':'Shows what a customer still does not know before paying.',
+           'caveat':'','goal':'Find the plans and read the renewal terms. Stop before any payment control.',
+           'mode':'journey','pillars':['cro'],'shape':'goal','journey':'','steps':[]}
+
+def web_target(project_id='default',url='https://shop.example.net',name='Shop'):
+    return store.save('target',{'project_id':project_id,'type':'web','name':name,'url':url,
+                                'allowed_domains':['shop.example.net'],'package':'','builds':[],'visibility':'team'})
+
+def android_target(project_id='default'):
+    build={'sha256':'a'*64,'version_name':'9.1.0','version_code':91,'min_sdk':26,'target_sdk':34,
+           'launch_activity':'.Main','abis':['arm64-v8a'],'size':1024,'uploaded_at':'2026-01-01T00:00:00Z','archived':False}
+    return store.save('target',{'project_id':project_id,'type':'android','name':'Player','url':'',
+                                'allowed_domains':[],'package':'com.example.player','builds':[build],'visibility':'team'})
+
+def test_a_scenario_suggestion_arrives_complete_and_runnable(client,monkeypatch):
+    seen=fake_worker(monkeypatch,suggestions=[SCENARIO,GOAL_ONLY])
+    target=web_target()
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':target['id'],
+                                               'goal':'does a download still play with no network'})
+    assert r.status_code==200,r.text
+    scenario,goal=r.json()['suggestions']
+    assert scenario['shape']=='scenario' and goal['shape']=='goal' and goal['steps']==[]
+    assert scenario['journey']=='Play a downloaded title offline.'
+    # A scenario verdict is recorded under Functionality and runs as a journey, whatever the worker said.
+    assert scenario['mode']=='journey' and 'functionality' in scenario['pillars'] and 'ux_ui' in scenario['pillars']
+    # The steps arrive in order, in the spelling the rows and the runner use.
+    kinds=[next(k for k in ('goal','manual','event','check','hold') if s.get(k)) for s in scenario['steps']]
+    assert kinds==['goal','manual','event','hold']
+    assert scenario['steps'][1]['ask']=='one-time code' and 'password' not in json.dumps(scenario['steps'])
+    # Nulls the strict schema forced out of the worker are gone; a real false or zero would not be.
+    assert 'until' not in scenario['steps'][0] and scenario['steps'][3]['hold']['playing'] is True
+    assert scenario['steps'][3]['hold']['for']==20
+    # The mission this workspace holds is the one asked about, not another website in the same workspace.
+    assert 'Website: https://shop.example.net' in seen['prompt']
+    assert 'Start URL for this mission: https://shop.example.net' in seen['prompt']
+    assert 'Website: https://example.com' not in seen['prompt']
+    assert 'Rules for steps' in seen['prompt'] and '{{password}}' in seen['prompt']
+    assert seen['timeout']==120
+
+def test_a_scenario_suggestion_works_on_android_too(client,monkeypatch):
+    seen=fake_worker(monkeypatch,suggestions=[SCENARIO,GOAL_ONLY])
+    target=android_target()
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':target['id'],
+                                               'goal':'does a download still play with no network'})
+    assert r.status_code==200,r.text
+    scenario=r.json()['suggestions'][0]
+    assert scenario['shape']=='scenario' and len(scenario['steps'])==4
+    assert 'seo_aeo' not in scenario['pillars']
+    assert 'com.example.player' in seen['prompt'] and '9.1.0' in seen['prompt']
+    # An operator may still be asked to sign in during the run; only stored credentials are refused.
+    assert 'stop before sign-in' not in seen['prompt']
+    assert 'stored credentials' in seen['prompt']
+
+def test_an_android_suggestion_needs_a_build(client,monkeypatch):
+    fake_worker(monkeypatch,suggestions=[SCENARIO,GOAL_ONLY])
+    target=store.save('target',{'project_id':'default','type':'android','name':'Player','url':'','allowed_domains':[],
+                                'package':'com.example.player','builds':[],'visibility':'team'})
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':target['id'],'goal':'play something'})
+    assert r.status_code==422 and 'build' in r.json()['detail']
+
+def broken(**changes):
+    return {**SCENARIO,**changes}
+
+@pytest.mark.parametrize('bad,why',[
+    (broken(steps=[{'goal':'Open the downloads list','check':{'text':'Now playing','within':10}}]),'two kinds in one step'),
+    (broken(steps=[SCENARIO['steps'][0],{'check':{'text':'a','playing':True,'within':10}}]),'one valid step and one not'),
+    (broken(steps=[]),'a scenario with no steps'),
+    (broken(steps=[dict(SCENARIO['steps'][0])]*41),'more than forty steps'),
+    (broken(steps=['not a step']),'a step that is not an object'),
+    (broken(steps={'goal':'x'}),'steps that are not a list'),
+    ({**GOAL_ONLY,'steps':[SCENARIO['steps'][0]]},'a goal carrying steps'),
+])
+def test_a_broken_candidate_is_rejected_whole(client,monkeypatch,bad,why):
+    """A partial scenario would hand the person a mission missing its prerequisite and call it ready."""
+    fake_worker(monkeypatch,suggestions=[bad,GOAL_ONLY])
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
+    assert r.status_code==502,why
+    assert 'usable mission' in r.json()['detail']
+
+def test_extra_candidates_are_accepted_and_a_missing_one_is_not(client,monkeypatch):
+    fake_worker(monkeypatch,suggestions=[GOAL_ONLY,SCENARIO,GOAL_ONLY])
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
+    assert r.status_code==200 and len(r.json()['suggestions'])==2
+    fake_worker(monkeypatch,suggestions=[GOAL_ONLY])
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
+    assert r.status_code==502 and '1 usable mission of the 2' in r.json()['detail']
+
+def test_a_malformed_response_container_fails_in_a_controlled_way(client,monkeypatch):
+    from engine import ai,suggest as goal_suggest
+    async def health():return {p:{'installed':True,'logged_in':p=='codex','subscription':'','models':[]} for p in ('codex','claude')}
+    async def call(*a,**kw):return {'suggestions':'two of them'},ai.usage_record('codex','m','m','low',input_tokens=1,output_tokens=1)
+    monkeypatch.setattr(goal_suggest.ai,'health',health);monkeypatch.setattr(goal_suggest.ai,'call',call)
+    r=client.post('/api/missions/suggest',json={'project_id':'default','goal':'try it'})
+    assert r.status_code==502 and 'no list of missions' in r.json()['detail']
+
+def test_a_revision_returns_one_whole_mission(client,monkeypatch):
+    seen=fake_worker(monkeypatch,suggestions=[{**SCENARIO,'title':'Downloads - survive a relaunch too'}])
+    current={'name':'Downloads - survive going offline','goal':'Play the saved title with the network away.',
+             'mode':'journey','pillars':['functionality','ux_ui'],'steps':[{'goal':'Open the downloads list'}]}
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],
+                                               'goal':'kill the app and relaunch it before the check','revise':True,'current':current})
+    assert r.status_code==200,r.text
+    body=r.json()['suggestions']
+    assert len(body)==1 and body[0]['title']=='Downloads - survive a relaunch too'
+    # The mission being changed travels as data, distinct from the instruction in the person's words.
+    assert 'Open the downloads list' in seen['prompt'] and 'kill the app and relaunch it' in seen['prompt']
+    assert '"mode": "journey"' in seen['prompt'] and 'ux_ui' in seen['prompt']
+    assert 'exactly one mission' in seen['prompt']
+
+def test_a_revision_needs_the_mission_it_is_changing(client,monkeypatch):
+    fake_worker(monkeypatch,suggestions=[GOAL_ONLY])
+    r=client.post('/api/missions/suggest',json={'project_id':'default','goal':'make it shorter','revise':True})
+    assert r.status_code==422 and 'needs the mission' in r.text
+    r=client.post('/api/missions/suggest',json={'project_id':'default','goal':'an idea','current':{'goal':'x'}})
+    assert r.status_code==422 and 'Only a revision' in r.text
+
+def test_an_invalid_revision_never_reaches_the_worker(client,monkeypatch):
+    seen=fake_worker(monkeypatch,suggestions=[GOAL_ONLY])
+    body={'project_id':'default','goal':'make it shorter','revise':True,
+          'current':{'goal':'x','steps':[{'goal':'Open the list','check':{'text':'a','within':10}}]}}
+    assert client.post('/api/missions/suggest',json=body).status_code==422
+    body['current']={'goal':'x','steps':[{'goal':'Open the downloads list'}]*41}
+    assert client.post('/api/missions/suggest',json=body).status_code==422
+    body['current']={'goal':'x','mode':'invented'}
+    assert client.post('/api/missions/suggest',json=body).status_code==422
+    assert client.post('/api/missions/suggest',json={'project_id':'default','goal':'hi','revise':True,
+                                                    'current':{'goal':'x'}}).status_code==422
+    assert not seen,'A malformed request still asked the worker'
+
+def test_the_expanded_schema_stays_inside_the_strict_limitations(client,monkeypatch):
+    seen=fake_worker(monkeypatch,suggestions=[SCENARIO,GOAL_ONLY])
+    client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
+    schema=seen['schema'];item=schema['properties']['suggestions']['items']
+    from engine.suggest import UNSUPPORTED
+    steps=json.dumps({'steps':item['properties']['steps'],'defs':schema['$defs']})
+    for keyword in UNSUPPORTED:assert f'"{keyword}":' not in steps,f'{keyword} survives in the strict schema'
+    # Every reference the step schema carries resolves from the root of the response schema.
+    for ref in set(re.findall(r'"#/\$defs/([A-Za-z]+)"',json.dumps(schema))):assert ref in schema['$defs'],f'{ref} does not resolve'
+    assert set(item['required'])=={'title','why','caveat','goal','journey','mode','shape','pillars','steps'}
+    assert item['additionalProperties'] is False

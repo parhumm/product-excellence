@@ -1,4 +1,4 @@
-import asyncio,os,re,httpx
+import asyncio,json,os,re,httpx
 from pathlib import Path
 from playwright.async_api import async_playwright
 from tests.browser_helpers import open_view
@@ -16,6 +16,7 @@ async def scenario_builder(page):
   assert await page.locator('#snapshot-field').is_visible(),'The saved-state picker stays hidden after choosing it'
   await page.check('input[name=start_state][value=fresh]')
  # A shipped journey fills the rows, and every placeholder it leaves is visible as one.
+ await page.locator('#scenario-more > summary').click()
  await page.locator('#scenario-presets summary').click()
  await page.wait_for_selector('#preset-body [data-preset]')
  assert await page.locator('#preset-body .preset').count()==12,'The twelve shipped journeys are not listed'
@@ -56,8 +57,10 @@ async def scenario_builder(page):
  steps_before=await page.locator('#scenario-steps .step').count()
  # The rows and the YAML are the same steps; text that does not parse never replaces them.
  await page.locator('#scenario-yaml-box summary').click()
+ # The toggle lands after the click, so wait for the steps to leave rather than for text that may be left over.
+ await page.wait_for_selector('#scenario-steps',state='hidden')
  await page.wait_for_function("document.querySelector('#scenario-yaml').value.includes('- ')")
- assert not await page.locator('#scenario-steps').is_visible(),'The rows stay visible while the YAML editor is open'
+ assert not await page.locator('#scenario-lines').is_visible(),'The readable list stays visible while the YAML editor is open'
  await page.fill('#scenario-yaml','- check: {text: a, playing: true}')
  await page.locator('#yaml-apply').click()
  await page.wait_for_selector('#scenario-yaml-error:not(:empty)')
@@ -81,6 +84,122 @@ async def scenario_builder(page):
  assert await page.locator('#scenario-steps .step').count()==1,'Removing a step did not shorten the list'
  await page.locator('#add-step').click()
  assert await page.locator('#scenario-steps .step').count()==2,'Adding a step did not lengthen the list'
+ # The readable list is the same scenario spelled differently, so it never falls behind the rows.
+ assert await page.locator('#scenario-lines li').count()==2,'The readable list does not match the rows'
+ await page.locator('#edit-steps').click()
+ assert await page.locator('#scenario-lines').is_visible(),'Leaving the row editor does not bring the readable list back'
+ assert not await page.locator('#scenario-steps').is_visible(),'The rows stay on screen after leaving the editor'
+
+# --- idea first ---------------------------------------------------------------
+SUGGESTED=[
+ {'title':'Offline playback survives a relaunch','why':'Whether a downloaded title still plays with no connection.',
+  'caveat':'A downloaded title on the device','mode':'journey','pillars':['functionality','ux_ui'],
+  'shape':'scenario','journey':'Download, go offline, relaunch, play.','goal':'As a subscriber, play a downloaded title with the device offline.',
+  'steps':[{'goal':'Open the downloads list'},{'manual':'Sign in on the device','ask':'one-time code','timeout':300},
+           {'event':{'delay_ms':0}},{'check':{'playing':True,'policy':'confirmed','within':20}}]},
+ {'title':'The download finishes on a slow connection','why':'Whether a shaped connection still completes a download.',
+  'caveat':'','mode':'journey','pillars':['functionality'],'shape':'goal','journey':'','goal':'As a subscriber, finish a download on a slow connection.','steps':[]}]
+def answered(items):return {'suggestions':items,'usage':{'provider':'codex','model_reported':'gpt-5-mini'}}
+async def stub(page,payload,status=200):
+ """Deterministic answers for the one endpoint the idea flow calls. No AI quota is spent here."""
+ await page.unroute('**/api/missions/suggest')
+ await page.route('**/api/missions/suggest',lambda route:asyncio.ensure_future(
+  route.fulfill(status=status,content_type='application/json',body=json.dumps(payload))))
+async def mission_ideas(page):
+ """Idea, suggestions, application, revision and undo, with the worker's answers stubbed."""
+ assert await page.locator('#idea-box').get_attribute('open') is not None,'A new mission does not open on the idea'
+ assert not await page.locator('#draft-section').is_visible(),'A new mission shows a draft before there is one'
+ assert not await page.locator('#mission-suggestions').is_visible(),'The suggestion panel shows before anything was asked'
+ # The starters come from the shipped journeys already loaded for the builder.
+ await page.wait_for_selector('#idea-starters [data-starter]')
+ await page.locator('#idea-starters [data-starter]').first.click()
+ assert (await page.locator('#mission-idea').input_value()).strip(),'A starter left the idea box empty'
+ # Writing it yourself is always reachable, worker or no worker.
+ await page.locator('#idea-manual').click()
+ assert await page.locator('#draft-section').is_visible(),'Write it yourself does not reveal the mission'
+ assert await page.locator('#scenario-section').is_visible(),'Write it yourself does not reveal the steps'
+ assert await page.locator('#idea-box').get_attribute('open') is None,'The idea stays open once the mission is on screen'
+ # Everything a run is configured with lives behind one disclosure; open it and leave it open.
+ await page.locator('#run-settings > summary').click()
+ assert await page.locator('select[name=browser]').is_visible(),'Run settings do not open on their disclosure'
+ # A budget the person already raised is never cut back by an applied suggestion.
+ await page.fill('#mission-form [name=max_steps]','30')
+ await page.fill('#mission-form [name=max_seconds]','900')
+ await page.select_option('#mission-form [name=browser]','firefox')
+ await stub(page,answered(SUGGESTED))
+ await page.locator('#idea-box > summary').click()
+ await page.fill('#mission-idea','Does a downloaded title still play when the phone loses its connection?')
+ await page.locator('#idea-suggest').click()
+ await page.wait_for_selector('#mission-suggestions .suggestion')
+ assert await page.locator('#mission-suggestions .suggestion').count()==2,'Two missions were not offered'
+ cards=page.locator('#mission-suggestions .suggestion')
+ assert await cards.nth(0).locator('.steplines li').count()==4,'A card hides some of the steps it would apply'
+ first=await cards.nth(0).inner_text()
+ assert 'Chromium' in first,'A shaped step gives no Chromium notice'
+ assert 'operator' in first,'A manual step gives no operator notice'
+ assert 'Needs first' in first,'The card drops the precondition the worker named'
+ assert 'No steps' in await cards.nth(1).inner_text(),'A goal-only suggestion pretends to have steps'
+ await cards.nth(0).locator('[data-apply]').click()
+ await page.wait_for_selector('#scenario-lines li')
+ assert await page.locator('#mission-form [name=name]').input_value()=='Offline playback survives a relaunch','The title did not become the mission name'
+ assert 'downloaded title' in await page.locator('#mission-form [name=goal]').input_value(),'The goal did not arrive'
+ assert await page.locator('#mission-form [name=mode]').input_value()=='journey','The mode did not arrive'
+ assert await page.locator('input[name=pillars][value=functionality]').is_checked(),'Functionality is not selected for a scenario'
+ assert await page.locator('#mission-form [name=browser]').input_value()=='chromium','A zero-delay step did not select Chromium'
+ assert await page.locator('#mission-form [name=max_steps]').input_value()=='30','An applied suggestion lowered a larger action budget'
+ assert await page.locator('#scenario-lines li').count()==4,'The applied steps are not the steps the card showed'
+ lines=await page.locator('#scenario-lines').inner_text()
+ assert 'asks for one-time code' in lines,'The value an operator supplies is not named in the readable list'
+ summary=await page.locator('#run-summary').inner_text()
+ assert 'chromium' in summary and '15 min' in summary and '30 actions' in summary,f'The run settings summary is wrong: {summary}'
+ # One slot of undo, and it puts back every field the suggestion touched.
+ await page.locator('#undo-ai').click()
+ assert await page.locator('#mission-form [name=browser]').input_value()=='firefox','Undo did not put the browser back'
+ assert await page.locator('#scenario-lines li.nosteps').count()==1,'Undo did not put the empty scenario back'
+ assert await page.locator('#undo-ai').is_hidden(),'Undo stays offered after it was used'
+ await cards.nth(0).locator('[data-apply]').click()
+ await page.wait_for_selector('#scenario-lines li:not(.nosteps)')
+ # A revision returns one whole mission, and Undo reaches back to the one before it.
+ await stub(page,answered([{**SUGGESTED[0],'title':'Offline playback survives two relaunches','mode':'explore',
+   'pillars':['functionality'],'steps':SUGGESTED[0]['steps'][:2]}]))
+ await page.fill('#mission-revise','Relaunch the app twice instead of once.')
+ await page.locator('#revise-go').click()
+ await page.wait_for_selector('#mission-suggestions .suggestion [data-apply]')
+ assert await page.locator('#mission-suggestions .suggestion').count()==1,'A revision offered more than one mission'
+ await page.locator('#mission-suggestions [data-apply]').first.click()
+ await page.wait_for_function("document.querySelectorAll('#scenario-lines li').length===2")
+ assert await page.locator('#mission-form [name=mode]').input_value()=='explore','The revision did not carry its mode'
+ await page.locator('#undo-ai').click()
+ assert await page.locator('#scenario-lines li').count()==4,'Undo did not restore the mission the revision replaced'
+ assert await page.locator('#mission-form [name=mode]').input_value()=='journey','Undo did not restore the mode'
+ # A failed revision changes nothing and keeps what the person typed.
+ await stub(page,{'detail':'The AI worker could not suggest a mission'},status=502)
+ await page.fill('#mission-revise','Add a check that the title still plays.')
+ await page.locator('#revise-go').click()
+ await page.wait_for_selector('#revise-error:not(:empty)')
+ assert await page.locator('#scenario-lines li').count()==4,'A failed revision changed the mission anyway'
+ assert await page.locator('#mission-revise').input_value()=='Add a check that the title still plays.','A failed revision discarded the instruction'
+ assert not await page.locator('#mission-form button[type=submit]').first.is_disabled(),'Saving stays blocked after a failed revision'
+ # Text that is not applied is not a scenario, so nothing may replace the steps while it sits there.
+ await stub(page,answered([SUGGESTED[0]]))
+ await page.locator('#scenario-more > summary').click()
+ await page.locator('#scenario-yaml-box summary').click()
+ await page.wait_for_selector('#scenario-steps',state='hidden')
+ await page.wait_for_function("document.querySelector('#scenario-yaml').value.includes('- ')")
+ await page.fill('#scenario-yaml','- goal: Not applied yet')
+ await page.locator('#revise-go').click()
+ await page.wait_for_selector('#revise-error:not(:empty)')
+ assert 'Apply your YAML' in await page.locator('#revise-error').inner_text(),'Unapplied YAML did not stop the revision'
+ assert await page.locator('#mission-form button[type=submit]').first.is_disabled(),'A mission with unapplied YAML can still be saved'
+ await page.locator('#yaml-apply').click()
+ await page.wait_for_function("document.querySelectorAll('#scenario-steps .step').length===1")
+ await page.locator('#scenario-yaml-box summary').click()
+ await page.locator('#scenario-more > summary').click()
+ assert not await page.locator('#mission-form button[type=submit]').first.is_disabled(),'Applied YAML still blocks saving'
+ # Nothing on this page may answer twice to the same id or name.
+ ids=await page.evaluate("[...document.querySelectorAll('#mission-form [id]')].map(e=>e.id)")
+ assert len(ids)==len(set(ids)),'The mission form repeats an element id'
+ await page.unroute('**/api/missions/suggest')
 
 async def main():
  base=os.environ.get('PEX_BASE_URL','http://127.0.0.1:8741')
@@ -104,7 +223,19 @@ async def main():
     await page.wait_for_function("document.querySelectorAll('.journey:not([hidden])').length < 12")
     assert await page.locator('.journey:not([hidden])').count()>0,'Searching hid every journey'
     await page.fill('#journey-search','')
+    # A journey link opens the mission already drafted, so there is no idea to write first.
+    link=await page.locator('.journey .toolbar a[href^="#new/"]').first.get_attribute('href')
+    await page.goto(base.rstrip('/')+'/'+link)
+    await page.wait_for_selector('#scenario-steps .step')
+    assert await page.locator('#draft-section').is_visible(),'A journey link does not open its mission'
+    assert await page.locator('#idea-box').get_attribute('open') is None,'A journey link opens on the idea instead of the mission'
+    assert (await page.locator('#mission-form [name=goal]').input_value()).strip(),'A journey link left the goal empty'
+    await open_view(page,'journeys',base)
    if route=='new':
+    # The idea comes first, so everything else on this form is reached through it.
+    site_option=page.locator('select[name=target_id] option').filter(has_text='Website').first
+    if await site_option.count():await page.select_option('select[name=target_id]',await site_option.get_attribute('value'))
+    await mission_ideas(page)
     # The model catalog and the escape hatch for an unlisted id must both be reachable.
     assert await page.locator('select[name=model] optgroup').count()>0,'Model catalog is empty'
     assert await page.locator('select[name=model] option[value="__custom__"]').count()==1,'Custom model option missing'
@@ -120,12 +251,10 @@ async def main():
     assert await page.locator('select[name=effort]').is_visible(),'Reasoning effort stays hidden for a fixed model'
     assert not await page.locator('select[name=model_max]').is_visible(),'Ceiling shows for a fixed model'
     await page.select_option('select[name=model]','dynamic')
-    extras=page.locator('#mission-form > details')
+    extras=page.locator('#draft-section > details:not(#run-settings)')
     assert await extras.count()==1,'Extra settings section missing'
     assert not await extras.first.get_attribute('open'),'Extra settings open on a new mission'
     assert await page.locator('select[name=mode] option[value=benchmark]').count()==1,'Benchmark mode missing'
-    site_option=page.locator('select[name=target_id] option').filter(has_text='Website').first
-    if await site_option.count():await page.select_option('select[name=target_id]',await site_option.get_attribute('value'))
     # One vocabulary, two targets: the builder shows for a website too, minus the saved device state.
     assert await page.locator('#scenario-section').is_visible(),'The scenario builder is hidden for a website mission'
     assert not await page.locator('#start-snapshot').is_visible(),'A saved device state is offered for a website mission'
@@ -185,6 +314,10 @@ async def main():
   await page.set_viewport_size({'width':390,'height':844});await open_view(page,'missions',base)
   assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'Mobile overflow'
   assert await page.locator('#workspace').is_visible(),'Workspace picker is hidden on mobile'
+  # The narrowest phone still in use, on the view with the most controls.
+  await page.set_viewport_size({'width':320,'height':640});await open_view(page,'new',base)
+  assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth'),'The mission form overflows a 320px screen'
+  await page.set_viewport_size({'width':390,'height':844});await open_view(page,'missions',base)
   await page.screenshot(path=str(output/'ui-mobile.png'),full_page=True)
   print('UI pages checked. JS errors:',errors)
   assert not errors

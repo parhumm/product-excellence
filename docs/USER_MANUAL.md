@@ -71,7 +71,44 @@ Import the saved file under **Settings → Test personas**, then choose it on th
 
 You can also create your own.
 
-Start with a small, clear task:
+#### Start from an idea
+
+**Missions → New mission** opens on one question: *What do you want to find out?*
+Write it the way you would say it to a colleague — "does a downloaded title still
+play when the phone loses its connection?" — and press **Suggest two missions**.
+The buttons underneath the box are the shipped journeys, there to borrow a
+sentence from if nothing comes to mind.
+
+Two whole missions come back, each as a card: what it is, what you learn from it,
+the goal it will pursue and, where it needs them, every step in order and in plain
+words. A card says up front what it would change — that a shaped step needs
+Chromium, that a step waits for a person at the screen, that an app event needs an
+Android target — and what has to exist first, such as an account or a downloaded
+file. Nothing runs and nothing is saved while you read them.
+
+**Use this mission** fills the form in: the name, the goal, the mode, the pillars
+and the steps, with the time and action budgets raised if the steps need more room.
+Then the mission is yours. Read every step. Fill any blank the suggestion left —
+they are listed above the steps and the mission will not save while one remains.
+**Edit steps** opens the rows underneath, the same editor described under
+[Journeys with steps](#journeys-with-steps), and everything you change there shows
+in the readable list straight away.
+
+To change it in words instead, write the change under **Change something** —
+"add a relaunch before the last check, and say the download must survive it" — and
+press **Revise this mission**. The whole mission comes back changed, as one card
+you apply the same way.
+
+**Undo**, beside *Your mission*, puts back the mission exactly as it was before the
+last thing the AI worker filled in — name, goal, steps, mode, pillars, browser and
+budgets. There is one step of it, and it does not survive leaving the page.
+
+Nothing here saves or runs on its own: **Save mission** and **Save and run** are
+still the only two buttons that do anything outside this page. And if no AI worker
+is signed in, **Write it yourself** opens the same form empty, with every manual
+tool intact.
+
+Writing it yourself, start with a small, clear task:
 
 > Open the homepage, find search, and open a movie’s details.
 
@@ -228,7 +265,7 @@ Some questions are about what the app remembers, not about one page. A download 
 
 The quickest way in is **Missions → Start from a journey**. The gallery shows the twelve shipped journeys with what each one answers, how many steps and blanks it has, and anything it needs — a person to sign in, or Chromium. Pick one and the mission form opens with the target, name, goal, time limit and steps already filled in.
 
-You can also build one by hand: choose any target, Android or website, and the mission form grows a **Scenario** section. Open **Start from a shipped journey** and pick one, or describe the journey in a sentence and press **Draft the steps** to have the AI worker write a first version — leave the box empty and it drafts from the goal you already wrote. Either way you get ordered rows you can edit, reorder and remove. **Advanced: edit as YAML** shows the same steps as text for anyone who prefers it.
+You can also build one by hand: choose any target, Android or website, and the mission form grows a **Steps** section. It reads as a numbered list of what will happen; **Edit steps** turns that list into rows you can change, reorder and remove, and turns it back when you are done. Under **Other ways to get steps** are three more routes to the same steps: **Start from a shipped journey** to pick one, **Describe it and let the AI worker draft the steps** to write the journey in a sentence and have a first version drafted — leave the box empty and it drafts from the goal you already wrote — and **Advanced: edit as YAML** to see the same steps as text. Whichever you use, the readable list, the rows and the YAML are always the same steps.
 
 A row is one of five things:
 
@@ -236,7 +273,7 @@ A row is one of five things:
 - **Check** — a fact that has to become true within a number of seconds.
 - **Hold** — a fact that has to stay true across a number of seconds, sampled throughout.
 - **Event** — something done to the device or the page: change the network, slow it down, wait, send it to the background, go back, kill the app, start it again, open a link, open a notification.
-- **Manual** — hand the run to the person sitting at it. Use it for signing in, paying and one-time codes, or for anything that has to happen outside the app: approving a request, revoking an entitlement.
+- **Manual** — hand the run to the person sitting at it. Use it for signing in, paying and one-time codes, or for anything that has to happen outside the app: approving a request, revoking an entitlement. A manual step can name one value it needs — *one-time code*, *card number* — in its own field. Name the value; never write the value itself, because the steps are saved and shared.
 
 A shipped journey arrives with blanks where your own film title or account belongs. They are listed above the steps, each one labelled with what to put in it. Fill a blank once and it is filled everywhere — in the name, the goal and every step that uses it. The run button says how many are left and stays disabled until none are, and the mission refuses to save while one remains, which is what stops a template running against the wrong content.
 

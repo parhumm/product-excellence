@@ -239,7 +239,7 @@ return {committed,ceiling:committed+ceiling+60}}
 // One readable line per step, used in the draft preview and anywhere a scenario is summarised.
 function describeStep(s){const k=stepKind(s);
 if(k==='goal')return 'Goal: '+s.goal+(s.until&&s.until.text?' · stops early at "'+s.until.text+'"':'');
-if(k==='manual')return 'Operator: '+s.manual+' · up to '+(s.timeout||300)+' s';
+if(k==='manual')return 'Operator: '+s.manual+(s.ask?' · asks for '+s.ask:'')+' · up to '+(s.timeout||300)+' s';
 if(k==='event'){const e=eventKind(s.event),v=s.event[e];
 return 'Event: '+EVENT_KINDS[e]+(typeof v==='boolean'?'':' · '+v)+(e==='speed'&&s.event.delay_ms?' · +'+s.event.delay_ms+' ms':'')}
 const o=s[k],f=oracleKind(o),v=f==='screen'?(o.screen.contains||o.screen.equals):f==='notification'?o.notification.text+(o.notification.present===false?' (must be absent)':''):typeof o[f]==='boolean'?(o[f]?'yes':'no'):o[f];
@@ -249,6 +249,7 @@ while(parts.length>1)target=(target[parts.shift()]??={});
 if(value===null)delete target[parts[0]];else target[parts[0]]=value}
 function pruneStep(step){if(step.until&&!step.until.text)delete step.until;
 if(step.name==='')delete step.name;
+if(step.ask==='')delete step.ask;
 for(const k of ['check','hold']){const o=step[k];if(o&&o.policy==='unknown')o.required=false}
 return step}
 function applyControl(step,el){const value=el.dataset.bool?el.value==='true':el.type==='number'?(el.value===''?null:+el.value):el.value;
@@ -285,7 +286,9 @@ return kinds+fact
 +(unknown?`<p class="cell wide muted">An unconfirmed expectation is recorded as an observation: severity info, no score deduction, never release-blocking.</p>`:'')}
 function stepBody(step,kind,i){
 if(kind==='goal')return inp(i,'goal',step.goal,'What the AI worker should achieve on the screen','Open the downloads list and start the saved title')+inp(i,'until.text',step.until&&step.until.text,'Stop early when this text appears (optional)','Now playing');
-if(kind==='manual')return inp(i,'manual',step.manual,'What the operator should do','Sign in as the second account')+inp(i,'timeout',step.timeout,'Seconds they have','','narrow','number')+`<p class="cell wide muted">No screenshots are taken while this step waits. On a device the screen recording stops too, so credentials stay off the evidence.</p>`;
+if(kind==='manual')return inp(i,'manual',step.manual,'What the operator should do','Sign in as the second account')
++cell('Value they supply, by name (optional)',`<input maxlength="80" dir="auto" data-index="${i}" data-path="ask" value="${esc(step.ask||'')}" placeholder="one-time code">`,'narrow')
++inp(i,'timeout',step.timeout,'Seconds they have','','narrow','number')+`<p class="cell wide muted">No screenshots are taken while this step waits. On a device the screen recording stops too, so credentials stay off the evidence. Name the value the operator supplies; never write the value here.</p>`;
 if(kind==='event')return eventBody(step,i);
 return oracleBody(step,kind,i)}
 function stepRow(step,i,total){const kind=stepKind(step);
@@ -297,22 +300,29 @@ return `<li class="step" data-index="${i}"><div class="stephead"><span class="st
 function scenarioSection(m){scenarioSteps=clone(m.scenario||[]);
 const start=m.snapshot?'snapshot':m.reset==='keep'?'keep':'fresh';
 const radio=(v,t,help)=>`<label id="start-${v}"><input type="radio" name="start_state" value="${v}" ${start===v?'checked':''}><span>${t}<small>${help}</small></span></label>`;
-return `<section class="field full scenario" id="scenario-section"><label>Stateful scenario</label>
-<small>Ordered steps one tester would carry out, in order, once the app or the page is open. The goal above still says why. Leave this empty to run the goal on its own.</small>
-<div class="scenariotools"><details id="scenario-presets"><summary><strong>Start from a shipped journey</strong></summary><div id="preset-body">Loading the shipped journeys…</div></details>
+return `<section class="field full scenario" id="scenario-section"><label>Steps</label>
+<small>Ordered steps one tester would carry out, once the app or the page is open. The goal above still says why. Leave this empty to run the goal on its own.</small>
+<div class="blanks" id="scenario-blanks" hidden></div>
+<div class="toolbar" id="scenario-modes"><button type="button" class="compact" id="edit-steps" aria-expanded="false" aria-controls="scenario-steps">Edit steps</button><span id="scenario-summary" class="muted" aria-live="polite"></span></div>
+<ol class="steplines" id="scenario-lines"></ol>
+<ol class="steps" id="scenario-steps" hidden></ol>
+<div class="toolbar" id="step-tools" hidden><button type="button" class="compact" id="add-step">Add a step</button></div>
+<fieldset class="startstate"><legend>Start state</legend><div class="checks">${radio('fresh','Fresh app data','App data or browser storage is cleared first. This is not a reinstall and changes nothing on the server.')}${radio('keep','Keep previous app data','Whatever the last run left behind stays. Replays cannot confirm a reproduction from it.')}${radio('snapshot','Load a saved device state','Same saved device state. Account and server preconditions are still checked by the steps.')}</div>
+<div class="field" id="snapshot-field"><label for="snapshot_id">Saved device state</label><select id="snapshot_id" name="snapshot_id"></select><small id="snapshot-note">Reading what is saved on this Mac…</small></div></fieldset>
+<details id="scenario-more"><summary><strong>Other ways to get steps</strong></summary><div class="scenariotools">
+<details id="scenario-presets"><summary><strong>Start from a shipped journey</strong></summary><div id="preset-body">Loading the shipped journeys…</div></details>
 <details id="scenario-draft"><summary><strong>Describe it and let the AI worker draft the steps</strong></summary><div class="draftbody">
 <textarea id="scenario-describe" dir="auto" placeholder="Download a title on a shaped connection, pause and resume it twice, then play it with the device offline."></textarea>
 <input id="scenario-texts" dir="auto" placeholder="Text that really appears in your app, separated by commas">
 <div class="toolbar"><button type="button" class="compact" id="draft-steps">Draft the steps</button><small>Nothing runs and no device is touched. Every drafted step is checked against the same contract as the rows.</small></div>
-<div id="draft-result" aria-live="polite"></div></div></details></div>
-<fieldset class="startstate"><legend>Start state</legend><div class="checks">${radio('fresh','Fresh app data','App data or browser storage is cleared first. This is not a reinstall and changes nothing on the server.')}${radio('keep','Keep previous app data','Whatever the last run left behind stays. Replays cannot confirm a reproduction from it.')}${radio('snapshot','Load a saved device state','Same saved device state. Account and server preconditions are still checked by the steps.')}</div>
-<div class="field" id="snapshot-field"><label for="snapshot_id">Saved device state</label><select id="snapshot_id" name="snapshot_id"></select><small id="snapshot-note">Reading what is saved on this Mac…</small></div></fieldset>
-<div class="blanks" id="scenario-blanks" hidden></div>
-<ol class="steps" id="scenario-steps"></ol>
-<div class="toolbar" id="step-tools"><button type="button" class="compact" id="add-step">Add a step</button><span id="scenario-summary" class="muted"></span></div>
-<details id="scenario-yaml-box"><summary>Advanced: edit as YAML</summary><textarea id="scenario-yaml" spellcheck="false" aria-describedby="scenario-yaml-error"></textarea><div class="toolbar"><button type="button" class="compact primary" id="yaml-apply">Apply YAML</button><small>Comments are not kept. The rows come back only once this parses.</small></div><p class="error" id="scenario-yaml-error" role="alert"></p></details></section>`}
-function scenarioBind(mf,sync){const box=$('#scenario-section');if(!box)return;
+<div id="draft-result" aria-live="polite"></div></div></details>
+<details id="scenario-yaml-box"><summary>Advanced: edit as YAML</summary><textarea id="scenario-yaml" spellcheck="false" aria-describedby="scenario-yaml-error"></textarea><div class="toolbar"><button type="button" class="compact primary" id="yaml-apply">Apply YAML</button><small>Comments are not kept. The rows come back only once this parses.</small></div><p class="error" id="scenario-yaml-error" role="alert"></p></details>
+</div></details></section>`}
+// The scenario section, bound. Callers get back only what they actually need: a way to put
+// other steps in, the blanks, the one unapplied-YAML question, and where to send focus.
+function scenarioBind(mf,sync,gate){const box=$('#scenario-section');if(!box)return null;
 const list=$('#scenario-steps'),summary=$('#scenario-summary'),tools=$('#step-tools'),runButton=mf.querySelector('[name=run]');
+const lines=$('#scenario-lines'),editButton=$('#edit-steps'),more=$('#scenario-more');
 const yamlBox=$('#scenario-yaml-box'),yamlArea=$('#scenario-yaml'),yamlError=$('#scenario-yaml-error');let appliedYaml='';
 const limit=()=>+mf.querySelector('[name=max_seconds]').value||0;
 const blanksBox=$('#scenario-blanks'),nameField=mf.querySelector('[name=name]'),goalField=mf.querySelector('[name=goal]');
@@ -333,9 +343,18 @@ return left};
 // A journey is worth no less time than its own windows need, and never more than the ceiling.
 const fitLimit=()=>{const f=mf.querySelector('[name=max_seconds]');
 f.value=Math.min(3600,Math.max(+f.value||0,Math.ceil(scenarioBudget(scenarioSteps).ceiling/60)*60))};
+// Rows, readable lines and YAML are three spellings of one scenario; exactly one is on screen.
+let editing=false;
+const present=()=>{const yaml=yamlBox.open;
+lines.hidden=yaml||editing;list.hidden=yaml||!editing;tools.hidden=list.hidden;
+editButton.disabled=yaml;editButton.setAttribute('aria-expanded',String(editing&&!yaml));
+editButton.textContent=editing?'Done editing steps':'Edit steps'};
+// Anything that focuses a row has to put the rows on screen first.
+const revealEditor=()=>{yamlBox.open=false;editing=true;present()};
 const summarise=()=>{const b=scenarioBudget(scenarioSteps),over=b.committed>=limit(),left=blanksLeft().length;
-// The server refuses a mission that still has a blank; this only says so sooner.
-mf.querySelectorAll('button[type=submit]').forEach(x=>x.disabled=left>0);
+// The server refuses a mission that still has a blank; this only says so sooner. Saving is
+// decided in one place, so this can never re-enable a button another rule disabled.
+if(gate)gate();
 summary.innerHTML=(left?`<strong class="error">${left} blank${left===1?'':'s'} left</strong> · `:'')+(scenarioSteps.length
 ?`${scenarioSteps.length} step${scenarioSteps.length===1?'':'s'} · waits and holds commit ${b.committed} s · up to about ${b.ceiling} s if every window runs out, against a ${limit()} s limit`
 +(b.ceiling>limit()?` <button type="button" class="compact" id="raise-limit">Raise the limit to ${Math.min(3600,Math.ceil(b.ceiling/60)*60)} s</button>`:'')
@@ -344,15 +363,22 @@ summary.innerHTML=(left?`<strong class="error">${left} blank${left===1?'':'s'} l
 const raise=$('#raise-limit');
 if(raise)raise.onclick=()=>{mf.querySelector('[name=max_seconds]').value=Math.min(3600,Math.ceil(scenarioBudget(scenarioSteps).ceiling/60)*60);summarise();$('#add-step').focus()};
 if(runButton)runButton.textContent=scenarioSteps.length?`Save and run ${scenarioSteps.length} steps`:'Save and run'};
+// The readable list and the rows are drawn from the same steps, so neither can drift.
+const drawLines=()=>{lines.innerHTML=scenarioSteps.map(step=>`<li dir="auto">${esc(describeStep(step))}</li>`).join('')
+||'<li class="nosteps muted">No steps yet. This mission runs the goal on its own.</li>'};
 const draw=()=>{list.innerHTML=scenarioSteps.map((s,i)=>stepRow(s,i,scenarioSteps.length)).join('')
-||'<li class="nosteps muted">No steps yet. Add one, start from a shipped journey, or describe what you want.</li>';drawBlanks();summarise()};
+||'<li class="nosteps muted">No steps yet. Add one, start from a shipped journey, or describe what you want.</li>';drawLines();drawBlanks();summarise();present()};
+editButton.onclick=()=>{editing=!editing;present();
+(editing?list.querySelector('input,select')||$('#add-step'):editButton).focus()};
 for(const f of [nameField,goalField])if(f)f.addEventListener('input',()=>{drawBlanks();summarise()});
 // A value edit changes one field; anything that changes which fields exist redraws the rows.
 list.onchange=e=>{const el=e.target,i=+el.dataset.index;if(!Number.isInteger(i)||!scenarioSteps[i])return;
 const step=scenarioSteps[i];
 // Editing a value touches one field; only the policy changes which fields are usable.
 if(el.dataset.path){applyControl(step,el);el.classList.toggle('ph',el.tagName==='INPUT'&&PLACE.test(el.value));
-el.dataset.path.endsWith('policy')?draw():summarise();return}
+// Only the policy changes which fields exist; everything else keeps the focused row where it is.
+if(el.dataset.path.endsWith('policy')){draw();return}
+drawLines();drawBlanks();summarise();return}
 if(el.dataset.act==='kind')scenarioSteps[i]=pruneStep({...(step.name?{name:step.name}:{}),...blankStep(el.value)});
 if(el.dataset.act==='event-kind')step.event={[el.value]:EVENT_DEFAULT[el.value]};
 if(el.dataset.act==='oracle-kind'){const kind=stepKind(step),o=step[kind];
@@ -371,7 +397,7 @@ const landed=what==='up'?i-1:what==='down'||what==='dup'?i+1:Math.min(i,scenario
 const row=list.querySelector(`li[data-index="${landed}"]`);
 (row&&(what==='del'?row.querySelector('select'):row.querySelector(`button[data-act="${what}"]`))||$('#add-step')).focus()};
 $('#add-step').onclick=()=>{if(scenarioSteps.length>=40){toast('A scenario holds at most 40 steps');return}
-scenarioSteps.push(blankStep('goal'));draw();list.querySelector('li:last-child input[data-path="goal"]')?.focus()};
+scenarioSteps.push(blankStep('goal'));revealEditor();draw();list.querySelector('li:last-child input[data-path="goal"]')?.focus()};
 // --- shipped journeys -------------------------------------------------------
 const usePreset=preset=>{const mission=preset.mission;scenarioSteps=clone(mission.scenario||[]);
 const goal=mf.querySelector('[name=goal]');if(goal&&mission.goal)goal.value=mission.goal;
@@ -380,13 +406,18 @@ for(const key of ['mode','max_seconds','ai_budget','provider']){const input=mf.q
 mf.querySelectorAll('[name=pillars]').forEach(c=>c.checked=(mission.pillars||[]).includes(c.value));
 const start=mission.snapshot?'snapshot':mission.reset==='keep'?'keep':'fresh';
 mf.querySelectorAll('[name=start_state]').forEach(r=>r.checked=r.value===start);
-sync();startState();fitLimit();draw();$('#scenario-presets').open=false;
+sync();startState();fitLimit();revealEditor();draw();$('#scenario-presets').open=false;
 const left=blanksLeft().length;
 toast(left?`Journey loaded. Fill ${left} blank${left===1?'':'s'} before saving.`:'Journey loaded.');
 (blanksBox.querySelector('input')||list.querySelector('input,select'))?.focus()};
 const drawPresets=()=>{const body=$('#preset-body');
 body.innerHTML=scenarioPresets.map((p,i)=>`<div class="preset"><div><strong>${esc(p.name)}</strong><small dir="auto">${esc(p.about)}</small></div><div class="presetact"><span class="badge">${journeySize(p)}</span><button type="button" class="compact" data-preset="${i}">Use this journey</button></div></div>`).join('');
 body.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>usePreset(scenarioPresets[+b.dataset.preset]));
+// The same shipped journeys, offered as sentences to start from rather than steps to load.
+const starters=$('#idea-starters'),idea=$('#mission-idea');
+if(starters&&idea){starters.innerHTML=scenarioPresets.slice(0,4).map((p,i)=>`<button type="button" class="compact" data-starter="${i}" dir="auto">${esc(p.name)}</button>`).join('');
+starters.querySelectorAll('[data-starter]').forEach(b=>b.onclick=()=>{const p=scenarioPresets[+b.dataset.starter];
+idea.value=p.about||p.name;idea.focus()})}
 // Arriving from the gallery: pick the target this journey suits, then load it.
 if(pendingJourney){const wanted=scenarioPresets.find(p=>p.id===pendingJourney);pendingJourney='';
  if(wanted){const mine=(state.targets||[]).filter(t=>t.project_id===mf.querySelector('[name=project_id]').value);
@@ -397,8 +428,9 @@ if(pendingJourney){const wanted=scenarioPresets.find(p=>p.id===pendingJourney);p
 if(scenarioPresets)drawPresets();
 else api('/scenarios').then(found=>{scenarioPresets=found;drawPresets()}).catch(e=>$('#preset-body').innerHTML=`<p class="error">${esc(e.message)}</p>`);
 // --- start state ------------------------------------------------------------
-const chosen=()=>[...mf.querySelectorAll('[name=start_state]')].find(r=>r.checked)?.value||'fresh';
-const startState=()=>{$('#snapshot-field').hidden=chosen()!=='snapshot'};
+// Declared, not assigned: a journey deep link runs usePreset while this section is still being bound.
+function chosen(){return [...mf.querySelectorAll('[name=start_state]')].find(r=>r.checked)?.value||'fresh'}
+function startState(){$('#snapshot-field').hidden=chosen()!=='snapshot'}
 mf.querySelectorAll('[name=start_state]').forEach(r=>r.onchange=startState);startState();
 const picker=mf.querySelector('[name=snapshot_id]'),note=$('#snapshot-note'),saved=mf.dataset.snapshot||'';
 api('/android/snapshots?project='+encodeURIComponent(mf.querySelector('[name=project_id]').value)).then(answer=>{
@@ -422,24 +454,23 @@ texts:$('#scenario-texts').value.split(',').map(s=>s.trim()).filter(Boolean),
 provider:mf.querySelector('[name=provider]').value,codex_account:mf.querySelector('[name=codex_account]')?.value||''})});
 const drafted=answer.steps;
 draftOut.innerHTML=`<p><strong>${drafted.length} drafted step${drafted.length===1?'':'s'}.</strong> Nothing has changed yet.</p><ol class="draftlines">${drafted.map(s=>`<li dir="auto">${esc(describeStep(s))}</li>`).join('')}</ol>${answer.rejected&&answer.rejected.length?`<p class="muted">${answer.rejected.length} suggestion${answer.rejected.length===1?'':'s'} did not fit the contract and ${answer.rejected.length===1?'was':'were'} dropped: ${esc(answer.rejected.join('; '))}</p>`:''}<div class="toolbar"><button type="button" class="compact primary" id="draft-replace">Replace the ${scenarioSteps.length} step${scenarioSteps.length===1?'':'s'} above</button><button type="button" class="compact" id="draft-append">Add these to the end</button></div>`;
-$('#draft-replace').onclick=()=>{scenarioSteps=clone(drafted);fitLimit();draw();toast('Steps replaced. Review every one before saving.');list.querySelector('input,select')?.focus()};
+$('#draft-replace').onclick=()=>{scenarioSteps=clone(drafted);fitLimit();revealEditor();draw();toast('Steps replaced. Review every one before saving.');list.querySelector('input,select')?.focus()};
 $('#draft-append').onclick=()=>{scenarioSteps=scenarioSteps.concat(clone(drafted)).slice(0,40);fitLimit();draw();toast('Steps added. Review every one before saving.')};
 draftButton.textContent='Draft again'}
 catch(e){draftOut.innerHTML=`<p class="error">${esc(e.message)}</p>`;draftButton.textContent=original}
 finally{draftButton.disabled=false}};
 // --- YAML, the same steps in the other spelling ------------------------------
-const showRows=on=>{list.hidden=!on;tools.hidden=!on};
 let reopening=false;
 yamlBox.ontoggle=async()=>{
 if(!yamlBox.open){
   // Unapplied text is not a scenario, so the rows do not come back until it parses.
   if(yamlArea.value.trim()!==appliedYaml.trim()){reopening=true;yamlBox.open=true;yamlError.textContent='These edits are not applied yet. Select Apply YAML, or undo them, before going back to the rows.';yamlArea.focus();return}
-  showRows(true);yamlError.textContent='';return}
+  present();yamlError.textContent='';return}
 // Forcing the editor back open must not refetch over the edits that kept it open.
 if(reopening){reopening=false;return}
 yamlError.textContent='';yamlArea.value='Reading…';
 // Steps that cannot be spelled yet leave the rows in place, because the rows are where the gap is fixed.
-try{appliedYaml=yamlArea.value=(await api('/scenarios/yaml',{method:'POST',body:JSON.stringify({steps:scenarioSteps})})).yaml;showRows(false)}
+try{appliedYaml=yamlArea.value=(await api('/scenarios/yaml',{method:'POST',body:JSON.stringify({steps:scenarioSteps})})).yaml;present()}
 catch(e){yamlArea.value=appliedYaml='';yamlError.textContent=e.message}};
 $('#yaml-apply').onclick=()=>submitAction($('#yaml-apply'),async()=>{yamlError.textContent='';
 try{const answer=await api('/scenarios/yaml',{method:'POST',body:JSON.stringify({yaml:yamlArea.value})});
@@ -447,27 +478,52 @@ scenarioSteps=answer.steps;appliedYaml=yamlArea.value=answer.yaml;draw();
 toast(`${answer.steps.length} step${answer.steps.length===1?'':'s'} applied`)}
 catch(e){yamlError.textContent=e.message;yamlArea.focus()}});
 mf.querySelector('[name=max_seconds]').addEventListener('change',summarise);
-draw()}
+draw();
+return {
+ // Other steps, drawn everywhere they show. Undo restores exact values, so it skips the fit.
+ replace(steps,{fit=true}={}){scenarioSteps=clone(steps||[]);if(fit)fitLimit();draw()},
+ blanks:()=>blanksLeft().length,
+ // Unapplied text is not a scenario, so nothing may replace the steps while it sits there.
+ dirtyYaml:()=>yamlBox.open&&yamlArea.value.trim()!==appliedYaml.trim(),
+ showYaml(){more.open=true;yamlBox.open=true;yamlArea.focus()},
+ focusBlank(){const first=blanksBox.querySelector('input');if(first)first.focus();return !!first}}}
 function missionForm(id){const site=project(),host=(()=>{try{return new URL(site.url||'').hostname}catch(e){return ''}})(),existing=state.missions.find(m=>m.id===id);
 const available=(state.targets||[]).filter(t=>t.project_id===(existing?.project_id||workspace)),fallback=available[0];
 const m=existing||{project_id:workspace,target_id:fallback?.id||'',platform:fallback?.type||'web',build:'',device:health.android?.avd||'',visibility:'team',name:'',url:fallback?.url||site.url||'',goal:'',success_text:'',allowed_domains:fallback?.allowed_domains||site.allowed_domains||[host].filter(Boolean),provider:'codex',codex_account:'',model:DYNAMIC,model_max:'',effort:'low',mode:'journey',browser:'chromium',viewport:'desktop',network:'baseline',locale:'fa-IR',release:'live',competitors:[],max_steps:6,max_seconds:600,ai_budget:10,observe_seconds:0,pillars:Object.keys(label)};
 // The extra settings open by themselves when this mission already uses one of them.
 const extras=!!(m.persona_id||m.login_identifier||m.egress_id||m.success_text||m.observe_seconds||m.auto_replay||(m.locale&&m.locale!=='fa-IR')||(m.release&&m.release!=='live'));
-return head(id?'Edit mission':'New mission','Describe the goal, then set the conditions for the run.','<a class="button" href="#missions">Back</a>')+`<form id="mission-form" data-id="${id||''}" data-snapshot="${esc(m.snapshot||'')}"><div class="formgrid">${select('project_id','Workspace',state.projects.map(p=>option(p.id,state.hub?.mode==='hybrid'?`${p.name} · ${where(p.id)}`:p.name,m.project_id||workspace)).join(''))}${select('target_id','Target',available.map(t=>option(t.id,`${t.type==='android'?'Android app':'Website'} · ${t.name}`,m.target_id)).join(''),targetHelp(available))}${select('visibility','Visibility',option('team','Team',m.visibility||'team')+option('local','Only on this Mac',m.visibility||'team'))}${field('name','Mission name',m.name)}${field('url','Start URL or optional HTTPS deep link',m.url,'url')}${select('build','App build',option('','Latest non-archived',m.build)+(target(m.target_id)?.builds||[]).map(b=>option(b.sha256,`${b.version_name} · ${b.sha256.slice(0,10)}`,m.build)).join(''))}${field('device','Disposable Android device',m.device||health.android?.avd||'','text','Only the operator-designated AVD is accepted.')}
-<div class="field full"><label for="goal">User goal</label><textarea id="goal" name="goal" required placeholder="As a visitor, search for a movie and inspect its detail page. Stop before login or purchase.">${esc(m.goal)}</textarea>
-<div class="assist">${(()=>{const w=['codex','claude'].find(p=>health.ai?.[p]?.logged_in);return `<button type="button" class="compact" id="goal-suggest" ${w?'':'disabled'}>Suggest two better goals</button><small>${w?'Write what you want to learn in your own words. '+esc(w)+' phrases it as a mission you can run.':'Sign in Codex or Claude under Settings to get suggestions.'}</small>`})()}</div>
-<div id="goal-suggestions" class="suggestions" aria-live="polite" hidden></div></div>
+// An idea is where a brand-new mission starts. A journey link or a saved mission already has a draft.
+const fresh=!id&&!pendingJourney;
+const worker=['codex','claude'].find(p=>health.ai?.[p]?.logged_in)||'';
+return head(id?'Edit mission':'New mission','Describe what you want to find out, then review the mission before it runs.','<a class="button" href="#missions">Back</a>')+`<form id="mission-form" data-id="${id||''}" data-snapshot="${esc(m.snapshot||'')}"><div class="formgrid">${select('target_id','Target',available.map(t=>option(t.id,`${t.type==='android'?'Android app':'Website'} · ${t.name}`,m.target_id)).join(''),targetHelp(available))}${field('url','Start URL or optional HTTPS deep link',m.url,'url')}${select('build','App build',option('','Latest non-archived',m.build)+(target(m.target_id)?.builds||[]).map(b=>option(b.sha256,`${b.version_name} · ${b.sha256.slice(0,10)}`,m.build)).join(''))}${field('device','Disposable Android device',m.device||health.android?.avd||'','text','Only the operator-designated AVD is accepted.')}</div>
+<details class="section idea" id="idea-box" ${fresh?'open':''}><summary><strong>${fresh?'Start from an idea':'Start over from an idea'}</strong></summary>
+<div class="ideabody"><div class="field full"><label for="mission-idea">What do you want to find out?</label>
+<textarea id="mission-idea" dir="auto" placeholder="Does a downloaded title still play when the phone loses its connection?"></textarea>
+<small>Opening this never erases the mission below.</small></div>
+<div class="starters" id="idea-starters" role="group" aria-label="Questions the shipped journeys answer"></div>
+<div class="assist"><button type="button" class="compact primary" id="idea-suggest" ${worker?'':'disabled'}>Suggest two missions</button><button type="button" class="compact" id="idea-manual">Write it yourself</button><small>${worker?esc(worker)+' will suggest two missions.':'Sign in Codex or Claude under Settings to get suggestions. You can still write and save a mission.'}</small></div>
+<p class="error" id="idea-error" role="alert"></p></div></details>
+<div id="mission-suggestions" class="suggestions" aria-live="polite" hidden></div>
+<div id="draft-section" ${fresh?'hidden':''}><div class="drafthead"><h2>Your mission</h2><button type="button" class="compact" id="undo-ai" hidden>Undo</button></div>
+<div class="formgrid">${field('name','Mission name',m.name)}
+<div class="field full"><label for="goal">User goal</label><textarea id="goal" name="goal" required placeholder="As a visitor, search for a movie and inspect its detail page. Stop before login or purchase.">${esc(m.goal)}</textarea></div></div>
 ${scenarioSection(m)}
+<div class="field full" id="revise-box"><label for="mission-revise">Change something</label>
+<textarea id="mission-revise" dir="auto" placeholder="Add a relaunch before the last check, and say the download must survive it."></textarea>
+<div class="assist"><button type="button" class="compact" id="revise-go" ${worker?'':'disabled'}>Revise this mission</button><small>${worker?'The whole mission comes back changed. Undo puts it straight back.':'Sign in Codex or Claude under Settings to revise a mission.'}</small></div>
+<p class="error" id="revise-error" role="alert"></p></div>
+<details class="section" id="run-settings"><summary><strong>Run settings</strong> <span id="run-summary" class="muted"></span></summary><div class="formgrid">${select('project_id','Workspace',state.projects.map(p=>option(p.id,state.hub?.mode==='hybrid'?`${p.name} · ${where(p.id)}`:p.name,m.project_id||workspace)).join(''))}${select('visibility','Visibility',option('team','Team',m.visibility||'team')+option('local','Only on this Mac',m.visibility||'team'))}
 ${select('mode','Execution mode',['journey','explore','audit','benchmark'].map(v=>option(v,{journey:'Goal-driven journey',explore:'Exploratory mission',audit:'Page / pillar audit',benchmark:'Benchmark · compare with competitors'}[v],m.mode)).join(''))}
 <div class="field full" id="competitors-field"><label for="competitors">Competitor start URLs</label><textarea id="competitors" name="competitors" placeholder="https://competitor-one.com&#10;https://competitor-two.com">${esc((m.competitors||[]).join('\n'))}</textarea><small>One URL per line. Benchmark mode answers the same goal here first, then on each competitor.</small></div>
 ${select('provider','AI worker',['codex','claude','auto','none'].map(v=>option(v,{codex:'Codex · ChatGPT subscription',claude:'Claude · Claude Code subscription',auto:'First available worker',none:'No AI · deterministic audit only'}[v],m.provider)).join(''),'Each mission can use its own worker.')}${select('codex_account','Codex account',codexAccountOptions(m.codex_account||'',true,site.codex_account||'default'),'Inherits the workspace default unless this mission needs another local Codex login.')}${select('model','AI model',modelOptions(m.model||''),'Dynamic reads a page on a small model and saves the strong one for the evidence review. Any other choice runs every call on that model.')}${select('model_max','Highest model allowed',maxModelOptions(m.model_max||''),'Dynamic never goes above this model. Reviews use Opus/Sol unless capped lower. Prices are estimates at standard API prices; runs use your subscription.')}<div class="field model-custom"><label for="model_custom">Custom model id</label><input id="model_custom" name="model_custom" value="${esc(['codex','claude'].flatMap(p=>aiModels(p).map(o=>o.value)).includes(m.model||'')?'':m.model===DYNAMIC?'':m.model||'')}" autocomplete="off"><small>Any model id the selected CLI accepts.</small></div>${select('effort','Reasoning effort',['low','medium','high','xhigh'].map(v=>option(v,v,m.effort||'low')).join(''),'Higher effort is slower and uses more subscription quota.')}${field('ai_budget','Maximum AI calls',m.ai_budget,'number')}
 ${select('browser','Browser',['chromium','firefox','webkit'].map(v=>option(v,v,m.browser)).join(''))}${select('viewport','Viewport',['desktop','mobile','tablet'].map(v=>option(v,v,m.viewport)).join(''))}
 ${select('network','Network profile',state.networks.map(v=>option(v.id,v.name,m.network)).join(''),'Throttling profiles require Chromium. These are synthetic conditions.')}${field('max_steps','Maximum actions',m.max_steps,'number')}${field('max_seconds','Time limit in seconds',m.max_seconds,'number')}
-<div class="field full"><label>Evaluation pillars</label><div class="checks">${Object.entries(label).map(([k,v])=>`<label><input type="checkbox" name="pillars" value="${k}" ${(m.pillars||[]).includes(k)?'checked':''}>${v}</label>`).join('')}</div></div></div>
+<div class="field full"><label>Evaluation pillars</label><div class="checks">${Object.entries(label).map(([k,v])=>`<label><input type="checkbox" name="pillars" value="${k}" ${(m.pillars||[]).includes(k)?'checked':''}>${v}</label>`).join('')}</div></div></div></details>
 <details class="section" ${extras?'open':''}><summary><strong>Sign-in, proxy, replay and other settings</strong></summary><div class="formgrid">${select('persona_id','Test persona',option('','Unauthenticated visitor',m.persona_id)+state.personas.map(v=>option(v.id,v.name,m.persona_id)).join(''))}${field('login_identifier','Sign-in identifier',m.login_identifier||'','text','Phone, email or username the assistant types into the login form. Leave empty for a read-only run.')}${field('login_password','Sign-in password','','password','Stored locally and filled by the engine; the assistant never sees it. Leave blank to keep the saved password. Setting an identifier also lets this website send its own POST requests on the allowed domains.')}
 ${select('egress_id','Proxy route',option('','Direct connection',m.egress_id)+(state.egresss||[]).map(v=>option(v.id,v.name,m.egress_id)).join(''),'A real alternate ISP requires an actual proxy endpoint.')}${field('success_text','Success text (optional)',m.success_text,'text','Exact text that must be visible for the run to count as a success.')}${field('allowed_domains','Allowed navigation domains',m.allowed_domains.join(', '),'text','Comma-separated exact hostnames. The start hostname is always included.')}
 ${field('observe_seconds','Stay on the final page (seconds)',m.observe_seconds||0,'number','Records playback and network behaviour after the journey. 0 skips it.')}${select('auto_replay','Replay P0–P2 findings automatically',option('false','Off',String(m.auto_replay||false))+option('true','Once, with a separate run budget',String(m.auto_replay||false)))}${field('locale','Browser locale',m.locale)}${field('release','Release label',m.release,'text','Free tag such as live or staging, used when comparing runs.')}</div></details>
-<div class="toolbar"><button class="primary" type="submit">Save mission</button><button type="submit" name="run" value="1">Save and run</button>${id?`<button type="button" class="danger" data-delete-mission="${id}">Delete mission</button>`:''}</div><p class="error" id="form-error" role="alert"></p></form>`}
+<div class="toolbar"><button class="primary" type="submit">Save mission</button><button type="submit" name="run" value="1">Save and run</button>${id?`<button type="button" class="danger" data-delete-mission="${id}">Delete mission</button>`:''}</div></div>
+<p class="error" id="form-error" role="alert"></p></form>`}
 // One readable line per action: what it did and what it changed.
 const firstLine=t=>String(t||'').split('\n')[0].slice(0,160);
 const actionResult=a=>a.status==='policy_blocked'?`refused: ${firstLine(a.error)}`:a.status==='skipped'?`skipped: ${firstLine(a.error)}`:a.status==='failed'?`failed: ${firstLine(a.error)}`:a.state_changed?'page changed':a.evidence_after?'no visible change':'';
@@ -663,32 +719,122 @@ const seo=mf.querySelector('[name=pillars][value=seo_aeo]');if(seo){seo.disabled
 if(native){if(mode?.value==='benchmark')mode.value='audit';mf.querySelector('[name=network]').value='baseline'}
 if(changed){const selected=target(targetPicker.value),url=mf.querySelector('[name=url]'),domains=mf.querySelector('[name=allowed_domains]'),visibility=mf.querySelector('[name=visibility]');url.value=selected?.type==='web'?selected.url||'':'';domains.value=(selected?.allowed_domains||[]).join(', ');if(selected?.visibility==='local')visibility.value='local'}};
 sync();if(picker)picker.onchange=sync;if(mode)mode.onchange=sync;if(targetPicker)targetPicker.onchange=()=>sync(true);if(worker)worker.addEventListener('change',sync)
-scenarioBind(mf,sync);
-// AI goal suggestions. The rough sentence the user typed is kept, so Try again re-asks with it.
-const box=mf.querySelector('[name=goal]'),ask=$('#goal-suggest'),panel=$('#goal-suggestions');let rough='',shown=[];
-const applySuggestion=(s,card)=>{box.value=s.goal;if(mode&&s.mode)mode.value=s.mode;
-mf.querySelectorAll('[name=pillars]').forEach(c=>c.checked=(s.pillars||[]).includes(c.value));
-const nameField=mf.querySelector('[name=name]');if(nameField&&!nameField.value.trim())nameField.value=s.title;
-panel.querySelectorAll('.suggestion').forEach(el=>el.classList.remove('applied'));card.classList.add('applied');
-sync();toast('Goal applied. Review it, then save.');box.focus()};
-const draw=data=>{shown=data.suggestions;
-panel.innerHTML=data.suggestions.map((s,i)=>`<article class="suggestion"><h3>${esc(s.title)}</h3><p class="muted">What you learn: ${esc(s.why)}</p><p class="goaltext">${esc(s.goal)}</p><div class="findmeta"><span class="badge">${esc(s.mode)}</span>${(s.pillars||[]).map(k=>`<span class="badge">${esc(label[k]||k)}</span>`).join('')}</div>${s.caveat?`<small class="caveat">Needs first: ${esc(s.caveat)}</small>`:''}<div class="toolbar"><button type="button" class="compact primary" data-apply="${i}">Use this goal</button></div></article>`).join('')
-+`<small class="suggestfoot">Suggested by ${esc(data.usage?.provider||'')} · ${esc(data.usage?.model_reported||data.usage?.model_requested||'')}</small>`;
-panel.querySelectorAll('[data-apply]').forEach(b=>b.onclick=()=>applySuggestion(shown[+b.dataset.apply],b.closest('.suggestion')))};
-if(ask&&box&&panel)ask.onclick=async()=>{
- // Editing the box replaces the remembered idea; an applied suggestion does not.
- const typed=box.value.trim();if(typed&&!shown.some(s=>s.goal===typed))rough=typed;
- if(rough.length<3){$('#form-error').textContent='Write what you want to learn first, in your own words.';box.focus();return}
- const data={project_id:mf.querySelector('[name=project_id]').value,target_id:mf.querySelector('[name=target_id]').value,build:mf.querySelector('[name=build]').value,url:mf.querySelector('[name=url]').value,goal:rough,
-  mode:mode?mode.value:'journey',viewport:mf.querySelector('[name=viewport]').value,
-  provider:mf.querySelector('[name=provider]').value,codex_account:mf.querySelector('[name=codex_account]')?.value||'',
-  competitors:(mf.querySelector('[name=competitors]')?.value||'').split(/[\n,]/).map(s=>s.trim()).filter(Boolean)};
- const original=ask.textContent;$('#form-error').textContent='';
- ask.disabled=true;ask.textContent='Asking the AI worker…';panel.hidden=false;panel.setAttribute('aria-busy','true');
- panel.innerHTML='<div class="skeleton"></div><div class="skeleton"></div>';
- try{draw(await api('/missions/suggest',{method:'POST',body:JSON.stringify(data)}));ask.textContent='Try again'}
- catch(e){panel.innerHTML=`<p class="error">${esc(e.message)}</p>`;ask.textContent=original}
- finally{ask.disabled=false;panel.removeAttribute('aria-busy')}}}
+// --- idea first -------------------------------------------------------------
+// One endpoint answers both asks: two whole missions from an idea, or one revised mission.
+let scenario=null,undo=null,busy=false,shown=[],rough='';
+const draftBox=$('#draft-section'),ideaBox=$('#idea-box'),panel=$('#mission-suggestions'),
+ undoButton=$('#undo-ai'),runSummary=$('#run-summary'),ideaField=$('#mission-idea'),ideaError=$('#idea-error'),
+ suggestButton=$('#idea-suggest'),reviseField=$('#mission-revise'),reviseError=$('#revise-error'),reviseGo=$('#revise-go');
+const value=name=>mf.querySelector(`[name="${name}"]`);
+const checkedPillars=()=>[...mf.querySelectorAll('[name=pillars]:checked')].map(c=>c.value);
+// Saving is decided here alone, so no single rule can re-enable what another one forbids.
+function refreshSave(){const left=scenario?scenario.blanks():0,stuck=scenario?scenario.dirtyYaml():false;
+ mf.querySelectorAll('button[type=submit]').forEach(b=>b.disabled=busy||left>0||stuck)}
+// Every control sleeps while the worker thinks, and wakes to whatever the rules say afterwards.
+const setBusy=on=>{busy=on;
+ mf.querySelectorAll('input,select,textarea,button').forEach(el=>{
+  if(on){if(el.disabled)el.dataset.wasOff='1';el.disabled=true}
+  else{el.disabled=el.dataset.wasOff==='1';delete el.dataset.wasOff}});
+ if(!on){sync();describeRun()}
+ refreshSave()};
+// What this mission will actually do, in the words of its own settings.
+function describeRun(){if(!runSummary)return;
+ const native=target(value('target_id')?.value)?.type==='android',bits=[value('provider').value,value('mode').value];
+ if(!native)bits.push(value('browser').value);
+ bits.push(Math.max(1,Math.round(+value('max_seconds').value/60))+' min',(+value('max_steps').value||0)+' actions');
+ const on=checkedPillars().map(k=>label[k]||k);
+ bits.push(on.length?on.join(', '):'no pillars');
+ runSummary.textContent=bits.join(' · ')}
+if(runSummary){mf.querySelectorAll('#run-settings input,#run-settings select').forEach(el=>el.addEventListener('change',describeRun));
+ mf.querySelector('[name=target_id]')?.addEventListener('change',describeRun)}
+// Network shaping is a Chromium capability; a suggestion that uses it says so and takes it.
+const needsChromium=steps=>steps.some(s=>{const e=s.event;return !!e&&(!!e.speed||e.delay_ms!=null||['wifi','cellular'].includes(e.network))});
+const snapshot=()=>({name:value('name').value,goal:value('goal').value,steps:clone(scenarioSteps),
+ mode:value('mode').value,pillars:[...mf.querySelectorAll('[name=pillars]')].map(c=>c.checked),
+ browser:value('browser').value,max_seconds:value('max_seconds').value,max_steps:value('max_steps').value,ai_budget:value('ai_budget').value});
+const restore=was=>{value('name').value=was.name;value('goal').value=was.goal;value('mode').value=was.mode;
+ [...mf.querySelectorAll('[name=pillars]')].forEach((c,i)=>c.checked=was.pillars[i]);
+ for(const k of ['browser','max_seconds','max_steps','ai_budget'])value(k).value=was[k];
+ // Exact values are coming back, so the time limit is not re-fitted around them.
+ sync();if(scenario)scenario.replace(was.steps,{fit:false});describeRun();refreshSave()};
+if(undoButton)undoButton.onclick=()=>{if(!undo)return;restore(undo);undo=null;undoButton.hidden=true;
+ panel.querySelectorAll('.suggestion').forEach(el=>el.classList.remove('applied'));toast('Change undone.')};
+// One suggestion, put where each part belongs. The previous mission waits in the single undo slot.
+const apply=(s,revised)=>{undo=snapshot();if(undoButton)undoButton.hidden=false;
+ const browserWas=value('browser').value;
+ if(s.title)value('name').value=s.title;
+ value('goal').value=s.goal;
+ if(s.mode)value('mode').value=s.mode;
+ mf.querySelectorAll('[name=pillars]').forEach(c=>c.checked=(s.pillars||[]).includes(c.value));
+ const steps=s.steps||[];
+ if(steps.length){
+  // ponytail: a flat four actions per step, raised only upward; tune if scenarios start running out of room.
+  const room=Math.max(8,Math.min(40,4*steps.length));
+  if((+value('max_steps').value||0)<room)value('max_steps').value=room;
+  if((+value('ai_budget').value||0)<room)value('ai_budget').value=room;
+  if(needsChromium(steps))value('browser').value='chromium'}
+ sync();if(scenario)scenario.replace(steps);
+ if(draftBox)draftBox.hidden=false;if(ideaBox)ideaBox.open=false;
+ describeRun();refreshSave();
+ // The notice says only what actually happened: how much is left, and a setting this changed.
+ const left=scenario?scenario.blanks():0;
+ toast((revised?'Mission revised.':left?`Mission filled in. Fill the ${left} blank${left===1?'':'s'}, then save.`:'Mission filled in. Review it, then save.')
+  +(value('browser').value!==browserWas?' Chromium selected for network shaping.':''));
+ if(!(scenario&&scenario.focusBlank()))value('name').focus()};
+// A card shows the whole mission, steps included, because that is what gets applied.
+const cards=(data,useLabel,revised)=>{shown=data.suggestions||[];
+ const native=target(value('target_id').value)?.type==='android';
+ panel.hidden=false;
+ panel.innerHTML=shown.map((s,i)=>{const steps=s.steps||[],notes=[];
+  if(s.caveat)notes.push('Needs first: '+s.caveat);
+  if(needsChromium(steps))notes.push('Network shaping runs on Chromium, so applying this selects it.');
+  if(steps.some(x=>x.manual))notes.push('This mission pauses for an operator at the screen.');
+  if(!native&&steps.some(x=>x.event&&(x.event.home||x.event.back||x.event.relaunch||x.event.kill)))notes.push('App events such as home or relaunch only run on an Android target.');
+  return `<article class="suggestion"><h3 dir="auto">${esc(s.title||'Mission')}</h3><p class="muted" dir="auto">What you learn: ${esc(s.why||'')}</p><p class="goaltext" dir="auto">${esc(s.goal)}</p>`
+  +(steps.length?`<ol class="steplines">${steps.map(x=>`<li dir="auto">${esc(describeStep(x))}</li>`).join('')}</ol>`
+   :'<p class="muted">No steps: the worker finds its own way from the goal.</p>')
+  +`<div class="findmeta"><span class="badge">${esc(s.mode)}</span>${(s.pillars||[]).map(k=>`<span class="badge">${esc(label[k]||k)}</span>`).join('')}${steps.length?`<span class="badge">${steps.length} step${steps.length===1?'':'s'}</span>`:''}</div>`
+  +notes.map(n=>`<small class="caveat" dir="auto">${esc(n)}</small>`).join('')
+  +`<div class="toolbar"><button type="button" class="compact primary" data-apply="${i}">${esc(useLabel)}</button></div></article>`}).join('')
+ +`<small class="suggestfoot">Suggested by ${esc(data.usage?.provider||'')} · ${esc(data.usage?.model_reported||data.usage?.model_requested||'')}. Nothing runs until you save and start it.</small>`;
+ panel.querySelectorAll('[data-apply]').forEach(b=>b.onclick=()=>{apply(shown[+b.dataset.apply],revised);
+  panel.querySelectorAll('.suggestion').forEach(el=>el.classList.remove('applied'));b.closest('.suggestion').classList.add('applied')})};
+const context=goal=>({project_id:value('project_id').value,target_id:value('target_id').value,build:value('build').value,
+ url:value('url').value,goal,mode:value('mode').value,viewport:value('viewport').value,
+ provider:value('provider').value,codex_account:value('codex_account')?.value||'',
+ competitors:(value('competitors')?.value||'').split(/[\n,]/).map(s=>s.trim()).filter(Boolean)});
+const request=async({button,busyText,doneText,errorBox,body,after})=>{
+ // Unapplied YAML is not a scenario yet; nothing may replace the steps while it sits there.
+ if(scenario&&scenario.dirtyYaml()){errorBox.textContent='Apply your YAML edits before changing the mission.';scenario.showYaml();return}
+ const generation=renderGeneration,was=button.textContent;let arrived=false;
+ errorBox.textContent='';setBusy(true);button.textContent=busyText;
+ panel.hidden=false;panel.setAttribute('aria-busy','true');panel.innerHTML='<div class="skeleton"></div><div class="skeleton"></div>';
+ try{const data=await api('/missions/suggest',{method:'POST',body:JSON.stringify(body)});
+  // A later render replaced this form; an answer written into it would go nowhere.
+  if(generation!==renderGeneration||!mf.isConnected)return;
+  arrived=true;after(data)}
+ catch(e){if(generation!==renderGeneration||!mf.isConnected)return;
+  panel.hidden=true;panel.innerHTML='';errorBox.textContent=e.message}
+ finally{if(generation===renderGeneration&&mf.isConnected){
+  button.textContent=arrived&&doneText?doneText:was;panel.removeAttribute('aria-busy');setBusy(false)}}};
+if(suggestButton&&ideaField)suggestButton.onclick=()=>{
+ // Editing the box replaces the remembered idea; applying a suggestion does not.
+ const typed=ideaField.value.trim();if(typed)rough=typed;
+ if(rough.length<3){ideaError.textContent='Write what you want to find out first, in your own words.';ideaField.focus();return}
+ if(!value('target_id').value){ideaError.textContent='Choose the target this mission runs against first.';value('target_id').focus();return}
+ request({button:suggestButton,busyText:'Asking the AI worker…',doneText:'Try again',errorBox:ideaError,
+  body:context(rough),after:data=>cards(data,'Use this mission')})};
+const manual=$('#idea-manual');
+if(manual)manual.onclick=()=>{if(draftBox)draftBox.hidden=false;if(ideaBox)ideaBox.open=false;value('name').focus()};
+if(reviseGo&&reviseField)reviseGo.onclick=()=>{const wanted=reviseField.value.trim();
+ if(wanted.length<3){reviseError.textContent='Say what should change, in your own words.';reviseField.focus();return}
+ request({button:reviseGo,busyText:'Revising…',errorBox:reviseError,
+  body:{...context(wanted),revise:true,current:{name:value('name').value,goal:value('goal').value,
+   steps:scenarioSteps,mode:value('mode').value,pillars:checkedPillars()}},
+  after:data=>cards(data,'Use this revision',true)})};
+scenario=scenarioBind(mf,sync,refreshSave);
+$('#scenario-yaml')?.addEventListener('input',refreshSave);
+describeRun();refreshSave()}
 if(mf)mf.onsubmit=async e=>{e.preventDefault();const fd=new FormData(mf),data=Object.fromEntries(fd);data.allowed_domains=data.allowed_domains.split(',').map(s=>s.trim()).filter(Boolean);data.competitors=(data.competitors||'').split(/[\n,]/).map(s=>s.trim()).filter(Boolean);data.model=data.model==='__custom__'?(data.model_custom||'').trim():data.model;delete data.model_custom;data.pillars=fd.getAll('pillars');for(const k of ['max_steps','max_seconds','ai_budget','observe_seconds'])data[k]=+data[k];delete data.run;
 // Steps and the start state run on either platform; a saved device state is Android's alone.
 const start=data.start_state,snapshot=data.snapshot_id;delete data.start_state;delete data.snapshot_id;

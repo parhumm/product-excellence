@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- **A mission starts from one sentence.** The new mission form opens on *What do
+  you want to find out?*. Write it in your own words and two whole missions come
+  back as cards: the goal, and every step in order and in plain words, with what
+  each one would change — Chromium for a shaped link, a person at the screen for a
+  manual step, an Android target for an app event — and what has to exist first.
+  **Use this mission** fills in the name, goal, mode, pillars and steps, and raises
+  the time and action budgets if the steps need the room. Nothing is saved and
+  nothing runs until you press **Save mission** or **Save and run**.
+- **Change a mission by describing the change.** **Change something** takes a
+  sentence such as "add a relaunch before the last check" and returns the whole
+  mission changed, as one card you apply the same way. **Undo**, beside the
+  mission heading, puts back the name, goal, steps, mode, pillars, browser and
+  budgets exactly as they were before the last thing the worker filled in.
+- **Steps read as a list before they read as a form.** The **Steps** section shows
+  the scenario as numbered sentences; **Edit steps** opens the rows and closes them
+  again. Shipped journeys, the sentence drafter and the YAML editor moved under
+  **Other ways to get steps**, and all four spellings stay the same steps.
+- **A manual step can name the value it needs**, such as a one-time code, in its
+  own field. The name is saved; the value never is.
+- **Write it yourself** opens the same empty form, so every manual tool and every
+  saved setting stays reachable with no AI worker signed in.
+
 - **A run can ask you which way to sign in.** A screen that offers a password, a
   code by SMS, a code by a call and a Google account is asking which way in, not
   for a secret. Web runs and Android journeys now pause with those options as

@@ -54,6 +54,16 @@ def parse_bounds(value):
     x1,y1,x2,y2=map(int,match.groups())
     return (min(x1,x2),min(y1,y2),max(x1,x2),max(y1,y2))
 
+def stale_webview(root):
+    """Is this web view describing where its controls used to be?
+    The soft keyboard scrolls the page under it; the page scrolls back when the keyboard goes, but the
+    web view keeps handing uiautomator the scrolled description, so every box in it is off by that
+    scroll and a tap lands on whatever has moved into its place. It gives itself away: a box that ends
+    above the web view even begins cannot be painted, only reported."""
+    boxes=[(node,BOUNDS.fullmatch(node.get('bounds') or '')) for node in root.iter('node')]
+    tops=[int(box[2]) for node,box in boxes if box and node.get('class','').endswith('WebView')]
+    return bool(tops) and any(box and int(box[4])<int(box[2]) and int(box[4])<min(tops) for _,box in boxes)
+
 # MediaSession reports its own clock. `updated` is device uptime in ms, so only its movement,
 # never arithmetic on the host clock, says whether the reported position actually advanced.
 PLAY_STATES={'0':'none','1':'stopped','2':'paused','3':'playing','6':'buffering','7':'error',
@@ -576,13 +586,19 @@ class Device:
     async def _hierarchy(self):
         # uiautomator writes a good dump and still exits non-zero while a screen animates, and a
         # half-written file parses as nothing, so trust the XML rather than the exit code, and retry once.
-        for attempt in (0,1):
-            await self.shell('uiautomator','dump','/data/local/tmp/pex-window.xml',timeout=20,check=False)
-            raw=await self.adb_call('exec-out','cat','/data/local/tmp/pex-window.xml',timeout=10,check=False)
-            try:return sanitize_xml(raw)
-            except ElementTree.ParseError as error:
-                if attempt:raise AndroidError('The device did not produce a readable window dump: '+raw.strip()[:200]) from error
-                await asyncio.sleep(1)
+        for nudged in (False,True):
+            for attempt in (0,1):
+                await self.shell('uiautomator','dump','/data/local/tmp/pex-window.xml',timeout=20,check=False)
+                raw=await self.adb_call('exec-out','cat','/data/local/tmp/pex-window.xml',timeout=10,check=False)
+                try:parsed=sanitize_xml(raw);break
+                except ElementTree.ParseError as error:
+                    if attempt:raise AndroidError('The device did not produce a readable window dump: '+raw.strip()[:200]) from error
+                    await asyncio.sleep(1)
+            if nudged or not stale_webview(parsed[1]):return parsed
+            # Scrolling is what makes a web view describe itself again, from where the page really is.
+            width,height=self.display
+            await self.shell('input','swipe',str(width//2),str(height//3),str(width//2),str(height*2//3),'400')
+            await asyncio.sleep(1)
 
     def _hide(self,value):
         """Replace every operator-supplied value wherever the device reflects it back."""

@@ -419,3 +419,28 @@ async def test_an_ai_journey_hands_a_screen_of_several_ways_in_to_the_operator(m
     # The run records which way in was taken; a label is not a secret.
     assert (run['actions'][0]['target'],run['actions'][0]['value'])==('pex-2','Get the code by SMS')
     assert run['waiting_for'] is None and 'run' not in worker.pauses
+
+
+@pytest.mark.asyncio
+async def test_a_web_view_stuck_on_an_old_scroll_is_asked_to_describe_itself_again(monkeypatch,tmp_path):
+    """Boxes that end above the web view begins are a stale description; a scroll refreshes it."""
+    from engine import android
+    monkeypatch.setenv('PEX_ANDROID_AVD','pex-test')
+    device=android.Device({'device':'pex-test'},{'package':'dev.pex.app'},tmp_path,'run',avd='pex-test')
+    frame='<hierarchy rotation="0"><node class="android.webkit.WebView" bounds="[0,283][1080,2339]" enabled="true" clickable="false" text="" resource-id="" content-desc="" password="false" checked="false">{}</node></hierarchy>'
+    field='<node class="android.widget.EditText" bounds="[78,283][1002,176]" enabled="true" clickable="true" text="" resource-id="" content-desc="" password="false" checked="false"/>'
+    good='<node class="android.widget.EditText" bounds="[78,768][1002,897]" enabled="true" clickable="true" text="" resource-id="" content-desc="" password="false" checked="false"/>'
+    # A node clipped at the bottom of the screen reports its corners the same way round and is not stale.
+    clipped='<node class="android.view.View" bounds="[105,1763][976,1520]" enabled="true" clickable="true" text="Google" resource-id="" content-desc="" password="false" checked="false"/>'
+    assert android.stale_webview(android.sanitize_xml(frame.format(field))[1])
+    assert not android.stale_webview(android.sanitize_xml(frame.format(good+clipped))[1])
+
+    dumps=[frame.format(field),frame.format(good)];calls=[]
+    async def shell(*args,**kw):calls.append(args);return ''
+    async def adb_call(*args,**kw):return dumps.pop(0) if len(dumps)>1 else dumps[0]
+    monkeypatch.setattr(device,'shell',shell)
+    monkeypatch.setattr(device,'adb_call',adb_call)
+
+    _,root,_=await device._hierarchy()
+    assert any(args[:2]==('input','swipe') for args in calls)
+    assert [node.get('bounds') for node in root.iter('node')][-1]=='[78,768][1002,897]'

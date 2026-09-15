@@ -39,8 +39,11 @@ class GateProxy:
     on switch; both are echoed in every fixture reply, so the guest's own bytes say which route
     and which generation carried them.
     """
-    def __init__(self,tag='A'):
-        self.tag=tag;self.requests=[];self.generation=1;self.live=set();self.server=None;self.port=0
+    def __init__(self,tag='A',exit_ip=''):
+        # The address this upstream claims to exit from. Two upstreams answer differently, so the
+        # shipped relay's own verification reads back which one carried it, rather than being told.
+        self.tag=tag;self.exit_ip=exit_ip
+        self.requests=[];self.generation=1;self.live=set();self.server=None;self.port=0
 
     async def start(self):
         self.server=await asyncio.start_server(self._client,'127.0.0.1',0)
@@ -74,6 +77,7 @@ class GateProxy:
             head=await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'),10)
         except Exception as error:
             entry['served']='no request line: '+type(error).__name__;writer.close();return
+        entry['auth']=b'proxy-authorization' in head.lower()
         line=head.decode('latin1').split('\r\n')[0][:300];entry['line']=line
         method,_,rest=line.partition(' ');authority=rest.rsplit(' ',1)[0]
         entry['authority']=authority
@@ -89,21 +93,31 @@ class GateProxy:
                     writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');await writer.drain()
                 except Exception:pass
                 writer.close();return
-            nonce=(target.group(2) or '').rsplit('/',1)[-1][:80]
+            path=target.group(2) or ''
+            nonce=path.rsplit('/',1)[-1][:80]
             entry.update(fixture=True,served='answered',generation=self.generation,tag=self.tag,verbs_seen=nonce+':'+method)
-            body=f'PEXOK {nonce} {self.tag} {self.generation}\n'.encode()
+            # `/exit` is this upstream's claimed exit address, in the one form a relay probe accepts.
+            # `/bytes/N` is N bytes and nothing else, so a shaped link is measured on the payload alone.
+            body=(self.exit_ip+'\n').encode() if path.startswith('/exit') else (
+                  b'x'*min(int(nonce or 0),4*1024*1024) if path.startswith('/bytes/') and nonce.isdigit() else
+                  f'PEXOK {nonce} {self.tag} {self.generation}\n'.encode())
             try:
                 writer.write(b'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: '
                              +str(len(body)).encode()+b'\r\nConnection: close\r\n\r\n'+body);await writer.drain()
             except Exception:pass
             writer.close();return
-        if host!=FIXTURE_HOST:
+        if not fixture_host(host):
             entry['served']='refused'
             try:
                 writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');await writer.drain()
             except Exception:pass
             writer.close();return
         entry['fixture']=True;entry['served']='tunnelled';entry['generation']=self.generation;entry['tag']=self.tag
+        # A TLS request carries its nonce in the authority it asks for: the payload is opaque to a
+        # proxy, so that is the only place an app's own request can be correlated from. A proxy-aware
+        # client can put it in the name; a guest behind `-http-proxy` resolves names itself and hands
+        # the proxy an address, so there the nonce is the port.
+        entry['verbs_seen']=(host[4:-5] if host!=FIXTURE_HOST else authority.rsplit(':',1)[-1])+':CONNECT'
         self.live.add(writer)
         try:
             writer.write(b'HTTP/1.1 200 Connection Established\r\n\r\n');await writer.drain()
@@ -142,6 +156,10 @@ class GateProxy:
             if verb=='HOLD':
                 await asyncio.sleep(min(size or 5,120));return
             if verb!='GET':return
+
+def fixture_host(host):
+    """The fixture authority, or a `pex-<nonce>.test` name pointed at it for one request."""
+    return host==FIXTURE_HOST or (host.startswith('pex-') and host.endswith('.test'))
 
 # --- guest-side fixture calls -----------------------------------------------------------------
 
@@ -405,11 +423,289 @@ async def android_gate(artifacts):
     print('\nEvery advertised interface was measured; nothing failed.',flush=True)
     return 0
 
+# --- the shipped feature, end to end -----------------------------------------------------------
+
+# Two upstreams that answer differently, and a third address only a direct connection can reach.
+ROUTES={'route-a-live-01':('A','203.0.113.11',{}),
+        'route-b-live-02':('B','198.51.100.22',{'username':'relay','password':'upstream-only'})}
+
+class LocalEcho:
+    """An address reachable only without an upstream: every proxy here refuses anything but the fixture.
+
+    So the address the relay reads back is not something this harness told it. Through a route it can
+    only be the fixture's answer, and off every route it can only be this one.
+    """
+    def __init__(self):self.server=None;self.port=0;self.hits=0
+
+    async def start(self):
+        self.server=await asyncio.start_server(self._client,'127.0.0.1',0)
+        self.port=self.server.sockets[0].getsockname()[1];return self.port
+
+    async def stop(self):
+        if self.server:self.server.close();await self.server.wait_closed();self.server=None
+
+    async def _client(self,reader,writer):
+        try:
+            await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'),10);self.hits+=1
+            writer.write(b'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 10\r\n'
+                         b'Connection: close\r\n\r\n127.0.0.1\n');await writer.drain()
+        except Exception:pass
+        try:writer.close()
+        except Exception:pass
+
+def upstreams():
+    """The two tagged proxies and the relay configuration that names them, unstarted."""
+    proxies={id:GateProxy(tag,ip) for id,(tag,ip,_) in ROUTES.items()}
+    return proxies,{id:{'name':f'Route {tag}','server':'',**extra} for id,(tag,_,extra) in ROUTES.items()}
+
+async def open_upstreams(artifacts):
+    """Both upstreams and the echo listening, the shipped relay in front of them, probing as it ships.
+
+    The probe list is the harness's one substitution: the shipped default is two public echoes, and
+    what is measured here is the routing, not the internet. Stated in the transcript, not implied.
+    """
+    from engine import relay as routing
+    proxies,configured=upstreams()
+    echo=LocalEcho();await echo.start()
+    for id,proxy in proxies.items():
+        await proxy.start();configured[id]['server']=f'http://127.0.0.1:{proxy.port}'
+    routing.PROBES=(f'http://127.0.0.1:{echo.port}/exit',f'http://{FIXTURE_HOST}/exit')
+    return routing.Relay(configured),proxies,echo,routing
+
+def landed(proxy,nonce):
+    """The entries this upstream answered for one nonce: the guest's own bytes, not the harness's."""
+    return [r for r in proxy.requests if nonce in (r.get('verbs_seen') or '')]
+
+def exit_check(report,interface,check,route_id):
+    """One switch, judged on the address the relay read back rather than on the call returning."""
+    want='127.0.0.1' if route_id=='direct' else ROUTES[route_id][1]
+    return report.add(interface,'route '+route_id,
+        'pass' if check.get('observed_ip')==want else 'fail',
+        f"{check.get('route_name')} generation {check.get('generation')}: relay read back "
+        f"{check.get('observed_ip')!r}, expected {want!r}{'; '+check['error'] if check.get('error') else ''}",
+        generation=check.get('generation'),disconnected=check.get('disconnected'))
+
+async def held_tunnel(relay,nonce):
+    """A CONNECT tunnel through the shipped relay — the form an HTTPS request takes at a proxy."""
+    reader,writer=await asyncio.open_connection(relay.host,relay.port)
+    writer.write(f'CONNECT {FIXTURE_HOST}:9101 HTTP/1.1\r\nHost: {FIXTURE_HOST}:9101\r\n\r\n'.encode())
+    await writer.drain()
+    head=await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'),15)
+    writer.write(f'PEX {nonce} HOLD 90\n'.encode());await writer.drain()
+    answer=await asyncio.wait_for(reader.readline(),15)
+    return reader,writer,head.split(b'\r\n')[0].decode('latin1'),answer.decode('latin1').strip()
+
+async def dropped(reader):
+    """A switch terminates what the previous route carried; an empty read is that termination."""
+    try:return not await asyncio.wait_for(reader.read(1),15)
+    except (asyncio.TimeoutError,TimeoutError):return False
+    except Exception:return True
+
 async def web_live(artifacts):
-    print('Live web route acceptance is not built yet; run --android-gate.',file=sys.stderr);return 2
+    """Every claimed engine through the shipped relay, plus shaping where Chromium is claimed."""
+    os.environ.setdefault('PEX_DATA',str(artifacts/'data'))
+    from playwright.async_api import async_playwright
+    from engine import web
+    report=Report();relay,proxies,echo,routing=await open_upstreams(artifacts)
+    report.notes['probes']=list(routing.PROBES)
+    report.notes['probe_substitution']=('The two public exit-IP echoes are replaced by controlled ones. '
+        'What is measured is which upstream carried the request, not internet reachability.')
+    try:
+        await relay.start('route-a-live-01')
+        report.notes['relay']=relay.proxy
+        exit_check(report,'relay',await relay.verify(),'route-a-live-01')
+        async with async_playwright() as play:
+            for name in ('chromium','firefox','webkit'):
+                print(f'-- {name} --',flush=True)
+                await page_journey(play,name,relay,proxies,report,web)
+        await switch_evidence(relay,proxies,report)
+    except Exception as error:
+        report.add('harness','web','fail',f'{type(error).__name__}: {error}')
+    finally:
+        await relay.stop()
+        # Cancelling a run must leave nothing listening: a relay outliving its run is a leaked way out.
+        report.add('cleanup','relay closed','pass' if await refused(relay.host,relay.port) else 'fail',
+                   f'the relay port {relay.port or "already released"} refuses connections after stop()')
+        report.notes['route_traffic']={g:c for g,c in sorted(relay.stats.items())}
+        for id,proxy in proxies.items():
+            report.notes.setdefault('upstream_requests',{})[id]=proxy.requests[-120:];await proxy.stop()
+        await echo.stop()
+    return finish(report,artifacts,'web')
+
+async def refused(host,port):
+    if not port:return True
+    try:
+        reader,writer=await asyncio.wait_for(asyncio.open_connection(host,port),5)
+        writer.close();return False
+    except Exception:return True
+
+async def page_journey(play,name,relay,proxies,report,web):
+    """One engine: a page through route A, the shipped switch, then the same page through route B."""
+    a,b=proxies['route-a-live-01'],proxies['route-b-live-02']
+    # Every engine is measured on the same sequence, so each one starts from route A whatever the
+    # engine before it left behind. The reset is a switch like any other and is recorded as one.
+    if relay.route_id!='route-a-live-01':await relay.apply('route-a-live-01')
+    browser=await getattr(play,name).launch()
+    try:
+        context=await browser.new_context(proxy={'server':relay.proxy})
+        page=await context.new_page()
+        first=uuid.uuid4().hex[:12]
+        await page.goto(f'http://{FIXTURE_HOST}/page/{first}',wait_until='domcontentloaded',timeout=30000)
+        body=await page.inner_text('body')
+        report.add(name,'page on route A','pass' if f'PEXOK {first} A' in body and landed(a,first) and not landed(b,first) else 'fail',
+                   f'the page read {body.strip()[:80]!r} and upstream A logged {len(landed(a,first))} request(s) for this nonce')
+        cdp=await context.new_cdp_session(page) if name=='chromium' else None
+        shipped=web.Browser(page,context,cdp,{'offline':False,'latency_ms':0,'down_mbps':0,'up_mbps':0},
+                            {'console':[],'scenario':[]},{'url':f'http://{FIXTURE_HOST}/'},str,[],[],relay)
+        established=await shipped.apply_route('route-b-live-02',1,30)
+        report.add(name,'switch','pass' if '198.51.100.22' in established else 'fail',established[:160])
+        second=uuid.uuid4().hex[:12]
+        await page.goto(f'http://{FIXTURE_HOST}/page/{second}',wait_until='domcontentloaded',timeout=30000)
+        body=await page.inner_text('body')
+        # The claim is not that the switch was accepted; it is that the target's own request moved.
+        report.add(name,'page on route B','pass' if f'PEXOK {second} B' in body and landed(b,second) and not landed(a,second) else 'fail',
+                   f'the page read {body.strip()[:80]!r} and upstream B logged {len(landed(b,second))} request(s) for this nonce')
+        report.add(name,'credentials upstream only',
+                   'pass' if all(r.get('auth') for r in landed(b,second)) and not any(r.get('auth') for r in landed(a,first)) else 'fail',
+                   'route B carries Proxy-Authorization to its upstream; route A, which has no credentials, carries none')
+        if name=='chromium':await shaped_route(page,shipped,report,relay,proxies)
+        await context.close()
+    finally:await browser.close()
+
+async def shaped_route(page,shipped,report,relay,proxies):
+    """A route and the link speed it is to be measured under: one event, applied in that order."""
+    from engine import scenario as steps
+    size=32768
+    quick=(await timed(page.goto(f'http://{FIXTURE_HOST}/bytes/{size}',wait_until='load',timeout=30000)))[1]
+    journey=steps.Scenario([],shipped,notify=None,goal='',deadline=time.monotonic()+60)
+    await journey.apply({'route':'route-a-live-01','speed':'edge'},2)
+    slow=(await timed(page.goto(f'http://{FIXTURE_HOST}/bytes/{size}',wait_until='load',timeout=60000)))[1]
+    on_a=[f for f in shipped.faults if f.get('route')]
+    report.add('chromium','route with speed','pass' if slow>quick*3 and on_a and relay.route_id=='route-a-live-01' else 'fail',
+               f'{size} B took {quick} ms on the unshaped route and {slow} ms after the same event moved back to '
+               f'route A at edge; the run recorded {shipped.faults}',unshaped_ms=quick,shaped_ms=slow)
+    await shipped.apply_speed('full')
+
+async def switch_evidence(relay,proxies,report):
+    """What a switch costs and what `direct` proves, measured once rather than per engine."""
+    nonce=uuid.uuid4().hex[:12]
+    reader,writer,line,answer=await held_tunnel(relay,nonce)
+    report.add('relay','long-lived tunnel','pass' if '200' in line and 'PEXOK' in answer else 'fail',
+               f'CONNECT answered {line.strip()!r} and the fixture said {answer!r}')
+    check=await relay.apply('direct',3)
+    gone=await dropped(reader)
+    try:writer.close()
+    except Exception:pass
+    report.add('relay','switch disconnects','pass' if gone and check['disconnected'] else 'fail',
+               f"{check['disconnected']} connection(s) terminated by the switch; the held tunnel {'ended' if gone else 'stayed open'}")
+    exit_check(report,'relay',await relay.verify(check),'direct')
+    # TEST-NET-1 is routed by nothing, so reaching the fixture without an upstream must fail.
+    unreachable=uuid.uuid4().hex[:12]
+    before=sum(len(p.requests) for p in proxies.values())
+    try:
+        reader2,writer2,line2,_=await held_tunnel(relay,unreachable)
+        writer2.close();refused_direct='502' in line2 or '504' in line2
+        detail=f'the relay answered {line2.strip()!r} with no upstream configured'
+    except Exception as error:refused_direct=True;detail=f'the connection failed as {type(error).__name__}'
+    after=sum(len(p.requests) for p in proxies.values())
+    report.add('relay','direct reaches no upstream','pass' if refused_direct and after==before else 'fail',
+               detail+f'; upstream request count went {before} to {after}')
+
+def finish(report,artifacts,mode):
+    """The same transcript, matrix and exit rule every mode in this harness answers to."""
+    (artifacts/f'route-live-{mode}.json').write_text(json.dumps({'notes':report.notes,'rows':report.rows},
+                                                                ensure_ascii=False,indent=2,default=str))
+    (artifacts/f'route-live-{mode}.md').write_text(f'# Live route acceptance: {mode}\n\n'+report.matrix()
+                                                   +'\n\n```\n'+json.dumps(report.notes,indent=2,default=str)[:20000]+'\n```\n')
+    print('\n'+report.matrix(),flush=True)
+    print(f'\nArtifacts: {artifacts}',flush=True)
+    failed=report.failures()
+    if failed:
+        print(f'\n{len(failed)} check(s) did not pass:',flush=True)
+        for row in failed:print(f"  {row['interface']}/{row['capability']}: {row['detail']}",flush=True)
+        return 1
+    print(f'\nEvery advertised {mode} capability passed.',flush=True)
+    return 0
 
 async def android_live(artifacts):
-    print('Live Android route acceptance is not built yet; run --android-gate.',file=sys.stderr);return 2
+    """The shipped Device, launched against the shipped relay, with the app making its own requests."""
+    avd=os.environ.get('PEX_ANDROID_AVD','')
+    if not avd:print('Set PEX_ANDROID_AVD to a disposable AVD',file=sys.stderr);return 2
+    data=artifacts/'data';(data/'apps').mkdir(parents=True,exist_ok=True)
+    os.environ['PEX_DATA']=str(data)
+    from engine import android,targets
+    apk=Path(__file__).parent/'fixtures/crashapp/out/crashapp-v1.apk'
+    build=targets.inspect_apk(str(apk));(data/'apps'/(build['sha256']+'.apk')).write_bytes(apk.read_bytes())
+    report=Report();relay,proxies,echo,routing=await open_upstreams(artifacts)
+    a,b=proxies['route-a-live-01'],proxies['route-b-live-02']
+    report.notes.update(probes=list(routing.PROBES),build=build)
+    device=android.Device({'device':avd,'reset':'fresh'},build,artifacts/'device','route-live',relay=relay)
+    try:
+        await relay.start('route-a-live-01')
+        exit_check(report,'relay',await relay.verify(),'route-a-live-01')
+        await device.start()
+        report.notes['serial']=device.serial
+        # The proxy is host-side: a guest setting would be a different mechanism, and one an app can opt out of.
+        guest=await device.shell('settings','get','global','http_proxy',check=False)
+        report.add('device','host-side proxy','pass' if guest.strip() in ('null','') else 'fail',
+                   f'guest global http_proxy reads {guest.strip()!r} while the emulator was launched against {relay.proxy}')
+        first=await app_request(device,report,'app on route A',a,b)
+        established=await device.apply_route('route-b-live-02',1,30)
+        report.add('switch','switch','pass' if '198.51.100.22' in established else 'fail',established[:160])
+        await app_request(device,report,'app on route B',b,a)
+        check=await relay.apply('direct',2)
+        exit_check(report,'switch',await relay.verify(check),'direct')
+        before=sum(len(p.requests) for p in proxies.values())
+        await app_request(device,report,'app off every route',None,None)
+        report.add('switch','direct reaches no upstream','pass' if sum(len(p.requests) for p in proxies.values())==before else 'fail',
+                   'no upstream saw the app\'s request once the run was switched to a direct connection')
+    except Exception as error:
+        report.add('harness','android','fail',f'{type(error).__name__}: {error}')
+    finally:
+        try:await device.stop()
+        except Exception as error:report.notes['stop_error']=str(error)[:300]
+        try:await device.close_owned()
+        except Exception as error:report.notes['close_error']=str(error)[:300]
+        report.notes['network_restore']=device.network_restore
+        await relay.stop()
+        report.add('cleanup','relay closed','pass' if await refused(relay.host,relay.port) else 'fail',
+                   f'the relay port {relay.port or "already released"} refuses connections after stop()')
+        report.notes['route_traffic']={g:c for g,c in sorted(relay.stats.items())}
+        for id,proxy in proxies.items():
+            report.notes.setdefault('upstream_requests',{})[id]=proxy.requests[-120:];await proxy.stop()
+        await echo.stop()
+    return finish(report,artifacts,'android')
+
+async def app_request(device,report,capability,expected,other):
+    """The fixture app's own HTTP stack, pointed at an address that carries this request's nonce.
+
+    `check no_crash` proves nothing about routing; only the app's own bytes arriving at an upstream
+    does. The guest resolves names itself, so a made-up hostname never leaves it and the port is the
+    only part of the authority this run can choose: one unused port per request is the nonce. The
+    fixture answers a line protocol rather than TLS, so the app's own handshake fails; what is being
+    measured is which upstream was asked to carry it.
+    """
+    nonce=str(9200+uuid.uuid4().int%700)
+    await device.shell('am','force-stop',device.app['package'])
+    await device.shell('am','start','-n',device.app['package']+'/'+device.app['launch_activity'],
+                       '-e','probe_url',f'https://{FIXTURE_HOST}:{nonce}/')
+    await asyncio.sleep(3)
+    observation=await device.observe('probe-'+nonce)
+    control=next((c for c in observation['controls'] if 'HTTPS probe' in (c.get('label') or '')),None)
+    if not control:
+        return report.add('app',capability,'fail','the fixture app never offered its probe control')
+    await device.act({'type':'tap','target':control['id']})
+    if expected is None:
+        # Nothing to wait for: the run is on a direct connection and the request must reach no upstream.
+        # Give it the same room a routed request gets before the count is read.
+        await asyncio.sleep(20)
+        return report.add('app',capability,'pass','the app was asked for a request no upstream should carry')
+    for _ in range(20):
+        await asyncio.sleep(1)
+        if landed(expected,nonce):break
+    return report.add('app',capability,'pass' if landed(expected,nonce) and not landed(other,nonce) else 'fail',
+        f"upstream {expected.tag} logged {len(landed(expected,nonce))} request(s) for this app's own nonce "
+        f"and upstream {other.tag} logged {len(landed(other,nonce))}",nonce=nonce)
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)

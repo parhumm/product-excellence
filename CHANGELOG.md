@@ -13,7 +13,10 @@
   page, the device nor the record.
   Only HTTP(S) upstreams can be switched to. What this establishes is the exit
   address per switch, nothing about country, ISP or carrier: DNS is resolved on
-  this machine and UDP/QUIC is never proxied.
+  this machine and UDP/QUIC is never proxied. Every browser engine and the
+  emulator were accepted live against two tagged upstreams, each one's own
+  request read back on the route that carried it; the transcripts are kept in
+  `artifacts/route-live/`.
 - **An Android journey can take a route too.** The emulator is launched against
   the run's relay with `-http-proxy`, so nothing in the guest holds a proxy
   setting and no app can opt out of it. The designated AVD must not already be

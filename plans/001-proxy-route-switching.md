@@ -2,8 +2,9 @@
 
 Reviewed 2026-09-15 against commit `cc4fae1` and the current working tree.
 Source plan: `/Users/parhumm/.claude/plans/structured-mixing-hare.md`.
-Status: TODO. Effort: L overall; risk: high in forwarding and cleanup, medium elsewhere.
-This review changes the plan only. No implementation or live validation was performed.
+Status: Done — implemented `85c2657`..`1559713`, all stages, both platforms.
+Effort: L overall; risk: high in forwarding and cleanup, medium elsewhere.
+Live gates passed 2026-09-15; transcripts in `artifacts/android-gate/` and `artifacts/route-live/`.
 
 ## Outcome and boundaries
 
@@ -38,25 +39,12 @@ coverage remains unknown. Effort/risk describe the correction, not the whole fea
 | P2 | Android baseline calls `apply_speed`, which always appends a fault at :513; raw HTTPX failures may expose proxy details | Separate baseline configuration from step recording; sanitize public errors | S / medium |
 | P2 | `web.SPEEDS` and emulator preset values differ; research mixes command forms and contradicts its own dates | Record actual applied values and verify numeric syntax; do not promise equal throughput from equal labels | S / low |
 
-## Current state and drift check
+## Code touched
 
-Run `git status --short` and `git diff cc4fae1 -- engine app.py static/app.js tests pyproject.toml`.
-At review, existing edits affected `app.py`, `engine/contracts.py`, `engine/suggest.py`,
-`tests/test_phase1.py`, and `.claude/skills/pex-mission-write/references/goal-voice.md`.
-Preserve them. Reconcile changed symbols before implementing; line numbers are navigation aids.
-
-Relevant existing code:
-
-```python
-# engine/contracts.py:96 — kind and one_operation each collapse speed + delay
-if 'speed' in chosen and 'delay_ms' in chosen:chosen.remove('delay_ms')
-# engine/scenario.py:189 — event reasons are currently discarded
-await self.apply(step['event']);result.update(status='passed',reason='Applied')
-# engine/android.py:240 — loses asymmetric upload and fractional kbps
-kbits=int(down.group(1))//1000 if down else 0
-# engine/runner.py:728 — existing shared interpreter call
-await self._scenario(id,r,m,web.Browser(page,context,cdp,profile,r,m,hide,supplied,tabs),pursue,event,start+m['max_seconds'])
-```
+Drift check satisfied at execution: the working-tree edits this review asked to preserve
+were already committed, and every cited anchor resolved except `scenario.py:189` (actually
+187). `contracts.py` collapses speed + delay in two places (`kind` at 90, `one_operation`
+at 96) and `scenario.event_kind` in a third — all three had to agree.
 
 Use existing `ScenarioError`/`AndroidError` and the scenario interpreter's error→skip
 behavior. Follow `tests/test_web_scenario.py:scenario_journey` and
@@ -322,6 +310,26 @@ Primary references checked on the review date:
   netsim Wi-Fi separation and asymmetric rate syntax. Readback and traffic measurement
   resolve command/version uncertainty. The research's “post-netsim” date argument and
   assertion that the repository restore parser is correct are not acceptance evidence.
+
+Two contradictions between the research and this review are settled — do not re-litigate:
+
+- **The `console_network` parser.** The review is right; the running emulator proves it.
+  Readback is two speed lines (`download speed:` and `upload speed:`) plus one min/max
+  latency pair. The old parser read download only and restored `kbits:kbits`, so an
+  asymmetric link came back symmetric and a missing value became `0` → `'full'`.
+  Unavailable measurements stay null with a reason, never zero. The research is right that
+  speeds are echoed in bits/s though set in kbps, and that the set form is
+  `network speed <up> <down>`.
+- **Relay size.** The research's ~90-line estimate is not a target. Correctness of a
+  streaming proxy is the acceptance criterion.
+
+The netsim unknown resolved in our favour on emulator **36.6.11.0**: `-http-proxy` still
+routes guest TCP on both Wi-Fi and cellular (CONNECTs arrived for 80, 443 and 9101, and
+`settings get global http_proxy` read `null`), but `network speed`/`delay` shape the mobile
+radio only — over Wi-Fi they are accepted and do nothing. So a mission that shapes takes the
+device to mobile data first, and shaping asked for over Wi-Fi is refused rather than
+reported as applied. No packet-loss verb exists, which is why jitter, loss, reordering and
+periodic disconnects are refused on Android rather than approximated.
 
 ## Stop conditions and maintenance
 

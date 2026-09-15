@@ -30,7 +30,7 @@
   under, not a fault in it; a `network: restore` step goes back to it, and the end
   of the run goes back to the device's own settings. Offline, jitter, loss,
   reordering and periodic disconnects were never measured there and are refused.
-  The full transport gate transcript is kept with the run artifacts.
+  The full transport gate transcript is kept in `artifacts/android-gate/`.
 
 - **A mission starts from one sentence.** The new mission form opens on *What do
   you want to find out?*. Write it in your own words and four whole missions come

@@ -3,13 +3,19 @@
 ## Unreleased
 
 - **A mission starts from one sentence.** The new mission form opens on *What do
-  you want to find out?*. Write it in your own words and two whole missions come
-  back as cards: the goal, and every step in order and in plain words, with what
-  each one would change — Chromium for a shaped link, a person at the screen for a
-  manual step, an Android target for an app event — and what has to exist first.
-  **Use this mission** fills in the name, goal, mode, pillars and steps, and raises
-  the time and action budgets if the steps need the room. Nothing is saved and
-  nothing runs until you press **Save mission** or **Save and run**.
+  you want to find out?*. Write it in your own words and four whole missions come
+  back as cards, in two groups: two the worker works out for itself from the goal
+  alone, and two scenarios with every step already written, in order and in plain
+  words. Each card says what it would change — Chromium for a shaped link, a person
+  at the screen for a manual step, an Android target for an app event — and what
+  has to exist first.
+  **Use this goal** or **Use this scenario** fills in the name, goal, mode, pillars
+  and steps, and raises the time and action budgets if the steps need the room.
+  Nothing is saved and nothing runs until you press **Save mission** or **Save and
+  run**.
+- **A mission the worker gets wrong no longer costs the whole answer.** One
+  suggestion that does not fit the contract is dropped and named underneath the
+  cards that survived, instead of failing the minute you waited for.
 - **Change a mission by describing the change.** **Change something** takes a
   sentence such as "add a relaunch before the last check" and returns the whole
   mission changed, as one card you apply the same way. **Undo**, beside the

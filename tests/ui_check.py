@@ -98,8 +98,16 @@ SUGGESTED=[
   'steps':[{'goal':'Open the downloads list'},{'manual':'Sign in on the device','ask':'one-time code','timeout':300},
            {'event':{'delay_ms':0}},{'check':{'playing':True,'policy':'confirmed','within':20}}]},
  {'title':'The download finishes on a slow connection','why':'Whether a shaped connection still completes a download.',
-  'caveat':'','mode':'journey','pillars':['functionality'],'shape':'goal','journey':'','goal':'As a subscriber, finish a download on a slow connection.','steps':[]}]
-def answered(items):return {'suggestions':items,'usage':{'provider':'codex','model_reported':'gpt-5-mini'}}
+  'caveat':'','mode':'journey','pillars':['functionality'],'shape':'goal','journey':'','goal':'As a subscriber, finish a download on a slow connection.','steps':[]},
+ {'title':'Downloads survive a reload','why':'Whether the saved list is still there on the second look.',
+  'caveat':'','mode':'journey','pillars':['functionality'],'shape':'scenario','journey':'Open the list, reload, look again.',
+  'goal':'As a subscriber, find the downloads list again after a reload.',
+  'steps':[{'goal':'Open the downloads list'},{'check':{'text':'Downloads','within':10}}]},
+ {'title':'The plans page names the renewal','why':'Whether a customer can read the renewal before paying.',
+  'caveat':'','mode':'journey','pillars':['cro'],'shape':'goal','journey':'',
+  'goal':'As a visitor, find the plans and read the renewal terms. Stop before any payment control.','steps':[]}]
+def answered(items,rejected=()):return {'suggestions':items,'rejected':list(rejected),
+                                       'usage':{'provider':'codex','model_reported':'gpt-5-mini'}}
 async def stub(page,payload,status=200):
  """Deterministic answers for the one endpoint the idea flow calls. No AI quota is spent here."""
  await page.unroute('**/api/missions/suggest')
@@ -126,20 +134,31 @@ async def mission_ideas(page):
  await page.fill('#mission-form [name=max_steps]','30')
  await page.fill('#mission-form [name=max_seconds]','900')
  await page.select_option('#mission-form [name=browser]','firefox')
- await stub(page,answered(SUGGESTED))
+ await stub(page,answered(SUGGESTED,['Mission 5: step 2: a step holds one instruction']))
  await page.locator('#idea-box > summary').click()
  await page.fill('#mission-idea','Does a downloaded title still play when the phone loses its connection?')
  await page.locator('#idea-suggest').click()
  await page.wait_for_selector('#mission-suggestions .suggestion')
- assert await page.locator('#mission-suggestions .suggestion').count()==2,'Two missions were not offered'
+ assert await page.locator('#mission-suggestions .suggestion').count()==4,'Four missions were not offered'
+ # Goals and scenarios arrive under their own headings, goals first.
+ headings=await page.locator('#mission-suggestions .suggesthead').all_inner_texts()
+ assert headings==['Let the worker find its own way','Run these exact steps'],f'The groups are wrong: {headings}'
+ # A mission the worker got wrong is named beside the ones that survived, not instead of them.
+ panel=await page.locator('#mission-suggestions').inner_text()
+ assert 'did not fit the contract' in panel and 'step 2' in panel,'A dropped mission is not reported'
+ # Two goals come first, then the two scenarios, whatever order the worker sent them in.
  cards=page.locator('#mission-suggestions .suggestion')
- assert await cards.nth(0).locator('.steplines li').count()==4,'A card hides some of the steps it would apply'
- first=await cards.nth(0).inner_text()
+ offline=cards.nth(2)
+ assert await offline.locator('.steplines li').count()==4,'A card hides some of the steps it would apply'
+ first=await offline.inner_text()
  assert 'Chromium' in first,'A shaped step gives no Chromium notice'
  assert 'operator' in first,'A manual step gives no operator notice'
  assert 'Needs first' in first,'The card drops the precondition the worker named'
- assert 'No steps' in await cards.nth(1).inner_text(),'A goal-only suggestion pretends to have steps'
- await cards.nth(0).locator('[data-apply]').click()
+ assert 'Use this scenario' in first,'A scenario card does not say what it applies'
+ goalcard=await cards.nth(0).inner_text()
+ assert 'No steps' in goalcard,'A goal-only suggestion pretends to have steps'
+ assert 'Use this goal' in goalcard,'A goal card does not say what it applies'
+ await offline.locator('[data-apply]').click()
  await page.wait_for_selector('#scenario-lines li')
  assert await page.locator('#mission-form [name=name]').input_value()=='Offline playback survives a relaunch','The title did not become the mission name'
  assert 'downloaded title' in await page.locator('#mission-form [name=goal]').input_value(),'The goal did not arrive'
@@ -157,7 +176,7 @@ async def mission_ideas(page):
  assert await page.locator('#mission-form [name=browser]').input_value()=='firefox','Undo did not put the browser back'
  assert await page.locator('#scenario-lines li.nosteps').count()==1,'Undo did not put the empty scenario back'
  assert await page.locator('#undo-ai').is_hidden(),'Undo stays offered after it was used'
- await cards.nth(0).locator('[data-apply]').click()
+ await offline.locator('[data-apply]').click()
  await page.wait_for_selector('#scenario-lines li:not(.nosteps)')
  # A revision returns one whole mission, and Undo reaches back to the one before it.
  await stub(page,answered([{**SUGGESTED[0],'title':'Offline playback survives two relaunches','mode':'explore',

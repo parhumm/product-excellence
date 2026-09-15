@@ -22,7 +22,10 @@ FIELDS['pillars'] = {'type': 'array', 'items': {'type': 'string', 'enum': PILLAR
 VOICE = (store.ROOT / '.claude/skills/pex-mission-write/references/goal-voice.md').read_text()
 STEPS = (store.ROOT / '.claude/skills/pex-mission-write/references/scenario-steps.md').read_text()
 # One copy of the step rules: the drafting tool and the mission suggestions must not drift apart.
-STEP_RULES = ('- Establish the screen with a goal before checking text on it, and before any absence check.\n'
+STEP_RULES = ('- One thing per step: a step is a goal or a manual or an event or a check or a hold, never two of '
+              'them, and an event performs one operation. Never combine network with speed, or kill with relaunch, '
+              'or a goal with an event; write them as consecutive steps. A speed may carry its own delay_ms.\n'
+              '- Establish the screen with a goal before checking text on it, and before any absence check.\n'
               '- Use manual only for sign-in, payment or anything a password reaches. Never put a password in a goal.\n'
               '- An operator step may name one value it needs with ask, such as "one-time code". Name the value, '
               'never write the value itself.\n'
@@ -77,11 +80,8 @@ def shapes(native):
             '- goal: the worker pursues the goal text on its own. steps is empty and journey is an empty string.\n'
             '- scenario: an ordered list of steps one tester carries out, in order, once the '
             + ('app' if native else 'page') + ' is open.\n'
-            'Choose scenario only when the mission turns on state changing over time, or on a fact that has to hold '
-            'at a particular moment: going offline and back, a kill and relaunch, a download that must survive a '
-            'pause, a notification that must arrive. Otherwise return a goal. Do not force a scenario onto an idea '
-            'that does not need one.\n'
-            'If both shapes fit the rough idea, return one of each. Two scenarios are allowed when both are justified.\n'
+            'Both shapes carry the goal text: a scenario states in prose what the run is finding out, and its steps '
+            'are how it finds out. A scenario with empty goal text is not a mission and cannot be offered.\n'
             'A scenario sets journey to one sentence describing what the tester does, mode to journey, and includes '
             'functionality in pillars. A goal leaves steps empty.\n\n'
             '--- The step vocabulary ---\n' + STEPS + '\n--- Rules for steps ---\n' + STEP_RULES)
@@ -105,13 +105,19 @@ def fields(native):
 def prompt(req, project):
     native, told = facts(req, project)
     return ('A product team member wrote a rough idea for a ' + ('native Android app' if native else 'browser')
-            + ' mission. Return exactly two missions that would make this product better for its business, '
-            'written in the voice described below.\n\n'
+            + ' mission. Return four missions: two the worker can pursue from a goal alone, and two written as '
+            'ordered scenarios whose steps are already spelled out. Every one of them should make this product '
+            'better for its business, written in the voice described below.\n\n'
             + '\n'.join(told) + '\n\n--- The house voice and the mission fields ---\n' + VOICE +
             '\n--- Which mission is worth running ---\n' + LADDER +
             '\n\n--- Goal or scenario ---\n' + shapes(native) +
-            '\n\nThe two suggestions must differ in what the business learns, not in wording: take the two '
-            'highest rungs the rough idea supports.\n\nRules for every suggestion:\n' + fields(native) +
+            '\n\nWrite both scenarios even when the idea does not obviously turn on state: a scenario is the same '
+            'question asked at a particular moment, so find the moment — going offline and back, '
+            + ('a kill and relaunch, sending the app home and back, ' if native else 'a reload, going back, ')
+            + 'a slow link, a pause that must survive. A scenario carries every step it needs; the person will '
+            'not write them. Use <Placeholders> for anything real that has to be filled in later.\n\n'
+            'The two goals take the two highest rungs the rough idea supports. The two scenarios differ in the '
+            'moment they test, not in wording.\n\nRules for every suggestion:\n' + fields(native) +
             '\nThe rough idea, written by the user:\n' + req.goal)
 
 
@@ -197,6 +203,15 @@ def prune(value):
     return kept
 
 
+def why(error):
+    """What a rejected step says to the person: the rule it broke, never pydantic's title or docs link."""
+    try: first = error.errors()[0]
+    except Exception: return str(error).split(chr(10))[0][:160]
+    field = '.'.join(str(p) for p in first.get('loc') or ())
+    message = str(first.get('msg', '')).replace('Value error, ', '')
+    return ((field + ': ' if field else '') + message)[:160]
+
+
 def normalize_step(item):
     """One step in the spelling the rows, the YAML and the runner all use. Raises if it is not one."""
     if not isinstance(item, dict): raise ValueError('a step is an object with one key such as goal, check or event')
@@ -224,7 +239,7 @@ def candidate(item, competitors, native=False):
     steps = []
     for number, step in enumerate(raw, 1):
         try: steps.append(normalize_step(step))
-        except Exception as error: raise ValueError(f'step {number}: ' + str(error).split(chr(10))[-1][:160])
+        except Exception as error: raise ValueError(f'step {number}: ' + why(error))
     # A scenario verdict is recorded under Functionality, and it is a journey by construction.
     mission['mode'] = 'journey'
     if 'functionality' not in mission['pillars']: mission['pillars'] = ['functionality'] + mission['pillars']
@@ -241,10 +256,11 @@ async def worker(req, project):
 
 
 async def suggest(req, project):
-    """Two whole missions from a rough idea, or one revised mission, on the subscription's standard model."""
+    """Four whole missions from a rough idea — two goals and two scenarios — or one revised mission."""
     provider, account = await worker(req, project)
     native = (project.get('_target') or {}).get('type') == 'android'
-    wanted = 1 if req.revise else 2
+    wanted = 1 if req.revise else 4
+    per_shape = 1 if req.revise else 2   # two of each shape; a revision returns its one mission
     # The subscription's standard model, never the cheap or the frontier tier, but at low
     # effort: a short mission does not need deliberation, and this button is waited on.
     result, usage = await ai.call(provider, revision(req, project) if req.revise else prompt(req, project),
@@ -252,15 +268,18 @@ async def suggest(req, project):
                                   effort='low', codex_account=account)
     offered = result.get('suggestions') if isinstance(result, dict) else None
     if not isinstance(offered, list): raise RuntimeError('The worker returned no list of missions')
+    # A mission the worker got wrong costs its own card, not the whole minute of waiting.
     items, rejected = [], []
     for number, item in enumerate(offered, 1):
-        if len(items) == wanted: break
-        try: items.append(candidate(item, req.competitors, native))
-        except Exception as error: rejected.append(f'Mission {number}: ' + str(error).split(chr(10))[0][:160])
-    if len(items) < wanted:
-        raise RuntimeError(f'The worker returned {len(items)} usable mission of the {wanted} asked for; try again. '
-                           + '; '.join(rejected)[:400])
-    return {'suggestions': items, 'usage': usage}
+        if len(items) >= wanted: break
+        try: got = candidate(item, req.competitors, native)
+        except Exception as error:
+            rejected.append(f'Mission {number}: ' + str(error).split(chr(10))[0][:160]); continue
+        if sum(1 for x in items if x['shape'] == got['shape']) >= per_shape: continue
+        items.append(got)
+    if not items:
+        raise RuntimeError('The worker returned no usable mission; try again. ' + '; '.join(rejected)[:400])
+    return {'suggestions': items, 'rejected': rejected[:5], 'usage': usage}
 
 
 async def draft(req, project):
@@ -283,6 +302,6 @@ async def draft(req, project):
     steps, rejected = [], []
     for index, item in enumerate((result.get('steps') or [])[:40], 1):
         try: steps.append(normalize_step(item))
-        except Exception as error: rejected.append(f'Step {index}: ' + str(error).split('\n')[1 if '\n' in str(error) else 0][:160])
+        except Exception as error: rejected.append(f'Step {index}: ' + why(error))
     if not steps: raise RuntimeError('The worker returned no usable step. ' + ('; '.join(rejected)[:400]))
     return {'steps': steps, 'rejected': rejected[:5], 'usage': usage}

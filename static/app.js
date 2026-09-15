@@ -501,7 +501,7 @@ return head(id?'Edit mission':'New mission','Describe what you want to find out,
 <textarea id="mission-idea" dir="auto" placeholder="Does a downloaded title still play when the phone loses its connection?"></textarea>
 <small>Opening this never erases the mission below.</small></div>
 <div class="starters" id="idea-starters" role="group" aria-label="Questions the shipped journeys answer"></div>
-<div class="assist"><button type="button" class="compact primary" id="idea-suggest" ${worker?'':'disabled'}>Suggest two missions</button><button type="button" class="compact" id="idea-manual">Write it yourself</button><small>${worker?esc(worker)+' will suggest two missions.':'Sign in Codex or Claude under Settings to get suggestions. You can still write and save a mission.'}</small></div>
+<div class="assist"><button type="button" class="compact primary" id="idea-suggest" ${worker?'':'disabled'}>Suggest missions</button><button type="button" class="compact" id="idea-manual">Write it yourself</button><small>${worker?esc(worker)+' will suggest two goals and two scenarios.':'Sign in Codex or Claude under Settings to get suggestions. You can still write and save a mission.'}</small></div>
 <p class="error" id="idea-error" role="alert"></p></div></details>
 <div id="mission-suggestions" class="suggestions" aria-live="polite" hidden></div>
 <div id="draft-section" ${fresh?'hidden':''}><div class="drafthead"><h2>Your mission</h2><button type="button" class="compact" id="undo-ai" hidden>Undo</button></div>
@@ -782,10 +782,12 @@ const apply=(s,revised)=>{undo=snapshot();if(undoButton)undoButton.hidden=false;
   +(value('browser').value!==browserWas?' Chromium selected for network shaping.':''));
  if(!(scenario&&scenario.focusBlank()))value('name').focus()};
 // A card shows the whole mission, steps included, because that is what gets applied.
+const HEADINGS={goal:'Let the worker find its own way',scenario:'Run these exact steps'};
 const cards=(data,useLabel,revised)=>{shown=data.suggestions||[];
  const native=target(value('target_id').value)?.type==='android';
  panel.hidden=false;
- panel.innerHTML=shown.map((s,i)=>{const steps=s.steps||[],notes=[];
+ // data-apply is the index into shown, not into the group, so grouping never rewires a button.
+ const card=(s,i)=>{const steps=s.steps||[],notes=[];
   if(s.caveat)notes.push('Needs first: '+s.caveat);
   if(needsChromium(steps))notes.push('Network shaping runs on Chromium, so applying this selects it.');
   if(steps.some(x=>x.manual))notes.push('This mission pauses for an operator at the screen.');
@@ -795,7 +797,12 @@ const cards=(data,useLabel,revised)=>{shown=data.suggestions||[];
    :'<p class="muted">No steps: the worker finds its own way from the goal.</p>')
   +`<div class="findmeta"><span class="badge">${esc(s.mode)}</span>${(s.pillars||[]).map(k=>`<span class="badge">${esc(label[k]||k)}</span>`).join('')}${steps.length?`<span class="badge">${steps.length} step${steps.length===1?'':'s'}</span>`:''}</div>`
   +notes.map(n=>`<small class="caveat" dir="auto">${esc(n)}</small>`).join('')
-  +`<div class="toolbar"><button type="button" class="compact primary" data-apply="${i}">${esc(useLabel)}</button></div></article>`}).join('')
+  +`<div class="toolbar"><button type="button" class="compact primary" data-apply="${i}">${esc(useLabel||(s.shape==='scenario'?'Use this scenario':'Use this goal'))}</button></div></article>`};
+ const dropped=data.rejected?.length?`<p class="muted suggestfoot">${data.rejected.length} suggestion${data.rejected.length===1?'':'s'} did not fit the contract and ${data.rejected.length===1?'was':'were'} dropped: ${esc(data.rejected.join('; '))}</p>`:'';
+ panel.innerHTML=(useLabel?shown.map(card).join('')
+  :Object.keys(HEADINGS).map(shape=>{const group=shown.map((s,i)=>[s,i]).filter(([s])=>s.shape===shape);
+   return group.length?`<h3 class="suggesthead">${esc(HEADINGS[shape])}</h3>`+group.map(([s,i])=>card(s,i)).join(''):''}).join(''))
+ +dropped
  +`<small class="suggestfoot">Suggested by ${esc(data.usage?.provider||'')} · ${esc(data.usage?.model_reported||data.usage?.model_requested||'')}. Nothing runs until you save and start it.</small>`;
  panel.querySelectorAll('[data-apply]').forEach(b=>b.onclick=()=>{apply(shown[+b.dataset.apply],revised);
   panel.querySelectorAll('.suggestion').forEach(el=>el.classList.remove('applied'));b.closest('.suggestion').classList.add('applied')})};
@@ -823,7 +830,7 @@ if(suggestButton&&ideaField)suggestButton.onclick=()=>{
  if(rough.length<3){ideaError.textContent='Write what you want to find out first, in your own words.';ideaField.focus();return}
  if(!value('target_id').value){ideaError.textContent='Choose the target this mission runs against first.';value('target_id').focus();return}
  request({button:suggestButton,busyText:'Asking the AI worker…',doneText:'Try again',errorBox:ideaError,
-  body:context(rough),after:data=>cards(data,'Use this mission')})};
+  body:context(rough),after:data=>cards(data)})};
 const manual=$('#idea-manual');
 if(manual)manual.onclick=()=>{if(draftBox)draftBox.hidden=false;if(ideaBox)ideaBox.open=false;value('name').focus()};
 if(reviseGo&&reviseField)reviseGo.onclick=()=>{const wanted=reviseField.value.trim();

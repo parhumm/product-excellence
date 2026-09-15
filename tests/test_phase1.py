@@ -394,7 +394,15 @@ def fake_worker(monkeypatch,logged_in=('codex',),suggestions=None):
              'mode':'journey','pillars':['cro','functionality']},
             {'title':'Pricing against the competition','why':'Shows whether the price reads clearly beside rivals.',
              'caveat':'needs competitor URLs','goal':'Read the plans here and on each competitor, then compare.',
-             'mode':'benchmark','pillars':['cro','made-up-pillar']}]},ai.usage_record(
+             'mode':'benchmark','pillars':['cro','made-up-pillar']},
+            {'title':'Renewal terms survive a reload','why':'Shows whether the terms are there on the second look.',
+             'caveat':'','goal':'Open the plans, reload the page and read the renewal terms again.',
+             'mode':'journey','pillars':['cro'],'shape':'scenario','journey':'Read the terms, reload, read again.',
+             'steps':[{'goal':'Open the plans'},{'check':{'text':'renews','within':10}}]},
+            {'title':'Renewal terms on a slow link','why':'Shows whether the terms arrive on a shaped connection.',
+             'caveat':'','goal':'Shape the connection, open the plans and read the renewal terms.',
+             'mode':'journey','pillars':['cro'],'shape':'scenario','journey':'Slow the link, then read the terms.',
+             'steps':[{'event':{'delay_ms':400}},{'goal':'Open the plans'}]}]},ai.usage_record(
                  'codex',model,'gpt-5.6-terra',effort,input_tokens=800,output_tokens=200)
     monkeypatch.setattr(goal_suggest.ai,'health',health);monkeypatch.setattr(goal_suggest.ai,'call',call)
     return seen
@@ -405,11 +413,13 @@ def test_goal_suggestions_use_the_house_voice_and_the_standard_model(client,monk
     r=client.post('/api/missions/suggest',json={'project_id':'default','goal':'check if the pricing page explains renewal',
                                                'url':'https://example.com/pricing','mode':'audit'})
     assert r.status_code==200,r.text
-    body=r.json();two=body['suggestions']
-    assert len(two)==2 and two[0]['mode']=='journey'
+    body=r.json();four=body['suggestions']
+    # Four missions, two of each shape, and every one complete.
+    assert len(four)==4 and four[0]['mode']=='journey'
+    assert [s['shape'] for s in four].count('goal')==2 and [s['shape'] for s in four].count('scenario')==2
     # A benchmark without competitor URLs cannot be saved, so it is offered as the journey it is.
-    assert two[1]['mode']=='journey' and two[1]['caveat']=='needs competitor URLs'
-    assert two[1]['pillars']==['cro'] and body['usage']['provider']=='codex'
+    assert four[1]['mode']=='journey' and four[1]['caveat']=='needs competitor URLs'
+    assert four[1]['pillars']==['cro'] and body['usage']['provider']=='codex'
     # The subscription's standard model, at low effort so the form answers quickly.
     assert seen['model']==pricing.LADDER['codex'][1] and seen['effort']=='low'
     assert seen['codex_account']=='default'
@@ -418,6 +428,8 @@ def test_goal_suggestions_use_the_house_voice_and_the_standard_model(client,monk
     assert 'example.com' in seen['prompt'] and 'Three goals to imitate' in seen['prompt']
     assert '{{password}}' in seen['prompt']
     assert 'Home page · five-pillar audit' in seen['prompt']
+    # The prompt asks for the mix and no longer talks the worker out of a scenario.
+    assert 'Return four missions' in seen['prompt'] and 'Do not force a scenario' not in seen['prompt']
 
 def test_goal_suggestions_need_a_signed_in_worker(client,monkeypatch):
     fake_worker(monkeypatch,logged_in=())
@@ -519,19 +531,34 @@ def broken(**changes):
     ({**GOAL_ONLY,'steps':[SCENARIO['steps'][0]]},'a goal carrying steps'),
 ])
 def test_a_broken_candidate_is_rejected_whole(client,monkeypatch,bad,why):
-    """A partial scenario would hand the person a mission missing its prerequisite and call it ready."""
+    """A partial scenario would hand the person a mission missing its prerequisite and call it ready.
+
+    The broken one costs its own card and is named; the missions beside it still arrive.
+    """
     fake_worker(monkeypatch,suggestions=[bad,GOAL_ONLY])
     r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
-    assert r.status_code==502,why
-    assert 'usable mission' in r.json()['detail']
+    assert r.status_code==200,why
+    body=r.json()
+    assert [s['title'] for s in body['suggestions']]==[GOAL_ONLY['title']],why
+    assert body['rejected'] and body['rejected'][0].startswith('Mission 1:'),why
+    # Nothing truncated reached a card: no returned scenario is a shortened version of the broken input.
+    assert not [s for s in body['suggestions'] if s['shape']=='scenario'],why
 
-def test_extra_candidates_are_accepted_and_a_missing_one_is_not(client,monkeypatch):
-    fake_worker(monkeypatch,suggestions=[GOAL_ONLY,SCENARIO,GOAL_ONLY])
+def test_extra_candidates_are_accepted_and_a_thin_answer_still_answers(client,monkeypatch):
+    fake_worker(monkeypatch,suggestions=[GOAL_ONLY,SCENARIO,GOAL_ONLY,SCENARIO,GOAL_ONLY,SCENARIO])
     r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
-    assert r.status_code==200 and len(r.json()['suggestions'])==2
+    assert r.status_code==200
+    shapes=[s['shape'] for s in r.json()['suggestions']]
+    assert len(shapes)==4 and shapes.count('goal')==2 and shapes.count('scenario')==2
+    # One usable mission is still an answer, not a minute of waiting thrown away.
     fake_worker(monkeypatch,suggestions=[GOAL_ONLY])
     r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
-    assert r.status_code==502 and '1 usable mission of the 2' in r.json()['detail']
+    assert r.status_code==200 and len(r.json()['suggestions'])==1
+
+def test_no_usable_candidate_is_the_only_failure_left(client,monkeypatch):
+    fake_worker(monkeypatch,suggestions=[{**GOAL_ONLY,'goal':''},'not a mission'])
+    r=client.post('/api/missions/suggest',json={'project_id':'default','target_id':web_target()['id'],'goal':'try it'})
+    assert r.status_code==502 and 'no usable mission' in r.json()['detail']
 
 def test_a_malformed_response_container_fails_in_a_controlled_way(client,monkeypatch):
     from engine import ai,suggest as goal_suggest

@@ -75,19 +75,26 @@ You can also create your own.
 
 **Missions → New mission** opens on one question: *What do you want to find out?*
 Write it the way you would say it to a colleague — "does a downloaded title still
-play when the phone loses its connection?" — and press **Suggest two missions**.
+play when the phone loses its connection?" — and press **Suggest missions**.
 The buttons underneath the box are the shipped journeys, there to borrow a
 sentence from if nothing comes to mind.
 
-Two whole missions come back, each as a card: what it is, what you learn from it,
-the goal it will pursue and, where it needs them, every step in order and in plain
-words. A card says up front what it would change — that a shaped step needs
-Chromium, that a step waits for a person at the screen, that an app event needs an
-Android target — and what has to exist first, such as an account or a downloaded
-file. Nothing runs and nothing is saved while you read them.
+Four whole missions come back, in two groups. Under **Let the worker find its own
+way** are two the worker works out for itself from the goal alone. Under **Run
+these exact steps** are two scenarios with every step already written, in order and
+in plain words. Each is a card: what it is, what you learn from it, the goal it
+will pursue and the steps it carries. A card says up front what it would change —
+that a shaped step needs Chromium, that a step waits for a person at the screen,
+that an app event needs an Android target — and what has to exist first, such as an
+account or a downloaded file. Nothing runs and nothing is saved while you read them.
 
-**Use this mission** fills the form in: the name, the goal, the mode, the pillars
-and the steps, with the time and action budgets raised if the steps need more room.
+A mission the worker got wrong is dropped and named underneath — a scenario whose
+steps do not fit the contract is never shown half-written — and the missions beside
+it still arrive, so one bad step does not cost the whole answer.
+
+**Use this goal** or **Use this scenario** fills the form in: the name, the goal,
+the mode, the pillars and the steps, with the time and action budgets raised if the
+steps need more room.
 Then the mission is yours. Read every step. Fill any blank the suggestion left —
 they are listed above the steps and the mission will not save while one remains.
 **Edit steps** opens the rows underneath, the same editor described under

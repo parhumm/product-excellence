@@ -31,6 +31,11 @@ def test_payment_and_secret_policy():
  assert action_allowed({'type':'ask','target':'pex-1','value':'password'},M,{'tag':'android.widget.EditText','input_type':'password'})[0]
  for field in (None,{'tag':'button','input_type':''},{'tag':'input','input_type':'file'}):
   assert not action_allowed({'type':'ask','target':'pex-2','value':'card number'},M,field)[0]
+ # A screen offering several ways in is a choice for the operator, and needs at least two of them.
+ screen=[{'id':'pex-1','text':'Password'},{'id':'pex-2','text':'Get the code by SMS'}]
+ assert action_allowed({'type':'choose','target':'','value':'how to sign in','options':['pex-1','pex-2']},M,None,controls=screen)[0]
+ for options in (['pex-1'],['pex-1','pex-9'],[]):
+  assert not action_allowed({'type':'choose','target':'','value':'how to sign in','options':options},M,None,controls=screen)[0]
  assert action_allowed({'type':'click'},M,{'text':'Search movies'})[0]
 def test_password_scrubbed_from_page_captures():
     from engine.policy import scrub, PASSWORD_PLACEHOLDER

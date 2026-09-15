@@ -77,9 +77,15 @@ def mutation_allowed(method, url, mission, operator_supplied=False):
     own=(mission.get('mode')=='journey' or bool(mission.get('login_identifier')) or operator_supplied)
     return own and allowed_url(url,mission)
 
-def action_allowed(action, mission, target=None):
+def action_allowed(action, mission, target=None, controls=None):
     kind=action.get('type')
-    if kind not in ('click','type','focus','select','forward','press','scroll','open','back','reload','wait','ask','finish'): return False,'Unsupported action'
+    if kind not in ('click','type','focus','select','forward','press','scroll','open','back','reload','wait','ask','choose','finish'): return False,'Unsupported action'
+    if kind=='choose':
+        # A choice is only a choice when the screen really offers several ways on, each one a
+        # control the operator can be shown and the worker can then actuate.
+        ids={c['id'] for c in (controls or [])}
+        if len({o for o in (action.get('options') or []) if o in ids})<2:
+            return False,'choose needs options: the control ids of at least two ways to continue on this screen, such as pex-2 and pex-3'
     if kind=='open':
         # Models put the URL in either field; refuse with the field or host that was wrong.
         url=action.get('value') or action.get('target') or ''

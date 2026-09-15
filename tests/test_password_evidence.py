@@ -192,15 +192,17 @@ def test_budget_stop_still_spends_one_call_on_the_review(tmp_path, monkeypatch):
     assert {o['part'] for o in final['observations']} == {1}
 
 
-def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypatch):
-    """The operator supplies what the AI cannot invent, and the value stays out of every record."""
-    import pytest
+def web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission_goal='Sign in with a code'):
+    """Run one web journey that pauses for the operator, and hand back everything it recorded.
+
+    `controls` names the page's controls for whatever is currently in the field, `release` answers
+    the pause. Returns saved records, prompts, the values filled in, and the control ids clicked.
+    """
     from unittest.mock import Mock
     runtime = importlib.import_module('engine.runner')
     artifacts = tmp_path / 'artifacts'
     artifacts.mkdir()
-    supplied = '0912 345 6789'
-    mission = Mission(name='Fixture', url='https://example.com', goal='Sign in with a code',
+    mission = Mission(name='Fixture', url='https://example.com', goal=mission_goal,
                       browser='firefox', mode='journey', provider='codex',
                       ai_budget=5, max_steps=4).model_dump()
     run = {'id': 'run-test', 'mission_id': 'mission-test', 'mission': mission,
@@ -208,14 +210,9 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
            'observations': [], 'actions': [], 'events': [], 'findings': [], 'http': [],
            'console': [], 'coverage': {}, 'ai_calls': 0, 'ai_usage': [], 'ai_totals': {},
            'replay_of': '', 'baseline_id': ''}
-    saved, filled, prompts = [], [], []
+    saved, filled, clicked, prompts = [], [], [], []
     # A real field keeps what is already in it: fill replaces, press_sequentially appends.
     box = {'value': ''}
-    planned = [{'type': 'ask', 'target': 'pex-0', 'value': 'mobile number',
-                'reason': 'The form needs a number I do not have', 'outcome': 'continue'},
-               {'type': 'click', 'target': 'pex-1', 'value': '',
-                'reason': 'The number is in the field; continue', 'outcome': 'continue'},
-               {'type': 'finish', 'target': '', 'value': '', 'reason': 'Signed in', 'outcome': 'success'}]
 
     async def write(kind, record):
         saved.append(copy.deepcopy(record))
@@ -229,11 +226,7 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
         # The site reflects the number it was given, the way a "code sent to ..." line does.
         return {'url': 'https://example.com', 'title': 'Sign in',
                 'text': 'Code sent to ' + box['value'] if box['value'] else 'Sign in',
-                # Once the value has landed the page reports the field as filled, as observe.js does.
-                'controls': [{'id': 'pex-0', 'tag': 'input', 'role': '', 'input_type': 'tel',
-                              'text': 'Mobile number', 'href': '', 'filled': bool(box['value'])},
-                             {'id': 'pex-1', 'tag': 'button', 'role': '', 'input_type': '',
-                              'text': 'Continue', 'href': '', 'filled': False}],
+                'controls': controls(box['value']),
                 'metadata': {}, 'viewport': {}, 'metrics': {'lcp': 0, 'inp': None}}
 
     async def screenshot(path, **kwargs):
@@ -250,15 +243,21 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
         return ({'findings': [], 'executive_summary': {'headline': 'Reviewed', 'summary': 'All of it.',
                  'next_steps': ['Continue the run.']}}, runtime.ai.usage_record(provider, '', '', 'low'))
 
-    field = SimpleNamespace(
-        evaluate=AsyncMock(return_value={'text': 'Mobile number', 'href': '', 'input_type': 'tel', 'tag': 'input'}),
-        fill=AsyncMock(side_effect=lambda value: (filled.append(value), box.update(value=value))),
-        press_sequentially=AsyncMock(side_effect=lambda value: (filled.append(value), box.update(value=box['value'] + value))),
-        click=AsyncMock())
+    def locator(selector):
+        # Each control answers for itself, so the live recheck before actuation sees the real label.
+        cid = selector.split('"')[1]
+        c = next((x for x in controls(box['value']) if x['id'] == cid), {})
+        return SimpleNamespace(
+            evaluate=AsyncMock(return_value={'text': c.get('text', ''), 'href': c.get('href', ''),
+                                             'input_type': c.get('input_type', ''), 'tag': c.get('tag', '')}),
+            fill=AsyncMock(side_effect=lambda value: (filled.append(value), box.update(value=value))),
+            press_sequentially=AsyncMock(side_effect=lambda value: (filled.append(value), box.update(value=box['value'] + value))),
+            click=AsyncMock(side_effect=lambda: clicked.append(cid)))
+
     page = SimpleNamespace(url='https://example.com', video=None, set_default_timeout=Mock(),
         set_default_navigation_timeout=Mock(), on=Mock(), goto=goto, wait_for_load_state=AsyncMock(),
         wait_for_timeout=AsyncMock(), evaluate=evaluate, screenshot=screenshot,
-        content=AsyncMock(return_value='<p>Sign in</p>'), locator=Mock(return_value=field))
+        content=AsyncMock(return_value='<p>Sign in</p>'), locator=locator)
     context = SimpleNamespace(tracing=SimpleNamespace(start=AsyncMock(), stop=AsyncMock()),
         add_init_script=AsyncMock(), route=AsyncMock(), new_page=AsyncMock(return_value=page),
         on=Mock(), set_offline=AsyncMock(), close=AsyncMock(), storage_state=AsyncMock())
@@ -280,26 +279,79 @@ def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypat
             if run.get('waiting_for'):
                 break
         waiting = dict(run['waiting_for'])
+        await release(worker, waiting, saved)
+        await task
+        return waiting
+
+    return SimpleNamespace(waiting=asyncio.run(journey()), saved=saved, prompts=prompts,
+                           filled=filled, clicked=clicked, box=box)
+
+
+def test_a_web_run_pauses_for_a_value_fills_it_and_scrubs_it(tmp_path, monkeypatch):
+    """The operator supplies what the AI cannot invent, and the value stays out of every record."""
+    import pytest
+    supplied = '0912 345 6789'
+    planned = [{'type': 'ask', 'target': 'pex-0', 'value': 'mobile number', 'options': [],
+                'reason': 'The form needs a number I do not have', 'outcome': 'continue'},
+               {'type': 'click', 'target': 'pex-1', 'value': '', 'options': [],
+                'reason': 'The number is in the field; continue', 'outcome': 'continue'},
+               {'type': 'finish', 'target': '', 'value': '', 'options': [], 'reason': 'Signed in', 'outcome': 'success'}]
+
+    def controls(value):
+        # Once the value has landed the page reports the field as filled, as observe.js does.
+        return [{'id': 'pex-0', 'tag': 'input', 'role': '', 'input_type': 'tel',
+                 'text': 'Mobile number', 'href': '', 'filled': bool(value)},
+                {'id': 'pex-1', 'tag': 'button', 'role': '', 'input_type': '',
+                 'text': 'Continue', 'href': '', 'filled': False}]
+
+    async def release(worker, waiting, saved):
         assert waiting['kind'] == 'ask' and waiting['ask'] == 'mobile number' and waiting['needs_value'] is True
         # redact() blanks every key named token; the published record still has to carry this one.
         assert saved[-1]['waiting_for']['token'] == waiting['token']
         with pytest.raises(ValueError, match='no device to type on'):
             await worker.continue_step('run-test', waiting['step'], waiting['token'])
         await worker.continue_step('run-test', waiting['step'], waiting['token'], supplied)
-        await task
-        return waiting
 
-    waiting = asyncio.run(journey())
+    out = web_pause_journey(tmp_path, monkeypatch, planned, controls, release)
     # The field is cleared before the value is typed, or a second ask would append to the first.
-    assert filled == ['', supplied] and box['value'] == supplied and 'Mobile number' in waiting['instruction']
-    final = saved[-1]
+    assert out.filled == ['', supplied] and out.box['value'] == supplied and 'Mobile number' in out.waiting['instruction']
+    final = out.saved[-1]
     assert final['status'] == 'completed', final.get('error')
     assert [a['status'] for a in final['actions']] == ['executed', 'executed', 'executed']
-    action_prompts = [p for p in prompts if 'Choose ONE legitimate next browser action' in p]
+    action_prompts = [p for p in out.prompts if 'Choose ONE legitimate next browser action' in p]
     assert all('A control with filled:true already holds its value' in p for p in action_prompts)
     # The first observation has nothing in the field; the second must carry the flag to the worker.
     assert '"filled":true' not in action_prompts[0] and '"filled":true' in action_prompts[1]
     assert final['observations'][-1]['text'] == 'Code sent to {{supplied}}'
     assert final['waiting_for'] is None
-    assert all(supplied not in json.dumps(record) for record in saved)
-    assert all(supplied not in prompt for prompt in prompts)
+    assert all(supplied not in json.dumps(record) for record in out.saved)
+    assert all(supplied not in prompt for prompt in out.prompts)
+
+
+def test_a_web_run_hands_a_screen_of_several_ways_in_to_the_operator(tmp_path, monkeypatch):
+    """A screen offering a password, a code by SMS and Google asks which way in, not for a secret."""
+    import pytest
+    planned = [{'type': 'choose', 'target': '', 'value': 'how to sign in', 'options': ['pex-0', 'pex-1', 'pex-2'],
+                'reason': 'The screen offers three ways in', 'outcome': 'continue'},
+               {'type': 'finish', 'target': '', 'value': '', 'options': [], 'reason': 'Signed in', 'outcome': 'success'}]
+    ways = [('pex-0', 'Password'), ('pex-1', 'Get the code by SMS'), ('pex-2', 'Sign in with Google')]
+
+    def controls(value):
+        return [{'id': cid, 'tag': 'a', 'role': '', 'input_type': '', 'text': text,
+                 'href': 'https://example.com/' + cid, 'filled': False} for cid, text in ways]
+
+    async def release(worker, waiting, saved):
+        assert waiting['kind'] == 'choose' and [o['label'] for o in waiting['options']] == [t for _, t in ways]
+        # Only one of the offered controls releases the pause; anything else is refused.
+        with pytest.raises(ValueError, match='Pick one of the offered options'):
+            await worker.continue_step('run-test', waiting['step'], waiting['token'], 'pex-9')
+        await worker.continue_step('run-test', waiting['step'], waiting['token'], 'pex-1')
+
+    out = web_pause_journey(tmp_path, monkeypatch, planned, controls, release, mission_goal='Sign in')
+    assert out.clicked == ['pex-1'] and out.filled == []
+    final = out.saved[-1]
+    assert final['status'] == 'completed', final.get('error')
+    assert [a['status'] for a in final['actions']] == ['executed', 'executed']
+    # The run records which way in was taken; a label is not a secret.
+    assert (final['actions'][0]['target'], final['actions'][0]['value']) == ('pex-1', 'Get the code by SMS')
+    assert 'return action choose' in [p for p in out.prompts if 'Choose ONE legitimate' in p][0]

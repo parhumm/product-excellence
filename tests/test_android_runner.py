@@ -231,17 +231,30 @@ class AskingDevice(ScenarioDevice):
     async def act(self,action):self.taps.append((action['type'],action['target']))
     async def type_focused(self,value):assert self.recording is False;self.typed.append(value)
 
-async def ask_journey(monkeypatch,tmp_path,answer):
-    """Run a plain AI journey whose first action asks the operator, and release the pause with `answer`."""
+class ChoosingDevice(AskingDevice):
+    """A screen offering three ways in, the way a sign-in screen offers password, SMS and Google."""
+    ways=[('pex-1','Password'),('pex-2','Get the code by SMS'),('pex-3','Sign in with Google')]
+    async def observe(self,id):
+        screen=await ScenarioDevice.observe(self,id)
+        # Compose buttons carry no text of their own; the caption reaches the worker as the label.
+        screen['controls']=[{'id':cid,'tag':'android.view.View','role':'button','text':'','label':name,'labeled':True,
+                             'input_type':'','box':{'x':0,'y':n*60,'width':300,'height':50},'identity':cid}
+                            for n,(cid,name) in enumerate(self.ways)]
+        return screen
+
+async def ask_journey(monkeypatch,tmp_path,answer,*,device=AskingDevice,planned=None,first=None):
+    """Run a plain AI journey whose first action pauses for the operator, and release it with `answer`.
+
+    `first` is tried against the open pause before `answer`, for a release that must be refused."""
     monkeypatch.setattr(runner_module,'ARTIFACTS',tmp_path)
     async def write(kind,value):return value
     monkeypatch.setattr(runner_module,'write',write)
     devices=[]
-    class Recorded(AskingDevice):
+    class Recorded(device):
         def __init__(self,*a,**k):super().__init__(*a,**k);devices.append(self)
     monkeypatch.setattr(runner_module.android,'Device',Recorded)
-    planned=[{'type':'ask','target':'pex-1','value':'SMS code','reason':'the app needs the code','outcome':'continue'},
-             {'type':'finish','target':'','value':'','reason':'signed in','outcome':'success'}]
+    planned=planned or [{'type':'ask','target':'pex-1','value':'SMS code','options':[],'reason':'the app needs the code','outcome':'continue'},
+                        {'type':'finish','target':'','value':'','options':[],'reason':'signed in','outcome':'success'}]
     prompts=[]
     async def call(provider,prompt,schema,image=None,timeout=100,model='',effort='low',codex_account=''):
         prompts.append(prompt);return planned.pop(0),runner_module.ai.usage_record(provider,model,model,effort)
@@ -252,6 +265,7 @@ async def ask_journey(monkeypatch,tmp_path,answer):
         await asyncio.sleep(0.01)
         if run.get('waiting_for'):break
     waiting=dict(run['waiting_for'])
+    if first:await first(worker,waiting)
     await worker.continue_step('run',waiting['step'],waiting['token'],**answer)
     await task
     return run,waiting,devices[0],prompts,worker
@@ -384,3 +398,24 @@ async def test_typing_closes_the_soft_keyboard_only_while_it_is_open(monkeypatch
     calls.clear();shown[0]='mInputShown=false'
     await device.type_focused('482913')
     assert ('input','keyevent','KEYCODE_BACK') not in calls
+
+
+@pytest.mark.asyncio
+async def test_an_ai_journey_hands_a_screen_of_several_ways_in_to_the_operator(monkeypatch,tmp_path):
+    """The operator picks the way on; the worker taps it and the run carries into the code flow."""
+    planned=[{'type':'choose','target':'','value':'how to sign in','options':['pex-1','pex-2','pex-3'],
+              'reason':'the screen offers three ways in','outcome':'continue'},
+             {'type':'finish','target':'','value':'','options':[],'reason':'signed in','outcome':'success'}]
+    async def refuse(worker,waiting):
+        # Only one of the offered controls releases the pause; anything else is refused.
+        with pytest.raises(ValueError,match='Pick one of the offered options'):
+            await worker.continue_step('run',waiting['step'],waiting['token'],'pex-9')
+    run,waiting,device,_,worker=await ask_journey(monkeypatch,tmp_path,{'value':'pex-2'},
+                                                  device=ChoosingDevice,planned=planned,first=refuse)
+    assert waiting['kind']=='choose' and [o['label'] for o in waiting['options']]==[n for _,n in ChoosingDevice.ways]
+    # Nothing secret is typed for a choice, so the recording is never stopped.
+    assert device.taps==[('tap','pex-2')] and device.typed==[] and device.recording is True
+    assert [a['status'] for a in run['actions']]==['executed','executed'] and run['mission_outcome']=='success'
+    # The run records which way in was taken; a label is not a secret.
+    assert (run['actions'][0]['target'],run['actions'][0]['value'])==('pex-2','Get the code by SMS')
+    assert run['waiting_for'] is None and 'run' not in worker.pauses

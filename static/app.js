@@ -100,11 +100,17 @@ setTimeout(()=>ctx.close(),600)}catch(e){}}
 // A pause for the operator: on a device the recording is stopped, so the notice must say so and say how long is left.
 function operatorNotice(r){const w=r.waiting_for;if(!w)return '';
 const left=Math.max(0,Math.round((new Date(w.until)-Date.now())/1000));
-const android=(r.platform||r.mission.platform)==='android',asking=w.kind==='ask';
-const how=!w.ask?'Do this on the device, then continue.'
+const android=(r.platform||r.mission.platform)==='android',asking=w.kind==='ask',choosing=w.kind==='choose';
+const options=w.options||[];
+const how=choosing?`Pick how the run should carry on and the console ${android?'taps':'clicks'} it for you.`
+:!w.ask?'Do this on the device, then continue.'
 :android?'Type the value here and the console enters it into the focused field on the device, or enter it on the device yourself and continue with the box empty.'
 :'Type the value here and the console fills it into the field. That field is masked in every screenshot and the value is scrubbed from the saved evidence, but the journey video may still show it.';
-return `<div class="notice"><strong>${asking?'The run needs a value from you':`Step ${w.step} is waiting for you`}</strong><p dir="auto">${esc(w.instruction)}</p><p>${android?'Screen recording is stopped until you continue, and no screenshots are taken while this step waits. ':''}${how}</p><p><strong>${left?left+' seconds left':'No time left'}</strong> of the ${w.seconds} allowed. ${asking?'The run stops if nobody answers in time.':'This step fails if nobody continues in time.'}</p><div class="toolbar">${w.ask?`<input id="ask-value" dir="auto" type="${/password|card|cvv|pin/i.test(w.ask)?'password':'text'}" placeholder="${esc(w.ask)}" autocomplete="off" maxlength="200">`:''}<button class="primary" data-continue-step="${r.id}" data-step-number="${w.step}" data-token="${esc(w.token)}">Continue run</button>${asking?`<button data-skip-step="${r.id}" data-step-number="${w.step}" data-token="${esc(w.token)}">Skip</button>`:''}<button class="danger" data-cancel="${r.id}">Stop run</button></div></div>`}
+const release=`data-continue-step="${r.id}" data-step-number="${w.step}" data-token="${esc(w.token)}"`;
+// A choice is released by one of its own buttons, so each option is a Continue run of its own.
+const pick=choosing?options.map(o=>`<button class="primary" ${release} data-value="${esc(o.id)}" dir="auto">${esc(o.label)}</button>`).join('')
+:`${w.ask?`<input id="ask-value" dir="auto" type="${/password|card|cvv|pin/i.test(w.ask)?'password':'text'}" placeholder="${esc(w.ask)}" autocomplete="off" maxlength="200">`:''}<button class="primary" ${release}>Continue run</button>`;
+return `<div class="notice"><strong>${choosing?'The run needs a choice from you':asking?'The run needs a value from you':`Step ${w.step} is waiting for you`}</strong><p dir="auto">${esc(w.instruction)}</p><p>${android&&!choosing?'Screen recording is stopped until you continue, and no screenshots are taken while this step waits. ':''}${how}</p><p><strong>${left?left+' seconds left':'No time left'}</strong> of the ${w.seconds} allowed. ${asking||choosing?'The run stops if nobody answers in time.':'This step fails if nobody continues in time.'}</p><div class="toolbar">${pick}${asking||choosing?`<button data-skip-step="${r.id}" data-step-number="${w.step}" data-token="${esc(w.token)}">Skip</button>`:''}<button class="danger" data-cancel="${r.id}">Stop run</button></div></div>`}
 function statusNotice(r){const known=STATUS_NOTICE[r.status];if(!known&&!r.error)return '';
 const [title,fallback]=known||['Run message',''];const next=canContinue(r)?CONTINUE_NEXT:fallback;
 const body=(r.status==='blocked'&&r.success_basis)||r.error||'';
@@ -577,7 +583,7 @@ if(videos.length&&speed){const apply=()=>{videos.forEach(v=>v.playbackRate=+spee
 const onward=$('#continue-form');if(onward)onward.onsubmit=e=>{e.preventDefault();const b=onward.querySelector('[data-continue]');submitAction(b,async()=>{await api(`/runs/${b.dataset.continue}/continue`,{method:'POST',body:JSON.stringify({ai_calls:+onward.ai_calls.value||0,steps:+onward.steps.value||0})});toast('Continuing this run');await render()})};
 const releaseStep=(b,id,skip)=>submitAction(b,async()=>{
 // A wrong or already used token is answered by showing what the run actually wants now, never by sending it again.
-try{await api(`/runs/${id}/continue-step`,{method:'POST',body:JSON.stringify({step:+b.dataset.stepNumber,token:b.dataset.token,value:skip?'':($('#ask-value')||{}).value||'',skip})});toast(skip?'Skipping this value':'Continuing the run')}catch(e){toast(e.message)}
+try{await api(`/runs/${id}/continue-step`,{method:'POST',body:JSON.stringify({step:+b.dataset.stepNumber,token:b.dataset.token,value:skip?'':(b.dataset.value??(($('#ask-value')||{}).value||'')),skip})});toast(skip?'Skipping this value':'Continuing the run')}catch(e){toast(e.message)}
 await render()});
 main.querySelectorAll('[data-continue-step]').forEach(b=>b.onclick=()=>releaseStep(b,b.dataset.continueStep,false));
 main.querySelectorAll('[data-skip-step]').forEach(b=>b.onclick=()=>releaseStep(b,b.dataset.skipStep,true));

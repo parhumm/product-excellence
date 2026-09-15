@@ -5,10 +5,12 @@ from .store import DATA
 from . import pricing
 
 ACTION_SCHEMA={'type':'object','properties':{
-    'type':{'type':'string','enum':['click','type','focus','select','forward','press','scroll','open','back','reload','wait','ask','finish']},
+    'type':{'type':'string','enum':['click','type','focus','select','forward','press','scroll','open','back','reload','wait','ask','choose','finish']},
     'target':{'type':'string'},'value':{'type':'string'},'reason':{'type':'string'},
+    # Only `choose` names several controls; every other action sends an empty list.
+    'options':{'type':'array','items':{'type':'string'}},
     'outcome':{'type':'string','enum':['continue','success','blocked']}},
-    'required':['type','target','value','reason','outcome'],'additionalProperties':False}
+    'required':['type','target','value','options','reason','outcome'],'additionalProperties':False}
 FINDING_PROPERTIES={k:{'type':'string'} for k in ['title','pillar','classification','severity','observed','expected','recommendation','evidence_id','issue_key']}
 FINDING_PROPERTIES['issue_key'].update(pattern=r'^[a-z0-9]+(?:-[a-z0-9]+)*$',maxLength=100)
 FINDING_PROPERTIES['pillar']['enum']=['functionality','cro','seo_aeo','ux_ui','performance']

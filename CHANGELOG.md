@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A run can ask you which way to sign in.** A screen that offers a password, a
+  code by SMS, a code by a call and a Google account is asking which way in, not
+  for a secret. Web runs and Android journeys now pause with those options as
+  buttons on the run page; you pick one and the run clicks or taps it and carries
+  on. **Skip** and **Stop run** stay beside them.
 - **A run can ask you for a value instead of giving up.** When a web run or an
   Android journey reaches a field it has no value for (a phone number, email,
   username, password, one-time code, authenticator code or card details), it

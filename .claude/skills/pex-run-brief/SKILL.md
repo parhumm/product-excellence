@@ -1,7 +1,7 @@
 ---
 name: pex-run-brief
 description: Use when the user wants a shareable report of a finished Product Excellence run, with screenshots.
-argument-hint: "[run id] [audience, for example executives or the web team]"
+argument-hint: "[run id, or several benchmark run ids] [audience, for example executives or the web team]"
 allowed-tools: Read, Write, Bash(.venv/bin/python scripts/cli.py:*), Bash(.venv/bin/python .claude/skills/pex-run-brief/scripts/build_report.py:*)
 disable-model-invocation: true
 ---
@@ -61,6 +61,19 @@ accessibility, playback QoE, device-fleet or field-performance certification.
 Match the audience: for executives, the effect on customers and the decision to
 take. For a web team, the pillar, the page and the evidence.
 
+### Benchmark runs
+
+A benchmark run gets a different report: a playbook, not a journey. Its reader
+wants to know, for each thing worth fixing, who already does it well and what
+exactly to copy. Several benchmark runs can share one report, usually one run
+per page type, because a benchmark review sees only the last screen of each site.
+
+Write the narrative from `references/benchmark-outline.md`. Each card shows the
+product's own whole screenshot beside the competitor screenshots that show the
+fix, never cropped or zoomed, with the element in question outlined. Look at
+every screenshot before placing a mark or quoting a competitor, and say when a
+claim comes from page text because a banner covered the screen.
+
 ## 4. Build
 
 ```bash
@@ -68,14 +81,19 @@ take. For a web team, the pillar, the page and the evidence.
   --narrative <scratchpad>/narrative.json --out <path>.html
 ```
 
+For benchmark runs, pass every run id before `--narrative`; the script takes the
+benchmark layout when all of them are benchmark runs.
+
 It embeds the screenshots, so the file opens anywhere without the evidence
-folder, and it refuses a narrative that cites evidence the run does not contain.
-Without `--out` it writes `report.html` beside the run's artifacts.
+folder. It refuses a narrative that cites evidence the runs do not contain, or a
+code excerpt that is not in the saved page source.
+Without `--out` it writes `report.html` beside the first run's artifacts.
 
 ## 5. Report
 
 Print the path, the headline and the gate. Say which pillars were not scored, and
-which improvements are unverified.
+which improvements are unverified. For a benchmark, say which sites did not
+answer, since they are missing from the comparison.
 
 A completed run means the test finished, not that the website is fine. Never
 include a password, an email address, a token or a persona path. If the run's

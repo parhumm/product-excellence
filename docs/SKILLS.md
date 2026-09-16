@@ -22,7 +22,7 @@ app, and they update when the app updates.
 | know what else is worth testing | `/pex-mission-suggest` | creating each mission | five to eight suggestions for your website, and the ones you pick, created |
 | understand why a run blocked or failed | `/pex-run-diagnose` | changing the mission or running again | the cause, the evidence for it, and the smallest fix, proved by a second run |
 | turn findings into work | `/pex-findings-triage` | writing owners and statuses back | one ticket per issue worth fixing, and a release delta against a baseline |
-| tell people what happened | `/pex-run-brief` | nothing; it only reads and writes a file | a shareable HTML report: the screens the visitor saw, ranked improvements, scores, and what the run does not prove |
+| tell people what happened | `/pex-run-brief` | nothing; it only reads and writes a file | a shareable HTML report: the screens the visitor saw, ranked improvements, scores, and what the run does not prove; for benchmark runs, a playbook that sets each problem beside the competitor screens that show the fix |
 | report a bug in this tool | `/pex-issue-report` | filing anything on GitHub | a complete, redacted bug report, checked against the open issues first |
 | release a new version | `/pex-release-ship` | pushing, and again before deploying | tests, a version bump, a changelog entry, a tag, the deploy, and proof it is live |
 | turn an Android crash or ANR into a local bug report | `/pex-app-crash` | nothing; it only reads and writes a file | a sanitized attributable stack and timeline report |
@@ -59,8 +59,16 @@ starting the run itself.
 > /pex-run-brief <the run id>
 ```
 
-It exports the finished run and writes a one-page Markdown file, then prints the
-path, the headline and the gate.
+It exports the finished run and writes a standalone HTML report with the
+screenshots embedded, then prints the path, the headline and the gate.
+
+```
+> /pex-run-brief <home benchmark run id> <plans benchmark run id>
+```
+
+Given benchmark runs, it writes one playbook across them: where the product
+ranks on each page, and for every problem, the product's screen beside the
+competitor screens that show the fix, with the element outlined.
 
 If a run ends blocked or failed instead:
 

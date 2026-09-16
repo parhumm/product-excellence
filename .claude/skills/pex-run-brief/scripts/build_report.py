@@ -4,6 +4,12 @@
     .venv/bin/python .claude/skills/pex-run-brief/scripts/build_report.py <run id> \
         --narrative <scratchpad>/narrative.json --out <path>.html
 
+Benchmark runs take the benchmark layout (scripts/benchmark.py), and several of
+them can share one report, usually one benchmark per page type:
+
+    .venv/bin/python .claude/skills/pex-run-brief/scripts/build_report.py <run id> <run id> ... \
+        --narrative <scratchpad>/benchmark.json --out <path>.html
+
 Every number, score, deduction and page address comes from the run's own record.
 The narrative file carries only what a model has to write: the headline, the
 ranked improvements and the corrections. The script refuses a narrative that
@@ -368,17 +374,28 @@ def build(record, narrative, folder, run_id):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Build the HTML report for a finished run.')
-    parser.add_argument('run_id')
-    parser.add_argument('--narrative', help='JSON written by the skill: headline, improvements, journey, corrections')
-    parser.add_argument('--out', help='where to write the report (default: the run artifact folder)')
+    parser = argparse.ArgumentParser(description='Build the HTML report for one run, or for several benchmark runs.')
+    parser.add_argument('run_ids', nargs='+', metavar='run_id')
+    parser.add_argument('--narrative', help='JSON written by the skill: references/report-outline.md, '
+                                            'or references/benchmark-outline.md for benchmark runs')
+    parser.add_argument('--out', help='where to write the report (default: the first run artifact folder)')
     args = parser.parse_args(argv)
 
-    record, folder = load(args.run_id)
+    loaded = [(run_id, *load(run_id)) for run_id in args.run_ids]
     narrative = json.loads(pathlib.Path(args.narrative).read_text()) if args.narrative else {}
+    first_id, record, folder = loaded[0]
     narrative.setdefault('headline', (record.get('ai_summary') or {}).get('headline', ''))
     out = pathlib.Path(args.out) if args.out else folder / 'report.html'
-    out.write_text(build(record, narrative, folder, args.run_id), encoding='utf-8')
+    modes = {(r.get('mission') or {}).get('mode') for _, r, _ in loaded}
+    if modes == {'benchmark'}:
+        sys.path.insert(0, str(pathlib.Path(__file__).parent))
+        import benchmark
+        page = benchmark.build(benchmark.Runs(loaded), narrative, esc, picture, STYLE)
+    elif len(loaded) > 1:
+        sys.exit('Several runs share one report only when every one of them is a benchmark run.')
+    else:
+        page = build(record, narrative, folder, first_id)
+    out.write_text(page, encoding='utf-8')
     print(out)
     return 0
 

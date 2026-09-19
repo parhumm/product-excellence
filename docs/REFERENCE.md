@@ -253,7 +253,7 @@ CLI exit codes after `run --wait`: 0 completed/pass, 1 completed/warn, 2 blocked
 | `pex-mission-suggest` | model or user | cli.py, one fetch of the workspace's own home page, Read, Write |
 | `pex-run-diagnose` | model or user | cli.py, `curl` on 127.0.0.1, Read, Write |
 | `pex-findings-triage` | model or user | cli.py, Read, Write |
-| `pex-run-brief` | user only | cli.py, its own `scripts/build_report.py`, Read, Write |
+| `pex-run-brief` | user only | cli.py, its own `scripts/build_report.py` (benchmark runs use `scripts/benchmark.py`), Read, Write |
 | `pex-issue-report` | user only | its own `scripts/collect.py`, `gh issue list`, `create` and `comment` |
 | `pex-release-ship` | user only | `git`, pytest and `tests.ui_check`, `curl`, `ssh root@<box>` |
 

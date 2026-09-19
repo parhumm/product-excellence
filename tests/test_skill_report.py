@@ -355,3 +355,63 @@ def test_only_benchmark_runs_share_a_report(benchmark_folders, run_folder):
     with pytest.raises(SystemExit) as stop:
         build_benchmark(benchmark_folders, playbook(), runs=(HOME, RUN_ID))
     assert 'every one of them is a benchmark run' in str(stop.value)
+
+
+def test_a_mark_label_stays_on_its_screenshot(benchmark_folders):
+    marks = playbook()
+    marks['plays'][0]['screens'][0]['marks'] = [
+        {'x': 44, 'y': 1, 'w': 35, 'h': 5, 'label': 'Only main action: Subscribe now, to /payment'},
+        {'x': 2, 'y': 11, 'w': 96, 'h': 4.5, 'label': 'First heading'},
+        {'x': 60, 'y': 30, 'w': 30, 'h': 5, 'label': 'Kept on the left', 'right': False}]
+    page = build_benchmark(benchmark_folders, marks)
+    # With more room to the left of the box, the label ends at the box's right edge and wraps there.
+    assert 'class="hl right" style="left:44%;top:1%;width:35%;height:5%"><span style="max-width:calc(79cqw - 4px)">' in page
+    assert 'class="hl" style="left:2%;top:11%;width:96%;height:4.5%"><span style="max-width:calc(98cqw - 4px)">' in page
+    assert 'class="hl" style="left:60%;top:30%;width:30%;height:5%"><span style="max-width:calc(40cqw - 4px)">' in page
+
+
+def test_a_site_that_did_not_answer_is_described_without_cutting_a_word(benchmark_folders):
+    path = benchmark_folders / 'artifacts' / PLANS / 'run.json'
+    record = json.loads(path.read_text())
+    record['benchmark'][1]['observed'] = ('The page showed an error: "Da ist etwas schiefgelaufen" ("Something went '
+                                          'wrong"). The product and promotions APIs returned 403, so no plans, prices, '
+                                          'renewal terms or gift options appeared on the page at all.')
+    path.write_text(json.dumps(record))
+    page = build_benchmark(benchmark_folders, playbook())
+    assert 'so no plans, prices, renewal terms or gift options…' in page
+    assert 'gift options a<' not in page and 'gift options a…' not in page
+
+
+def test_each_ranking_card_keeps_the_release_check_and_pillar_scores(benchmark_folders):
+    path = benchmark_folders / 'artifacts' / HOME / 'run.json'
+    record = json.loads(path.read_text())
+    record['gate'] = 'warn'
+    record['scores'] = {'cro': {'score': 58, 'deductions': []}, 'ux_ui': {'score': 52, 'deductions': []},
+                        'overall': {'score': 55, 'scored': 2, 'of': 2}}
+    path.write_text(json.dumps(record))
+    page = build_benchmark(benchmark_folders, playbook())
+    assert 'Release check <b>warn</b> · overall <b>55</b> of 100' in page
+    assert '<li>Conversion <b>58</b></li>' in page and '<li>UX and UI <b>52</b></li>' in page
+    # A pillar the run did not assess is named as not scored, never shown as zero.
+    assert '<li class="unscored">Performance not scored</li>' in page
+    assert 'Performance <b>0</b>' not in page
+    assert 'Release check <b>pass</b>' in page  # the plans run keeps its own gate
+
+
+def test_a_speed_card_can_chart_one_page_and_leave_the_rest_to_the_speed_section(benchmark_folders):
+    one = playbook()
+    one['plays'][0]['speed'] = HOME[:8]
+    page = build_benchmark(benchmark_folders, one)
+    card, section = page.split('id="speed"')
+    assert 'Home page</td>' in card and 'Plans benchmark</td>' not in card
+    assert 'Plans benchmark</td>' in section and 'Home page</td>' not in section
+
+    everything = playbook()
+    everything['plays'][0]['speed'] = True
+    assert 'id="speed"' not in build_benchmark(benchmark_folders, everything)
+
+    unknown = playbook()
+    unknown['plays'][0]['speed'] = '9' * 8
+    with pytest.raises(SystemExit) as stop:
+        build_benchmark(benchmark_folders, unknown)
+    assert '99999999' in str(stop.value)

@@ -77,15 +77,18 @@ fictional runs with drawn screens.
   product's own screen first, then the competitor screens that show the fix.
 - **marks** outline the element a card talks about: `x`, `y`, `w` and `h` are
   percentages of the whole screenshot. Look at the image before placing one. A
-  label sits above its box; set `below` when the box is near the top, `right`
-  when it is near the right edge, and `dashed` for "below this edge" or
-  "missing here". One to three marks per screen.
+  label sits above its box; set `below` when the box is near the top, and
+  `dashed` for "below this edge" or "missing here". The script anchors the label
+  on whichever side of the box has more room and wraps it there, so it never
+  runs off the screenshot; set `right` to `true` or `false` only to override that.
+  One to three marks per screen.
 - **code** is for what a screenshot cannot show, such as robots directives,
   titles and structured data. Every line must be copied from that screen's
   `step-NNN.dom.txt`; the script refuses a line it cannot find there. Use
   `"side": "today"` for the product's own source.
-- **speed**: set it on the one card about load time to draw the speed table
-  inside that card. Without it the table gets its own section.
+- **speed**: on the card about load time, `true` draws the speed table for
+  every run inside that card, and a run id draws only that page's rows. Runs no
+  card charts get their own speed section.
 - **confidence** is `confirmed` (a deterministic check, or the page source),
   `screenshot` (visible on a captured screen) or `unverified` (read from page
   text only, or your own reading).
@@ -97,7 +100,8 @@ fictional runs with drawn screens.
 ## What the script writes without you
 
 Each run's ranking with the product highlighted and unanswered sites struck
-through, the speed table from each site's measured LCP and server response,
+through, each run's release check and pillar scores ("not scored" where a
+pillar was not assessed), the speed table from each site's measured LCP and server response,
 the sites that did not answer and what they showed, the header facts, the AI
 call count, the masked-field note and the standard limits.
 

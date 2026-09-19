@@ -376,12 +376,13 @@ def build(record, narrative, folder, run_id):
     check(narrative, record, folder)
     fact = facts(record)
     rows, total = scores_table(record)
-    first = ('One run, one emulated device, one network profile, one moment in time.' if fact['android']
-             else 'One run, one browser, one network profile, one moment in time.')
-    limits = [first,
-              'A completed run means the test finished, not that the website is fine.',
+    android = fact['android']
+    limits = ['One run, one emulated device, one network profile, one moment in time.' if android
+              else 'One run, one browser, one network profile, one moment in time.',
+              'A completed run means the test finished, not that the app is fine.' if android
+              else 'A completed run means the test finished, not that the website is fine.',
               'Findings an AI critic has not confirmed are risks worth checking, not defects.']
-    if fact['android']:
+    if android:
         limits.append('This is a disposable-emulator lab result, not full accessibility, playback QoE, '
                       'device-fleet or field-performance certification.')
     corrections = lines(narrative, 'corrections')

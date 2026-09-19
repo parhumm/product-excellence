@@ -192,6 +192,8 @@ def test_an_android_report_states_the_device_it_actually_ran_on(android_folder):
     # The mission's web defaults never applied to the emulator.
     assert 'chromium' not in page and 'desktop viewport' not in page
     assert 'One run, one emulated device' in page and 'disposable-emulator lab result' in page
+    # An Android run never claims to say whether the website is fine.
+    assert 'not that the app is fine' in page and 'website is fine' not in page
 
 
 def test_android_measurements_taken_are_never_invented(android_folder):

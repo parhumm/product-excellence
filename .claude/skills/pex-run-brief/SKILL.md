@@ -53,9 +53,12 @@ export; nothing is estimated.
   evidence reference. Mark any finding a critic has not confirmed.
 - **What to do next**: the three actions from the export's next steps, in the
   order a team would take them.
-- **What this does not prove**: three lines. One run, one browser, one network
-  profile, one moment. A completed run means the test finished, not that the
-  website is fine. AI findings a critic has not confirmed are risks, not defects.
+- **What this does not prove**: three lines. One run, one network profile, one
+  moment, on one browser for a web run or one emulated device for an Android run.
+  A completed run means the test finished, not that the website, or for Android
+  the app, is fine. AI findings a critic has not confirmed are risks, not
+  defects. An Android brief adds the disposable-emulator line and leaves out the
+  mission's `browser` and `viewport` defaults, which never applied.
 
 Write the file next to the export, or at the path the user gave, then go to
 section 6. The rest of this file is the report.
@@ -127,6 +130,6 @@ Print the path, the headline and the gate. Say which pillars were not scored, an
 which improvements are unverified. For a benchmark, say which sites did not
 answer, since they are missing from the comparison.
 
-A completed run means the test finished, not that the website is fine. Never
-include a password, an email address, a token or a persona path. If the run's
+A completed run means the test finished, not that the website, or for an Android
+run the app, is fine. Never include a password, an email address, a token or a persona path. If the run's
 evidence contains one, name the artifact instead.

@@ -38,7 +38,16 @@ Mark with "not confirmed" any finding an AI critic did not confirm.
 - A completed run means the test finished, not that the website is fine.
 - Findings an AI critic has not confirmed are risks worth checking, not defects.
 
+An Android run reads "one emulated device" for "one browser", says the app
+rather than the website, and adds a fourth line: this is a disposable-emulator
+lab result, not full accessibility, playback QoE, device-fleet or
+field-performance certification.
+
 ## How this was tested
 
 <browser>, <viewport>, <network profile>, <locale>, <provider and model>,
 <number of steps>, <run id>.
+
+For Android: <device and API>, <app version>, <network profile>, <locale>,
+<provider and model>, <number of steps>, <run id>. The mission's `browser` and
+`viewport` defaults never applied; leave them out.

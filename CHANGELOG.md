@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.7.0 — 2026-09-19
+
+- **A benchmark now produces a playbook, not a scoreboard.** `pex-run-brief`
+  takes several benchmark runs, one per page type, and builds a report that puts
+  each problem beside the competitor screenshot showing the fix, with the element
+  outlined, along with each run's ranking, the measured speed of each page and
+  the sites that did not answer. Every number, score, deduction and address still
+  comes from the run's own record, and a narrative is refused when it cites a
+  screen the run never captured, a mark outside its screenshot, or a code excerpt
+  that is not in the saved page source. The one-page Markdown brief stays beside
+  it: the brief to paste into a ticket, the report to send to someone.
+- **A report states the conditions the run actually had.** An Android mission
+  still carries the web defaults `browser: chromium` and `viewport: desktop`, and
+  they never applied to the emulator. The report now reads target, app, device
+  and `network_applied` instead, reports launch time, jank and PSS only where the
+  emulator measured them, names the package under test rather than an empty chip,
+  drops a condition with no recorded value, and says "the app", not "the
+  website", in an Android run's limitations.
+- **Reports open anywhere, without the network.** Neither builder loads fonts
+  from Google and screenshots are embedded, so a report about a private site
+  opens with its evidence offline.
+- **Benchmark reports read on a phone.** A mark's label anchors on the side of
+  its box with more room and wraps there, so it no longer runs off the screenshot
+  or the page; `right` still overrides. Each ranking card shows the run's release
+  check, overall score and every pillar, with "not scored" where a pillar was not
+  assessed. `speed` can name one run, so a speed card charts only that page, and
+  runs no card charts keep their own speed section. A site that did not answer is
+  described up to a sentence or word, never cut mid-word.
+- **The score table no longer contradicts itself.** Open findings are counted the
+  way `engine/outcomes.py:actionable` counts them, so a rejected or closed
+  finding no longer argues with the score. The three standard limits always
+  survive; a narrative's own limits are added to them rather than replacing them.
+  An evidence id whose screenshot is missing is refused, matching `benchmark.py`.
+
 ## 1.6.0 — 2026-09-15
 
 - **The landing page describes journeys, one-sentence missions, operator-assisted

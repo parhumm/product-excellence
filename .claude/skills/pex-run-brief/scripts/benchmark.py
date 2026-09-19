@@ -19,6 +19,8 @@ from urllib.parse import urlsplit
 
 IMPACT = ('high', 'medium', 'low')
 CONFIDENCE = {'confirmed': 'Confirmed', 'screenshot': 'Seen in screenshot', 'unverified': 'Needs checking'}
+PILLARS = {'functionality': 'Functionality', 'cro': 'Conversion', 'seo_aeo': 'Search and answers',
+           'ux_ui': 'UX and UI', 'performance': 'Performance'}
 # The engine masks these fields in every screenshot (engine/runner.py), so a filled
 # box over one is the tool's doing, not the site's.
 MASKED = 'password, email, phone and one-time-code fields'
@@ -86,6 +88,8 @@ def check(narrative, runs):
                         or box[0] + box[2] > 100.5 or box[1] + box[3] > 100.5:
                     sys.exit(f'A mark on {screen["evidence"]} must give x, y, w and h as percentages '
                              f'of the whole screenshot that stay inside it: {mark}')
+        if isinstance(play.get('speed'), str):
+            runs.find(play['speed'])
         for block in play.get('code') or []:
             _, _, folder, _ = observation(runs, block.get('run'), block.get('evidence'))
             source = folder / f'{block["evidence"]}.dom.txt'
@@ -113,6 +117,23 @@ def own(record):
 
 def answered(record):
     return {host(s.get('url')): s for s in record.get('sites') or []}
+
+
+def standing(record, esc):
+    """The run's release check and pillar scores, so a playbook never hides what the app decided."""
+    scores = record.get('scores') or {}
+    chips = []
+    for key, name in PILLARS.items():
+        entry = scores.get(key)
+        scored = isinstance(entry, dict) and entry.get('status') != 'not_evaluated' \
+            and isinstance(entry.get('score'), (int, float))
+        chips.append(f'<li>{esc(name)} <b>{int(entry["score"])}</b></li>' if scored
+                     else f'<li class="unscored">{esc(name)} not scored</li>')
+    overall = scores.get('overall')
+    overall = overall.get('score') if isinstance(overall, dict) else overall
+    total = f' · overall <b>{int(overall)}</b> of 100' if isinstance(overall, (int, float)) else ''
+    return (f'<p class="gate">Release check <b>{esc(record.get("gate") or "none")}</b>{total}</p>'
+            f'<ul class="pillars" aria-label="Pillar scores">{"".join(chips)}</ul>')
 
 
 def scoreboard(runs, narrative, esc):
@@ -143,6 +164,7 @@ def scoreboard(runs, narrative, esc):
   <div class="rank">{rank}</div>
   {f'<p>{esc(question)}</p>' if question else ''}
   <ol class="order" aria-label="Ranking, best first">{''.join(chips)}</ol>
+  {standing(record, esc)}
 </article>''')
     return f'<div class="board">{"".join(cards)}</div>'
 
@@ -154,6 +176,7 @@ def lcp_order(site):
 
 
 def speed_table(runs, narrative, esc):
+    """runs: the (run_id, record, folder) items to chart, all of them or one card's page."""
     rows, peak = [], 0
     pages = narrative.get('pages') or {}
     names = brand_names(narrative)
@@ -201,10 +224,14 @@ def screen_figure(runs, screen, esc, picture):
     mine = host(seen.get('url')) == own(record)
     marks = []
     for mark in screen.get('marks') or []:
+        # A label wider than the room beside its box runs off the screenshot, and on a phone off
+        # the page. Unless told otherwise, anchor it on the side with more room, and wrap it there.
+        right = mark.get('right', mark['x'] + mark['w'] > 100 - mark['x'])
+        room = mark['x'] + mark['w'] if right else 100 - mark['x']
         classes = ' '.join(c for c in ('hl', 'dash' if mark.get('dashed') else '', 'below' if mark.get('below') else '',
-                                       'right' if mark.get('right') else '') if c)
+                                       'right' if right else '') if c)
         marks.append(f'<span class="{classes}" style="left:{mark["x"]}%;top:{mark["y"]}%;width:{mark["w"]}%;height:{mark["h"]}%">'
-                     f'<span>{esc(mark.get("label"))}</span></span>')
+                     f'<span style="max-width:calc({room:g}cqw - 4px)">{esc(mark.get("label"))}</span></span>')
     wide = shot['w'] > shot['h']
     return f'''<figure class="shot{' wide' if wide else ''}">
   <span class="who {'us' if mine else 'them'}">{esc(screen.get('who') or host(seen.get('url')))}</span>
@@ -222,6 +249,13 @@ def items(values, esc):
     return ''.join(f'<li>{esc(v)}</li>' for v in values or [])
 
 
+def charted(runs, play):
+    """The runs a card's speed table covers: every run for `speed: true`, one for a run id."""
+    if isinstance(play.get('speed'), str):
+        return [runs.find(play['speed'])]
+    return list(runs) if play.get('speed') else []
+
+
 def plays(runs, narrative, esc, picture):
     cards = []
     for index, play in enumerate(narrative.get('plays') or [], 1):
@@ -232,7 +266,8 @@ def plays(runs, narrative, esc, picture):
         code = [b for b in play.get('code') or []]
         today_code = ''.join(code_block(b, esc) for b in code if b.get('side') == 'today')
         best_code = ''.join(code_block(b, esc) for b in code if b.get('side') != 'today')
-        speed = speed_table(runs, narrative, esc) if play.get('speed') else ''
+        chart = charted(runs, play)
+        speed = speed_table(chart, narrative, esc) if chart else ''
         cards.append(f'''<article class="play">
   <div class="top"><span class="n">{index}</span><h3>{esc(play.get('title'))}</h3>
     <div class="tags"><span class="chip {impact}">{impact.title()} impact</span><span class="tag">{esc(confidence)}</span>{copy}</div></div>
@@ -260,6 +295,18 @@ def also_found(narrative, esc):
 </section>'''
 
 
+def clip(text, limit=180):
+    """Shorten at a sentence end, or else a word, never mid-word."""
+    text = str(text or '').strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = cut.rfind('. ')
+    if end >= limit // 2:
+        return cut[:end + 1]
+    return cut.rsplit(' ', 1)[0].rstrip(' ,;:(') + '…'
+
+
 def limits(runs, narrative):
     lines, names = [], brand_names(narrative)
     for run_id, record, _ in runs:
@@ -269,7 +316,7 @@ def limits(runs, narrative):
                 continue
             name = host(site.get('url'))
             said = (verdicts.get(name) or {}).get('observed') or site.get('reason') or ''
-            lines.append(f'{names.get(name, name)} did not answer in run {run_id[:8]} ({site.get("outcome")}). {said[:180]}'.strip())
+            lines.append(f'{names.get(name, name)} did not answer in run {run_id[:8]} ({site.get("outcome")}). {clip(said)}'.strip())
     lines += ['Each page was visited once, so speed figures vary between visits.',
               'Rankings are the review AI\'s judgement of what each page showed, not traffic or conversion data.',
               f'The tool masks {MASKED} in screenshots; a filled box over one is not part of the site.',
@@ -287,15 +334,15 @@ def build(runs, narrative, esc, picture, base_style):
     network = (first.get('network_snapshot') or {}).get('name') or mission.get('network', '')
     me = own(first)
     title = narrative.get('title') or f'{me} benchmark'
-    speed = '' if any(p.get('speed') for p in narrative.get('plays') or []) else speed_table(runs, narrative, esc)
+    shown = {run_id for play in narrative.get('plays') or [] for run_id, _, _ in charted(runs, play)}
+    rest = [item for item in runs if item[0] not in shown]
+    speed = speed_table(rest, narrative, esc) if rest else ''
     keep = items(narrative.get('keep'), esc)
     corrections = items(narrative.get('corrections'), esc)
     run_list = ', '.join(f'{run_id[:8]} ({(record.get("mission") or {}).get("name", "")})' for run_id, record, _ in runs)
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{esc(title)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@0,400;0,500;0,600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>{base_style}{STYLE}</style></head><body><div class="wrap">
 
 <header>
@@ -309,7 +356,7 @@ def build(runs, narrative, esc, picture, base_style):
 
 <section aria-labelledby="board">
   <div class="intro"><span class="label">Where it stands</span><h2 id="board">{esc(narrative.get("board_title") or "Rank on each page")}</h2>
-  <p class="muted">The review ranked each page on one question, 1 being best. Sites that did not answer are struck through.</p></div>
+  <p class="muted">The review ranked each page on one question, 1 being best. Sites that did not answer are struck through. The release check and pillar scores are each run's own; a pillar the run did not assess reads "not scored", which is not zero.</p></div>
   {scoreboard(runs, narrative, esc)}
 </section>
 
@@ -356,6 +403,11 @@ STYLE = '''
 .order li{font:500 .74rem/1 var(--mono);padding:.32rem .45rem;border-radius:5px;background:var(--sunk);color:var(--muted)}
 .order li.us{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .order li.fail{text-decoration:line-through}
+.gate{margin:.35rem 0 0;padding-top:.6rem;border-top:1px solid var(--line);font-size:.86rem;color:var(--muted)}
+.gate b{color:var(--ink)}
+.pillars{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.3rem .8rem;font-size:.8rem;color:var(--muted)}
+.pillars b{color:var(--ink);font-variant-numeric:tabular-nums}
+.pillars li.unscored{font-style:italic}
 .legend{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;font-size:.86rem;color:var(--muted);align-items:center}
 .legend span{display:inline-flex;gap:.45rem;align-items:center}
 .swatch{display:inline-block;width:1.1rem;height:.8rem;border:2px solid var(--mark);border-radius:3px}
@@ -382,10 +434,10 @@ STYLE = '''
 .shot.wide .frame{border-radius:12px}
 .frame img{display:block;width:100%;height:auto;border-radius:15px}
 .shot.wide .frame img{border-radius:6px}
-.screen{position:relative}
+.screen{position:relative;container-type:inline-size}
 .hl{position:absolute;border:2.5px solid var(--mark);border-radius:5px;box-shadow:0 0 0 2px rgba(0,0,0,.55);pointer-events:none}
 .hl.dash{border-style:dashed}
-.hl span{position:absolute;left:-2.5px;bottom:100%;margin-bottom:3px;background:var(--mark);color:var(--mark-ink);font:600 .64rem/1.25 var(--mono);padding:.16rem .34rem;border-radius:4px;white-space:nowrap}
+.hl span{position:absolute;left:-2.5px;bottom:100%;margin-bottom:3px;background:var(--mark);color:var(--mark-ink);font:600 .64rem/1.25 var(--mono);padding:.16rem .34rem;border-radius:4px;width:max-content}
 .hl.below span{bottom:auto;top:100%;margin:3px 0 0}
 .hl.right span{left:auto;right:-2.5px}
 .shot figcaption{font-size:.84rem;line-height:1.45;color:var(--ink);display:grid;gap:.2rem}

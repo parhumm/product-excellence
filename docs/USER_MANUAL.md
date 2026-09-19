@@ -345,7 +345,7 @@ Use **Compare releases** after a change. Matching test conditions make compariso
 
 Android release comparison allows a changed APK build when the target, package, goal, applied network and measured device conditions match. It labels new, persisting and not-seen findings without editing either report. **Continue this run** remains web-only; replay uses the Android run's exact pinned APK.
 
-Download the readable Markdown report to share with your team. In Claude Code, `/pex-findings-triage` turns the findings into one ticket each and can compare a run with a baseline, and `/pex-run-brief` writes a shareable report, with the screens the visitor saw, for people who did not watch the run. The [skills guide](SKILLS.md) lists them all.
+Download the readable Markdown report to share with your team. In Claude Code, `/pex-findings-triage` turns the findings into one ticket each and can compare a run with a baseline, and `/pex-run-brief` writes either a one-page brief or a shareable report, with the screens the visitor saw, for people who did not watch the run. The [skills guide](SKILLS.md) lists them all.
 
 **Working with a team.** Sign in under **Settings** with the workspace credentials. New targets, missions and runs may be **Team** or **Only on this Mac**. A local item stays private and authoritative on that console until you explicitly share it; share its target first, then mission, then finished run. APK bytes never upload to the hub, so each execution Mac must upload the exact SHA locally. Shared raw video and logs are visible to every workspace member. Tests and AI still run on the initiating Mac.
 

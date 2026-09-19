@@ -86,15 +86,20 @@ def observations(record):
     return {o['id']: o for o in record.get('observations') or []}
 
 
-def check(narrative, record):
+def check(narrative, record, folder):
     """A report may only cite evidence the run actually captured."""
     known = set(observations(record))
     for section in ('journey', 'improvements'):
         for item in narrative.get(section) or []:
             evidence = item.get('evidence')
-            if evidence and evidence not in known:
+            if not evidence:
+                continue
+            if evidence not in known:
                 sys.exit(f"The narrative cites {evidence}, which this run does not contain. "
                          f"Known evidence ids: {', '.join(sorted(known)) or 'none'}.")
+            # A silently missing screenshot would make the card read as if there were nothing to show.
+            if not (folder / f'{evidence}.png').is_file():
+                sys.exit(f'{evidence} has no screenshot in {folder}.')
 
 
 def scores_table(record):
@@ -203,34 +208,86 @@ def evidence_blocks(record, narrative, folder):
 </section>'''
 
 
+def actionable(record):
+    """Findings a reader still has to act on. Mirrors engine/outcomes.py:actionable."""
+    return [f for f in record.get('findings') or []
+            if f.get('verifier_status') != 'REJECTED' and f.get('status') not in ('dismissed', 'resolved')]
+
+
+def part(label, value, suffix=''):
+    """One condition, or nothing at all. A blank field must never print as a bare label."""
+    value = str(value if value is not None else '').strip()
+    return f'{label}{value}{suffix}' if value else ''
+
+
+def android_conditions(record):
+    """An Android run's real conditions. Its mission still carries the web defaults
+    (browser chromium, viewport desktop), which never applied to the emulator."""
+    device = record.get('device') or {}
+    app = record.get('app') or {}
+    target = record.get('target') or {}
+    applied = record.get('network_applied') or {}
+    sha = str(app.get('sha256') or '')
+    return [
+        part('', target.get('package')),
+        part('version ', app.get('version_name')),
+        part('SHA ', sha[:12]),
+        part('API ', device.get('api')),
+        part('target SDK ', app.get('target_sdk')),
+        part('', device.get('abi')),
+        part('', device.get('display')),
+        part('', device.get('density_dpi'), ' dpi'),
+        part('locale ', device.get('locale') or (record.get('mission') or {}).get('locale')),
+        part('', device.get('renderer')),
+        part('', applied.get('name'), ' network'),
+        # Measured only when the emulator actually reported them; null is not zero.
+        part('launch ', device.get('launch_ms'), ' ms'),
+        part('jank ', device.get('jank_pct'), '%'),
+        part('PSS ', device.get('pss_kb'), ' kB'),
+    ]
+
+
+def web_conditions(record):
+    mission = record.get('mission') or {}
+    network = (record.get('network_snapshot') or {}).get('name') or mission.get('network')
+    return [
+        part('', mission.get('browser')),
+        part('', mission.get('viewport'), ' viewport'),
+        part('', network, ' network'),
+        part('locale ', mission.get('locale')),
+    ]
+
+
 def facts(record):
     mission = record.get('mission') or {}
-    network = (record.get('network_snapshot') or {}).get('name') or mission.get('network', '')
+    android = record.get('platform') == 'android'
     counts = {}
-    for finding in record.get('findings') or []:
+    for finding in actionable(record):
         counts[finding.get('severity', '?')] = counts.get(finding.get('severity', '?'), 0) + 1
     open_findings = ', '.join(f'{counts[k]} {k}' for k in sorted(counts))
-    tested = ', '.join(x for x in [
-        mission.get('browser', ''), f"{mission.get('viewport', '')} viewport", f'{network} network',
-        f"locale {mission.get('locale', '')}",
-        f"{record.get('provider', '')} on {record.get('ai_model', '') or 'the CLI default'}",
-        f"{len(record.get('actions') or [])} steps", f"{record.get('ai_calls', 0)} AI calls"] if x.strip(' ,'))
+    conditions = (android_conditions(record) if android else web_conditions(record)) + [
+        part('', record.get('provider'), f" on {record.get('ai_model') or 'the CLI default'}"),
+        part('', len(record.get('actions') or []), ' steps'),
+        part('', record.get('ai_calls', 0), ' AI calls')]
+    tested = ', '.join(x for x in conditions if x)
     return {
+        'android': android,
         'gate': record.get('gate') or 'none',
         'outcome': record.get('mission_outcome') or record.get('status') or '',
         'open': open_findings or 'none recorded',
         'blocked': record.get('policy_blocked_requests') or 0,
         'minutes': round((record.get('duration_seconds') or 0) / 60, 1),
         'date': (record.get('created_at') or '')[:10],
-        'url': mission.get('url', ''),
+        # An Android mission has no URL; name the package under test instead of an empty chip.
+        'url': mission.get('url') or (record.get('target') or {}).get('package', ''),
         'name': mission.get('name', 'Run'),
         'tested': tested,
     }
 
 
-def lines(narrative, key, fallback=()):
-    items = narrative.get(key) or list(fallback)
-    return ''.join(f'<li>{esc(x)}</li>' for x in items)
+def lines(narrative, key, extra=()):
+    """The standard lines always survive; the narrative may only add to them."""
+    return ''.join(f'<li>{esc(x)}</li>' for x in list(extra) + list(narrative.get(key) or []))
 
 
 STYLE = '''
@@ -316,18 +373,21 @@ footer{margin-top:3rem;padding-top:1.4rem;border-top:1px solid var(--line);font-
 
 
 def build(record, narrative, folder, run_id):
-    check(narrative, record)
+    check(narrative, record, folder)
     fact = facts(record)
     rows, total = scores_table(record)
-    limits = ['One run, one browser, one network profile, one moment in time.',
+    first = ('One run, one emulated device, one network profile, one moment in time.' if fact['android']
+             else 'One run, one browser, one network profile, one moment in time.')
+    limits = [first,
               'A completed run means the test finished, not that the website is fine.',
               'Findings an AI critic has not confirmed are risks worth checking, not defects.']
+    if fact['android']:
+        limits.append('This is a disposable-emulator lab result, not full accessibility, playback QoE, '
+                      'device-fleet or field-performance certification.')
     corrections = lines(narrative, 'corrections')
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{esc(fact["name"])} · run report</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@0,400;0,500;0,600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>{STYLE}</style></head><body><div class="wrap">
 
 <header>

@@ -1,16 +1,25 @@
 ---
 name: pex-run-brief
-description: Use when the user wants a shareable report of a finished Product Excellence run, with screenshots.
+description: Use when the user wants a brief or a shareable screenshot report of a finished Product Excellence run.
 argument-hint: "[run id, or several benchmark run ids] [audience, for example executives or the web team]"
 allowed-tools: Read, Write, Bash(.venv/bin/python scripts/cli.py:*), Bash(.venv/bin/python .claude/skills/pex-run-brief/scripts/build_report.py:*)
 disable-model-invocation: true
 ---
 
-# A report for people who did not watch the run
+# For people who did not watch the run
 
-A run page proves what happened. A report makes someone act on it. It shows the
-screens the visitor saw, says what to improve first, and stays inside the
-evidence.
+A run page proves what happened. This skill makes someone act on it, in one of
+two shapes. Both stay inside the evidence.
+
+- **The one-page brief**, Markdown, for pasting into a ticket or a message.
+  `references/brief-template.md`. Default when the user says brief, summary, or
+  names somewhere it has to be pasted.
+- **The report**, a standalone HTML file with the screens embedded, for sending
+  to someone who will read it rather than copy it. Default when the user says
+  report, asks for screenshots, or names benchmark runs.
+
+Ask which one only if neither is implied. Sections 1 and 2 apply to both; then
+take section 3 for the brief, or sections 4 to 6 for the report.
 
 Read `.claude/skills/_shared/rules.md` first and follow it.
 
@@ -21,8 +30,8 @@ Read `.claude/skills/_shared/rules.md` first and follow it.
 .venv/bin/python scripts/cli.py export <run id> --format md > <scratchpad>/run.md
 ```
 
-The Markdown export is the ready-made technical report. This report is shorter,
-visual, and written for someone who will not open it.
+The Markdown export is the ready-made technical report. Both the brief and the
+report are shorter and written for someone who will not open it.
 
 ## 2. Read the run before writing about it
 
@@ -32,7 +41,26 @@ check recorded, and a finding can claim something the evidence contradicts.
 
 For each screen, note what already helps the visitor and what gets in the way.
 
-## 3. Write the narrative
+## 3. The one-page brief
+
+`references/brief-template.md` has the shape. Every number in it comes from the
+export; nothing is estimated.
+
+- **Headline**: what a customer would experience, in one sentence.
+- **Scores**: per pillar, with the deductions that produced them. A pillar the
+  run did not assess is "not scored", never zero, and never averaged in.
+- **Top three findings**: title, severity, one line of consequence, and the
+  evidence reference. Mark any finding a critic has not confirmed.
+- **What to do next**: the three actions from the export's next steps, in the
+  order a team would take them.
+- **What this does not prove**: three lines. One run, one browser, one network
+  profile, one moment. A completed run means the test finished, not that the
+  website is fine. AI findings a critic has not confirmed are risks, not defects.
+
+Write the file next to the export, or at the path the user gave, then go to
+section 6. The rest of this file is the report.
+
+## 4. Write the narrative
 
 `references/report-outline.md` gives the JSON shape and the rules each field
 carries. Write it to the scratchpad. It holds only judgment:
@@ -52,11 +80,15 @@ Every number, score, deduction, page address and screenshot comes from the
 record, and the script writes those. Do not estimate any of them, and do not
 invent a conversion effect: name it as a hypothesis to test.
 
-For Android, replace browser and network prose with target, package, app version
-and SHA, API, ABI, display, locale, reset policy and applied network. Report
-launch time, jank and PSS only when measured, and list crash and ANR log evidence
-and unavailable checks. This is a disposable-emulator lab result, not full
-accessibility, playback QoE, device-fleet or field-performance certification.
+For Android the script writes the conditions itself — target, package, app
+version and SHA, API, target SDK, ABI, display, density, locale, renderer and
+applied network — and reports launch time, jank and PSS only where the emulator
+measured them. Do not restate them. An Android mission still carries the web
+defaults `browser: chromium` and `viewport: desktop`; they never applied, so
+never repeat them from the export. What is left for you: crash and ANR log
+evidence, and the checks that were unavailable. The report says on its own that
+this is a disposable-emulator lab result, not full accessibility, playback QoE,
+device-fleet or field-performance certification.
 
 Match the audience: for executives, the effect on customers and the decision to
 take. For a web team, the pillar, the page and the evidence.
@@ -74,7 +106,7 @@ fix, never cropped or zoomed, with the element in question outlined. Look at
 every screenshot before placing a mark or quoting a competitor, and say when a
 claim comes from page text because a banner covered the screen.
 
-## 4. Build
+## 5. Build
 
 ```bash
 .venv/bin/python .claude/skills/pex-run-brief/scripts/build_report.py <run id> \
@@ -89,7 +121,7 @@ folder. It refuses a narrative that cites evidence the runs do not contain, or a
 code excerpt that is not in the saved page source.
 Without `--out` it writes `report.html` beside the first run's artifacts.
 
-## 5. Report
+## 6. Report
 
 Print the path, the headline and the gate. Say which pillars were not scored, and
 which improvements are unverified. For a benchmark, say which sites did not

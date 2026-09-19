@@ -120,6 +120,104 @@ def test_a_missing_export_says_what_to_run(tmp_path, monkeypatch):
     assert 'cli.py export' in str(stop.value)
 
 
+def test_the_standard_limits_survive_a_narrative_that_adds_its_own(run_folder):
+    page = build(run_folder, narrative(limits=['The site was mid-migration that week.']))
+    assert 'A completed run means the test finished' in page
+    assert 'One run, one browser' in page
+    assert 'The site was mid-migration that week.' in page
+
+
+def test_findings_the_reader_need_not_act_on_are_not_counted_as_open(tmp_path, monkeypatch):
+    # engine/outcomes.py:actionable drops these two; the score table already does.
+    data = record()
+    data['findings'] += [{'severity': 'P1', 'title': 'Critic rejected this', 'verifier_status': 'REJECTED'},
+                         {'severity': 'P0', 'title': 'Already fixed', 'status': 'resolved',
+                          'verifier_status': 'CONFIRMED'}]
+    folder = tmp_path / 'artifacts' / RUN_ID
+    folder.mkdir(parents=True)
+    (folder / 'run.json').write_text(json.dumps(data))
+    for step in ('step-000', 'step-001'):
+        Image.new('RGB', (390, 844), (20, 24, 28)).save(folder / f'{step}.png')
+    monkeypatch.setenv('PEX_DATA', str(tmp_path))
+    page = build(folder, narrative())
+    assert 'Open findings: 1 P2' in page
+    assert 'P0' not in page and '1 P1' not in page
+
+
+def test_an_evidence_id_without_a_screenshot_is_refused(run_folder):
+    (run_folder / 'step-001.png').unlink()
+    with pytest.raises(SystemExit) as stop:
+        build(run_folder, narrative())
+    assert 'step-001 has no screenshot' in str(stop.value)
+
+
+def test_the_report_asks_nothing_of_the_network(run_folder):
+    # A report about a private site must not phone a CDN when someone opens it.
+    assert 'fonts.googleapis.com' not in build(run_folder, narrative())
+
+
+# --- Android runs ---------------------------------------------------------------
+
+def android_record():
+    """An Android mission keeps the web defaults it never used; the run carries the truth."""
+    data = record()
+    data['platform'] = 'android'
+    data['mission'] |= {'url': '', 'browser': 'chromium', 'viewport': 'desktop', 'locale': 'fa-IR'}
+    data['target'] = {'package': 'com.example.app', 'type': 'android'}
+    data['app'] = {'version_name': '4.54', 'target_sdk': 35,
+                   'sha256': '662d68866a89532c6e209305e8d5003d8fcb9f28a75e11836191aa2bc01d65b7'}
+    data['device'] = {'api': 34, 'abi': 'arm64-v8a', 'renderer': 'emulation', 'display': '1080x2400',
+                      'density_dpi': 420, 'locale': 'en-US', 'launch_ms': None, 'jank_pct': None,
+                      'pss_kb': 109106}
+    data['network_applied'] = {'name': 'Baseline', 'scope': 'Device default; no traffic probe'}
+    return data
+
+
+@pytest.fixture()
+def android_folder(tmp_path, monkeypatch):
+    folder = tmp_path / 'artifacts' / RUN_ID
+    folder.mkdir(parents=True)
+    (folder / 'run.json').write_text(json.dumps(android_record()))
+    for step in ('step-000', 'step-001'):
+        Image.new('RGB', (390, 844), (20, 24, 28)).save(folder / f'{step}.png')
+    monkeypatch.setenv('PEX_DATA', str(tmp_path))
+    return folder
+
+
+def test_an_android_report_states_the_device_it_actually_ran_on(android_folder):
+    page = build(android_folder, narrative())
+    assert 'com.example.app' in page and 'version 4.54' in page
+    assert 'SHA 662d68866a89' in page and 'API 34' in page and 'target SDK 35' in page
+    assert 'arm64-v8a' in page and '1080x2400' in page and '420 dpi' in page
+    # The mission's web defaults never applied to the emulator.
+    assert 'chromium' not in page and 'desktop viewport' not in page
+    assert 'One run, one emulated device' in page and 'disposable-emulator lab result' in page
+
+
+def test_android_measurements_taken_are_never_invented(android_folder):
+    page = build(android_folder, narrative())
+    assert 'PSS 109106 kB' in page          # measured
+    assert 'launch ' not in page            # launch_ms was null
+    assert 'jank ' not in page              # jank_pct was null
+
+
+def test_a_blank_condition_never_prints_as_a_bare_label(tmp_path, monkeypatch):
+    data = record()
+    data['mission'] |= {'viewport': '', 'locale': '', 'network': ''}
+    data['network_snapshot'] = {}
+    folder = tmp_path / 'artifacts' / RUN_ID
+    folder.mkdir(parents=True)
+    (folder / 'run.json').write_text(json.dumps(data))
+    Image.new('RGB', (390, 844), (20, 24, 28)).save(folder / 'step-000.png')
+    Image.new('RGB', (390, 844), (20, 24, 28)).save(folder / 'step-001.png')
+    monkeypatch.setenv('PEX_DATA', str(tmp_path))
+    page = build(folder, narrative())
+    # The conditions line drops what was not recorded instead of printing a dangling label.
+    assert 'chromium, claude on dynamic, 2 steps, 12 AI calls' in page
+    for dangling in (' viewport,', ' network,', 'locale ,', ', ,'):
+        assert dangling not in page
+
+
 # --- Benchmark runs -------------------------------------------------------------
 
 HOME = '1' * 32

@@ -167,16 +167,21 @@ def test_add_mode_sends_only_new_completed_runs(cluster,monkeypatch,tmp_path):
     script.main(['source',target['id'],'--apply'])
     # A second batch made after the first import: only the finished run of the new mission travels.
     second=mission('add-mission-b','Second mission');run('add-run-b',second,'completed');run('add-run-c',second,'failed')
+    store.save('mission_version',{'id':'add-version-b','mission_id':second['id'],'project_id':'source','snapshot':second},local=True)
     script.main(['source',target['id'],'--add','--completed','--apply'])
     assert {r['id'] for r in hub.all_records('mission',target['id'])}=={'add-mission-a','add-mission-b'}
     assert {r['id'] for r in hub.all_records('run',target['id'])}=={'add-run-a','add-run-b'}
     before={r['id']:r['_revision'] for r in hub.all_records('run',target['id'])}
     script.main(['source',target['id'],'--add','--completed','--apply'])
     assert {r['id']:r['_revision'] for r in hub.all_records('run',target['id'])}==before
+    assert {r['id'] for r in hub.all_records('mission_version',target['id'])}=={'add-version-b'}
     # A local mission named like one already on the server is reused instead of duplicated.
-    run('add-run-d',mission('add-mission-c','Second mission'),'completed')
+    third=mission('add-mission-c','Second mission');run('add-run-d',third,'completed')
+    store.save('mission_version',{'id':'add-version-c','mission_id':third['id'],'project_id':'source','snapshot':third},local=True)
     script.main(['source',target['id'],'--add','--completed','--match-missions','--apply'])
     assert {r['id'] for r in hub.all_records('mission',target['id'])}=={'add-mission-a','add-mission-b'}
+    # The reused mission keeps the team's own history; our local versions of it stay behind.
+    assert {r['id'] for r in hub.all_records('mission_version',target['id'])}=={'add-version-b'}
     remote=hub.get('run','add-run-d',target['id'])
     assert remote['mission_id']=='add-mission-b' and remote['mission']['id']=='add-mission-b'
     hub.close();engine.dispose()

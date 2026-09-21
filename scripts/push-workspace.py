@@ -111,12 +111,17 @@ def main(argv=None):
             for kind,r in data:
                 entry=manifest['records'].get(r['id']);current=remote[kind].get(r['id'])
                 if entry and entry['saved']:continue
-                if current and checksum(comparable(current))==checksum(r):continue
+                if current and checksum(comparable(current))==checksum(r):
+                    # An interrupted apply may have committed this before its manifest entry was closed.
+                    if entry and not entry['saved']:entry.update(saved=checksum(comparable(current)),revision=current['_revision'])
+                    continue
                 # A half-written record from an interrupted apply is resumed; anything else is a teammate's.
                 if current and not entry:raise ValueError('Record already on the team server with different content: '+r['id'])
                 keep.append((kind,r))
-            uploaded={r['id'] for kind,r in keep if kind=='mission'}
-            data=[(kind,r) for kind,r in keep if kind!='mission_version' or r.get('mission_id') in uploaded]
+            # A version belongs with its mission: send it when the mission is going up or is already there,
+            # but never onto a reused mission, whose own history is the team's.
+            owned={r['id'] for kind,r in keep if kind=='mission'}|(set(remote['mission'])-set(mission_map.values()))
+            data=[(kind,r) for kind,r in keep if kind!='mission_version' or r.get('mission_id') in owned]
         gaps=[f for kind,r in data if kind=='run' for f in missing.get(r['id'],[])]
         if gaps:raise ValueError('Missing source evidence: '+', '.join(gaps))
         # Existing teammates' records must not be overwritten, including before an initial apply.
@@ -127,7 +132,10 @@ def main(argv=None):
                 if kind!='target' and any(r['id'] not in manifest['records'] for r in existing):raise ValueError('Target contains records outside this import')
         for kind,r in data:
             entry=manifest['records'].get(r['id'])
-            if entry and entry['source_hash']!=checksum(r):raise ValueError('Source changed since import: '+r['id'])
+            if entry and entry['source_hash']!=checksum(r):
+                # A predeclared ID is only an intent; nothing was sent under it, so a migrated source may replace it.
+                if entry['saved'] or entry['staged']:raise ValueError('Source changed since import: '+r['id'])
+                entry['source_hash']=checksum(r)
         print(json.dumps({'mode':'apply' if args.apply else 'dry-run','records':{kind:sum(k==kind for k,r in data) for kind in ('target','mission','mission_version','run','schedule')},'excluded_local':excluded,'target_map':target_map,'mission_map':mission_map,'runs':[r['id'] for k,r in data if k=='run'],'artifacts':sum(len(r.get('_artifacts',{})) for k,r in data),'schedules':'paused','local_resources':'APKs, passwords, personas, custom networks and proxy credentials remain on the source machine'},indent=2))
         if not args.apply:return
         backup=path.with_suffix('.backup.json')

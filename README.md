@@ -304,6 +304,8 @@ to an issue. Maintainers should follow the [public release guide](docs/PUBLIC_RE
 
 Created by [Parhum Khoshbakht](https://www.linkedin.com/in/parhumm/).
 
+Thanks to [@kimiazamanpour](https://github.com/kimiazamanpour) for contributing.
+
 Project code and documentation are available under the
 [Apache License 2.0](LICENSE). Bundled material keeps the separate terms listed
 in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

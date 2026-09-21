@@ -497,6 +497,7 @@ async def report_html(id:str,req:ReportRequest):
     try:page=await report.write_report(r,folder,req.provider,req.model,account,req.refresh)
     except LookupError as e:raise HTTPException(409,str(e))
     except SystemExit as e:raise HTTPException(422,str(e))
+    except TimeoutError:raise HTTPException(504,'The AI worker did not answer within ten minutes. Try again, or pick a faster model.')
     except RuntimeError as e:raise HTTPException(502,str(e))
     return Response(page,media_type='text/html',headers={'Content-Disposition':f'attachment; filename="run-{id}.html"'})
 

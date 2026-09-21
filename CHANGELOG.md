@@ -8,7 +8,9 @@
   does not prove, with the screenshots inside the file so it opens offline. Pick
   the AI worker, the model and the Codex account there, as a mission does; one
   call writes the reading, and every number on the page still comes from the
-  run's own record. An improvement that cites a screen the run never captured is
+  run's own record. The wait is counted on screen — a long run's evidence can
+  take a worker minutes to read — and the finished report is offered as a link
+  to open or to save, rather than appearing in the downloads folder. An improvement that cites a screen the run never captured is
   dropped rather than shown. The reading is kept beside the evidence, so a second
   export costs nothing while the scores stay current; a different model, or
   `cli.py report ID --refresh`, writes a new one. The skill stays for the reports

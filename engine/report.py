@@ -547,7 +547,9 @@ async def narrate(record, folder, provider, model, codex_account=''):
               'run_summary': record.get('ai_summary') or {},
               'coverage': record.get('coverage') or {}}
     prompt = BRIEF + '\n' + prompts.prompt_note('review') + '\n' + prompts.evidence_json(packet)
-    result, usage = await ai.call(provider, prompt, NARRATIVE_SCHEMA, images or None, timeout=240,
+    # A run step is capped at 240 s to keep the browser moving; this is one call a person is waiting on,
+    # and a long run's evidence with six screens can take a worker several minutes to read.
+    result, usage = await ai.call(provider, prompt, NARRATIVE_SCHEMA, images or None, timeout=600,
                                   model='' if chosen == ai.DYNAMIC else chosen, effort=effort,
                                   codex_account=codex_account)
     return prune(result, record, folder), {'provider': provider, 'model': usage.get('model_reported') or chosen,

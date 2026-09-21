@@ -81,7 +81,7 @@ elif args.command=='import':
 elif args.command=='export':r=c.get(f'/runs/{args.run_id}/export',params={'format':args.format})
 elif args.command=='report':
  # One reasoning call reads the screens, so this waits far longer than a record fetch.
- r=c.post(f'/runs/{args.run_id}/report',timeout=300,
+ r=c.post(f'/runs/{args.run_id}/report',timeout=660,
           json={'provider':args.provider,'model':args.model,'codex_account':args.codex_account,'refresh':args.refresh})
  r.raise_for_status()
  if args.out:Path(args.out).write_text(r.text);print(args.out);sys.exit(0)

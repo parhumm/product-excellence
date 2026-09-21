@@ -154,6 +154,17 @@ def test_a_run_still_going_has_nothing_to_report(client, run, worker):
     assert worker == []
 
 
+def test_a_worker_that_never_answers_says_so_instead_of_failing(client, run, worker, monkeypatch):
+    async def call(*a, **k):
+        raise TimeoutError
+
+    monkeypatch.setattr(ai, 'call', call)
+    r = export(client)
+    # A reader waiting minutes deserves the reason, not a 500 they have to read a log for.
+    assert r.status_code == 504 and 'faster model' in r.json()['detail']
+    assert not (run / 'report-narrative.json').exists()
+
+
 def test_a_worker_that_is_not_signed_in_says_so(client, run, monkeypatch):
     async def health():
         return {'codex': {'logged_in': False, 'installed': False}, 'claude': {'logged_in': False, 'installed': True}}

@@ -143,3 +143,40 @@ def test_import_interruption_resume_and_restore(cluster,monkeypatch,tmp_path):
     changed=hub.get('mission','import-mission',target['id']);hub.save('mission',changed|{'name':'Teammate edit'})
     with pytest.raises(ValueError,match='Target (was edited|contains records outside)'):script.main(['source',target['id'],'--apply'])
     hub.close();restored.dispose();engine.dispose()
+
+def test_add_mode_sends_only_new_completed_runs(cluster,monkeypatch,tmp_path):
+    import importlib.util
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from engine import store,hub
+    from engine.contracts import Mission
+    server=cluster[0][0]
+    target=server.post('/hub/admin/workspaces',auth=('admin',ADMIN),json={'name':'Add fixture','url':'https://example.com','username':'adder','password':PASSWORD,'seed':False}).json()
+    engine=create_engine('sqlite:///'+str(tmp_path/'source.db'))
+    monkeypatch.setattr(store,'engine',engine);monkeypatch.setattr(store,'Session',sessionmaker(engine,expire_on_commit=False));monkeypatch.setattr(store,'DATA',tmp_path);monkeypatch.setattr(store,'ARTIFACTS',tmp_path/'artifacts');store.ARTIFACTS.mkdir()
+    hub.close();store.init()
+    store.save('project',{'id':'source','name':'Source','url':'https://example.com'},local=True)
+    def mission(id,name):return store.save('mission',{'id':id,**Mission(project_id='source',name=name,url='https://example.com',goal='Audit the fixture',mode='audit',provider='none').model_dump(exclude={'login_password'})},local=True)
+    def run(id,m,status):
+        r=store.save('run',{'id':id,'project_id':'source','mission_id':m['id'],'mission':m,'status':status,'observations':[{'screenshot':f'/api/runs/{id}/artifacts/x.png'}],'actions':[],'events':[],'findings':[],'http':[],'console':[]},local=True)
+        folder=store.ARTIFACTS/id;folder.mkdir();(folder/'x.png').write_bytes(('evidence '+id).encode())
+        return r
+    run('add-run-a',mission('add-mission-a','First mission'),'completed')
+    hub.atomic(tmp_path/'hub.json',{'url':str(server.base_url).rstrip('/'),'logins':{target['id']:{'username':'adder','password':PASSWORD}}})
+    spec=importlib.util.spec_from_file_location('push_workspace',ROOT/'scripts/push-workspace.py');script=importlib.util.module_from_spec(spec);spec.loader.exec_module(script)
+    script.main(['source',target['id'],'--apply'])
+    # A second batch made after the first import: only the finished run of the new mission travels.
+    second=mission('add-mission-b','Second mission');run('add-run-b',second,'completed');run('add-run-c',second,'failed')
+    script.main(['source',target['id'],'--add','--completed','--apply'])
+    assert {r['id'] for r in hub.all_records('mission',target['id'])}=={'add-mission-a','add-mission-b'}
+    assert {r['id'] for r in hub.all_records('run',target['id'])}=={'add-run-a','add-run-b'}
+    before={r['id']:r['_revision'] for r in hub.all_records('run',target['id'])}
+    script.main(['source',target['id'],'--add','--completed','--apply'])
+    assert {r['id']:r['_revision'] for r in hub.all_records('run',target['id'])}==before
+    # A local mission named like one already on the server is reused instead of duplicated.
+    run('add-run-d',mission('add-mission-c','Second mission'),'completed')
+    script.main(['source',target['id'],'--add','--completed','--match-missions','--apply'])
+    assert {r['id'] for r in hub.all_records('mission',target['id'])}=={'add-mission-a','add-mission-b'}
+    remote=hub.get('run','add-run-d',target['id'])
+    assert remote['mission_id']=='add-mission-b' and remote['mission']['id']=='add-mission-b'
+    hub.close();engine.dispose()

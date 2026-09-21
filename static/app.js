@@ -730,7 +730,10 @@ if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=URL.createObjectURL(await 
 const name='run-'+b.dataset.exportHtml.slice(0,8)+'.html';
 out.innerHTML=`<div class="toolbar"><a class="button primary" href="${reportUrl}" target="_blank" rel="noopener">Open report</a><a class="button" href="${reportUrl}" download="${name}">Download ${esc(name)}</a></div>`;
 toast('Report ready')}
-catch(e){out.innerHTML=`<p class="error">${esc(e.message)}</p>`;throw e}
+// fetch fails with a TypeError when the connection drops — a sleeping Mac, a closed laptop. The
+// worker keeps reading and keeps what it wrote, so the answer is to ask again, not to start over.
+catch(e){const m=e instanceof TypeError?'The console stopped answering — the connection dropped. The reading carries on; press Write report again in a moment.':e.message;
+out.innerHTML=`<p class="error">${esc(m)}</p>`;throw Error(m)}
 finally{clearInterval(tick)}}));
 const ep=main.querySelector('.export-html');if(ep){const model=ep.querySelector('[name=export_model]'),custom=ep.querySelector('.model-custom'),
 worker=ep.querySelector('[name=export_provider]'),account=ep.querySelector('[name=export_codex_account]')?.closest('.field');

@@ -29,6 +29,7 @@ import argparse
 import asyncio
 import base64
 import datetime
+import functools
 import html
 import io
 import json
@@ -556,6 +557,26 @@ async def narrate(record, folder, provider, model, codex_account=''):
                                            'effort': effort}
 
 
+# One reading per run and choice, however many pages are waiting on it.
+JOBS = {}
+
+
+def forget(key, task):
+    JOBS.pop(key, None)
+    # Nobody is left to be told when the browser has gone; retrieving it keeps the log honest.
+    if not task.cancelled():
+        task.exception()
+
+
+async def reading(record, folder, provider, model, codex_account, cache, asked):
+    """The paid call and the file it is kept in, so a finished reading is never lost."""
+    narrative, used = await narrate(record, folder, provider, model, codex_account)
+    kept = {'narrative': narrative, 'asked': asked, 'used': used,
+            'written_at': datetime.datetime.now().astimezone().isoformat(timespec='seconds')}
+    cache.write_text(json.dumps(kept, ensure_ascii=False, indent=2))
+    return kept
+
+
 async def write_report(record, folder, provider='auto', model='', codex_account='', refresh=False):
     """The run page's Export HTML: narrate once, then rebuild from the current record.
 
@@ -572,10 +593,14 @@ async def write_report(record, folder, provider='auto', model='', codex_account=
     # The choice as it was asked for is the cache key; the resolved worker is what the report credits.
     asked = {'provider': provider, 'model': model or ''}
     if not kept.get('narrative') or kept.get('asked') != asked:
-        narrative, used = await narrate(record, folder, provider, model, codex_account)
-        kept = {'narrative': narrative, 'asked': asked, 'used': used,
-                'written_at': datetime.datetime.now().astimezone().isoformat(timespec='seconds')}
-        cache.write_text(json.dumps(kept, ensure_ascii=False, indent=2))
+        key = (record['id'], provider, model or '')
+        job = JOBS.get(key)
+        if job is None:
+            job = JOBS[key] = asyncio.ensure_future(reading(record, folder, provider, model, codex_account, cache, asked))
+            job.add_done_callback(functools.partial(forget, key))
+        # Shielded, because the browser that asked is not what the call is for: a laptop that sleeps
+        # mid-read, or a second click, must not throw minutes of paid reading away or buy it twice.
+        kept = await asyncio.shield(job)
     # Encoding the screens is seconds of Pillow work; the console stays answerable while it runs.
     return await asyncio.to_thread(build, record, kept['narrative'], folder, record['id'],
                                    kept.get('used') or {}, kept.get('written_at', ''))

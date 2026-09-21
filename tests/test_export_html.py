@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app as service
-from engine import ai, store
+from engine import ai, report, store
 from engine.runner import Runner
 from tests.test_skill_report import RUN_ID, record
 
@@ -137,6 +137,49 @@ def test_the_reading_is_paid_for_once_but_the_numbers_stay_current(client, run, 
     # Another model is another reading.
     export(client, model='claude-sonnet-5')
     assert len(worker) == 2
+
+
+def test_a_reading_survives_the_page_that_asked_for_it(client, run, monkeypatch):
+    """A browser that drops mid-call must not throw minutes of paid reading away."""
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def health():
+        return {'codex': {'logged_in': True, 'installed': True}, 'claude': {'logged_in': True, 'installed': True}}
+
+    async def call(*a, **k):
+        started.set()
+        await release.wait()
+        return dict(NARRATIVE), {'model_reported': 'claude-opus-5'}
+
+    monkeypatch.setattr(ai, 'health', health)
+    monkeypatch.setattr(ai, 'call', call)
+    saved = store.get('run', RUN_ID)
+
+    async def drop_then_ask_again():
+        asked = asyncio.ensure_future(report.write_report(saved, run, 'claude'))
+        await started.wait()
+        asked.cancel()  # the connection goes, as uvicorn cancels the handler
+        with pytest.raises(asyncio.CancelledError):
+            await asked
+        release.set()
+        await asyncio.sleep(0)  # the worker was never waiting on the browser
+        return json.loads((run / 'report-narrative.json').read_text())
+
+    kept = asyncio.run(drop_then_ask_again())
+    assert kept['narrative']['headline'] == NARRATIVE['headline']
+
+
+def test_two_clicks_wait_on_one_call(client, run, worker):
+    """The same run and choice asked for twice at once is one reading, not two bills."""
+    saved = store.get('run', RUN_ID)
+
+    async def both():
+        return await asyncio.gather(report.write_report(saved, run, 'claude'),
+                                    report.write_report(saved, run, 'claude'))
+
+    first, second = asyncio.run(both())
+    assert len(worker) == 1
+    assert first == second
 
 
 def test_a_fresh_reading_can_be_asked_for(client, run, worker):

@@ -10,7 +10,8 @@ ROUTED={'project','target','mission','mission_version','run','schedule'}
 TERMINAL={'completed','blocked','failed','cancelled','interrupted'}
 # Playwright traces are large and only replayable next to the browser that wrote them.
 # A continued run writes one per visit: trace.zip, trace-2.zip, and so on.
-local_only=lambda name:name=='trace.zip' or re.fullmatch(r'trace-\d+\.zip',name) is not None
+# report-narrative.json is the raw reading a report is built from, redacted only when the page is rendered.
+local_only=lambda name:name in ('trace.zip','report-narrative.json') or re.fullmatch(r'trace-\d+\.zip',name) is not None
 CONFIG={}
 WORKSPACE=ContextVar("workspace",default="")
 # A list while the browser is reading a page: that read may fall back to the last copy

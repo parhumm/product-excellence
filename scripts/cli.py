@@ -17,6 +17,11 @@ k.add_argument('run_id');k.add_argument('--ai-calls',type=int,default=0,help='Ex
 k.add_argument('--steps',type=int,default=0,help='Extra steps; 0 repeats the mission limit');k.add_argument('--wait',action='store_true')
 i=sp.add_parser('import');i.add_argument('file')
 e=sp.add_parser('export');e.add_argument('run_id');e.add_argument('--format',choices=['json','md'],default='md')
+h=sp.add_parser('report',help='Write the shareable HTML report for a run. One AI call.')
+h.add_argument('run_id');h.add_argument('--provider',choices=['codex','claude','auto'],default='auto')
+h.add_argument('--model',default='',help='Empty or dynamic lets the console pick the review model')
+h.add_argument('--codex-account',default='');h.add_argument('--refresh',action='store_true',help='Write a new reading instead of reusing the last one')
+h.add_argument('--out',help='Where to write the file; the default prints it')
 f=sp.add_parser('findings',help='Print findings as JSON');f.add_argument('--project',default='');f.add_argument('--run');f.add_argument('--grouped',action='store_true',help='One row per issue instead of one per run')
 v=sp.add_parser('review',help='Set the status or owner of one finding');v.add_argument('run_id');v.add_argument('finding_id');v.add_argument('--status',choices=['open','accepted','resolved','dismissed']);v.add_argument('--owner')
 d=sp.add_parser('compare',help='What changed between two runs');d.add_argument('baseline');d.add_argument('candidate')
@@ -74,6 +79,12 @@ elif args.command=='share':r=c.post(f'/{args.kind}s/{args.id}/share')
 elif args.command=='import':
  with open(args.file,'rb') as f:r=c.post('/import',files={'file':f})
 elif args.command=='export':r=c.get(f'/runs/{args.run_id}/export',params={'format':args.format})
+elif args.command=='report':
+ # One reasoning call reads the screens, so this waits far longer than a record fetch.
+ r=c.post(f'/runs/{args.run_id}/report',timeout=300,
+          json={'provider':args.provider,'model':args.model,'codex_account':args.codex_account,'refresh':args.refresh})
+ r.raise_for_status()
+ if args.out:Path(args.out).write_text(r.text);print(args.out);sys.exit(0)
 elif args.command=='findings':
  r=c.get('/findings',params={'project':args.project,'grouped':args.grouped});r.raise_for_status()
  print(json.dumps([f for f in r.json() if not args.run or f.get('run_id')==args.run],indent=2));sys.exit(0)

@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import sys
 from pathlib import Path
@@ -168,6 +169,23 @@ async def test_claude_streaming_transcript_yields_the_same_usage(worker, tmp_pat
     _, usage = await ai.call('claude', 'Task', SCHEMA, image=image)
     assert '--input-format' in seen['args'] and usage['input_tokens'] == 20
     assert usage['est_cost_usd'] == pytest.approx(round(0.00704164, 6))
+
+
+@pytest.mark.asyncio
+async def test_several_screens_travel_as_several_images(worker, tmp_path):
+    """The report reads a whole journey, so one call carries more than one screen."""
+    seen, record = worker
+    shots = []
+    for name in ('step-000.png', 'step-001.png'):
+        shot = tmp_path / name; shot.write_bytes(b'PNG'); shots.append(shot)
+    record('\n'.join(['{"type":"system"}', CLAUDE_RESULT]))
+    await ai.call('claude', 'Task', SCHEMA, image=shots)
+    blocks = json.loads(seen['text'])['message']['content']
+    assert [b['type'] for b in blocks] == ['image', 'image', 'text']
+    assert {b['source']['data'] for b in blocks[:2]} == {base64.b64encode(b'PNG').decode()}
+    record(CODEX_EVENTS, write_answer=True)
+    await ai.call('codex', 'Task', SCHEMA, image=shots)
+    assert [seen['args'][i + 1] for i, a in enumerate(seen['args']) if a == '--image'] == [str(p) for p in shots]
 
 
 @pytest.mark.asyncio

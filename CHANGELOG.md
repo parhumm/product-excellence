@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **A run page can write its own shareable report.** **Export HTML** on a
+  finished run produces the standalone page `/pex-run-brief` used to be needed
+  for: the screens the visitor saw, ranked improvements, scores and what the run
+  does not prove, with the screenshots inside the file so it opens offline. Pick
+  the AI worker, the model and the Codex account there, as a mission does; one
+  call writes the reading, and every number on the page still comes from the
+  run's own record. An improvement that cites a screen the run never captured is
+  dropped rather than shown. The reading is kept beside the evidence, so a second
+  export costs nothing while the scores stay current; a different model, or
+  `cli.py report ID --refresh`, writes a new one. The skill stays for the reports
+  the button does not write: a benchmark playbook, or a narrative you want to
+  steer. The Markdown download is unchanged, now labelled **Export Markdown**.
+
 ## 1.7.0 — 2026-09-19
 
 - **A benchmark now produces a playbook, not a scoreboard.** `pex-run-brief`

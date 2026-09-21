@@ -70,6 +70,12 @@ pasting into a ticket, or a standalone HTML report with the screenshots
 embedded, for sending to someone who will read it. Ask for a "brief" or a
 "report"; then it prints the path, the headline and the gate.
 
+The run page's **Export HTML** button builds the same report without a Claude
+Code session: you pick the worker, model and Codex account there and one AI call
+writes the narrative. Use the skill when you want to steer that narrative — a
+report for an executive rather than a developer, a second pass over wording you
+disagree with, or a benchmark playbook, which the button does not write.
+
 ```
 > /pex-run-brief <home benchmark run id> <plans benchmark run id>
 ```

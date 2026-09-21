@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.0 — 2026-09-21
 
 - **A run page can write its own shareable report.** **Export HTML** on a
   finished run produces the standalone page `/pex-run-brief` used to be needed
@@ -16,6 +16,25 @@
   `cli.py report ID --refresh`, writes a new one. The skill stays for the reports
   the button does not write: a benchmark playbook, or a narrative you want to
   steer. The Markdown download is unchanged, now labelled **Export Markdown**.
+- **A reading outlives the browser that asked for it.** A three-minute call used
+  to die with the connection when Chrome suspended its sockets: the page said
+  "Failed to fetch", and a retry paid for the same reading again. The call now
+  runs on its own and saves the narrative as soon as it has one, so a laptop
+  that sleeps mid-read costs the wait and not the call. A second click on the
+  same run and choice waits on that reading rather than starting another, a
+  dropped connection is answered with what to do about it, and a worker that
+  stops answering ends after ten minutes with a reason instead of a stack trace.
+- **Missions saved before 1.6 reach the team server again.** 1.6 renamed the
+  oracle from `activity` to `screen` but left every saved mission, version and
+  run naming the old field, so the team server refused them as invalid records.
+  The app now renames it inside a check or hold once, when it starts, after
+  writing a backup. What a sample saw in front keeps its name, as does a
+  target's `launch_activity`.
+- **An added import survives an interruption and carries its versions.** An
+  apply cut short could leave a run on the server with its manifest entry still
+  open; the next pass now closes the entry instead of stalling on it. A
+  mission's versions travel with it, or join it when it is already there, but
+  never land on a team mission reused by name.
 
 ## 1.7.0 — 2026-09-19
 

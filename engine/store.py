@@ -36,6 +36,16 @@ def clean(value):
     if isinstance(value, list): return [clean(v) for v in value]
     return value
 
+def screened(value, oracle=False):
+    """`activity` became `screen` in 1.6; a check or hold written before that still names the old field.
+    Only those two are oracles: a sample's `activity` is evidence of what was in front and keeps its name."""
+    if isinstance(value, dict):
+        v=dict((k,screened(x,k in ('check','hold'))) for k,x in value.items() if not (oracle and k=='activity'))
+        if oracle and value.get('activity') is not None: v['screen']=value['activity']
+        return v
+    if isinstance(value, list): return [screened(x,oracle) for x in value]
+    return value
+
 def init(skip=lambda workspace:False):
     with engine.begin() as conn:
         if engine.dialect.name=='sqlite' and not conn.connection.driver_connection.in_transaction:conn.exec_driver_sql('BEGIN IMMEDIATE')
@@ -60,6 +70,14 @@ def init(skip=lambda workspace:False):
                 v={**v,'project_id':ws} if r['kind']!='project' else v
                 conn.execute(update(Record).where(Record.id==r['id']).values(workspace=ws,payload=v))
             else: logging.warning('Unresolved workspace: %s %s',r['kind'],r['id'])
+        # The LIKE narrows the scan but also catches a target's launch_activity, so the rewrite itself decides.
+        candidates=conn.execute(select(Record.id,Record.payload).where(Record.kind.in_(['mission','mission_version','run','schedule']),text('''CAST(payload AS TEXT) LIKE '%"activity"%' '''))).mappings()
+        stale=[(r['id'],v) for r in candidates if (v:=screened(r['payload']))!=r['payload']]
+        if stale:
+            from .hub import atomic
+            backup=[dict(r) for r in conn.execute(select(Record.id,Record.kind,Record.payload,Record.workspace,Record.revision)).mappings()]
+            atomic(DATA/'backups'/('records-before-screen-'+uuid.uuid4().hex+'.json'),backup)
+            for id,v in stale: conn.execute(update(Record).where(Record.id==id).values(payload=v))
         conn.execute(text('CREATE INDEX IF NOT EXISTS ix_records_workspace_kind ON records (workspace, kind)'))
         projects=[r for r in conn.execute(select(Record.id,Record.payload).where(Record.kind=='project')).mappings() if r['payload'].get('url') and not skip(r['id'])]
         from .targets import default_id,default_web

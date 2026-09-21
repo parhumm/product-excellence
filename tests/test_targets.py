@@ -101,3 +101,20 @@ def test_default_web_target_allows_its_own_host_without_project_domains(records)
     resolved=targets.resolve_mission(mission)
     assert resolved['url']=='https://example.org' and resolved['platform']=='web'
     with pytest.raises(ValueError):targets.resolve_mission({**mission,'url':'https://other.example'})
+
+def test_activity_becomes_screen_once_and_leaves_the_rest_alone(records):
+    store.save('project',{'id':'site','name':'Site','url':'https://example.com','allowed_domains':['example.com']},local=True)
+    scenario=[{'tap':{'text':'Play'},'check':{'activity':{'contains':'com.example/','equals':''}}},{'check':{'activity':None,'text':'Playing'}}]
+    store.save('mission',{'id':'legacy-oracle','project_id':'site','url':'https://example.com','scenario':scenario},local=True)
+    store.save('run',{'id':'legacy-run','project_id':'site','mission_id':'legacy-oracle','status':'completed','observations':[{'check':{'activity':None,'text':'Playing'}}],'samples':[{'at':'t','activity':'com.example/.Main','observed':'x'}]},local=True)
+    # A target's launch_activity reads like the old oracle to a text scan; it must survive untouched.
+    store.save('run',{'id':'modern-run','project_id':'site','status':'completed','mission':{'build':{'launch_activity':'com.example.Main'}}},local=True)
+    store.init();store.init()
+    mission=store.get('mission','legacy-oracle',local=True)
+    assert mission['scenario'][0]['check']=={'screen':{'contains':'com.example/','equals':''}}
+    assert mission['scenario'][0]['tap']=={'text':'Play'} and mission['scenario'][1]['check']=={'text':'Playing'}
+    assert store.get('run','legacy-run',local=True)['observations']==[{'check':{'text':'Playing'}}]
+    # What a sample saw in front is evidence, not an oracle; the running code still writes it under this name.
+    assert store.get('run','legacy-run',local=True)['samples']==[{'at':'t','activity':'com.example/.Main','observed':'x'}]
+    assert store.get('run','modern-run',local=True)['mission']=={'build':{'launch_activity':'com.example.Main'}}
+    assert len(list((records/'backups').glob('records-before-screen-*.json')))==1

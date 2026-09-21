@@ -8,8 +8,8 @@ from pydantic import ValidationError
 from fastapi import FastAPI,HTTPException,Request,UploadFile,File,Header
 from fastapi.responses import HTMLResponse,FileResponse,Response,JSONResponse
 from fastapi.staticfiles import StaticFiles
-from engine import store,ai,netem,presets,pricing,hub,views,suggest,targets,android
-from engine.contracts import Mission,GoalRequest,RunRequest,ContinueRequest,ContinueStepRequest,SnapshotRequest,DraftRequest,ScenarioText,Step,NetworkProfile,Egress,Schedule,Project,Target
+from engine import store,ai,netem,presets,pricing,hub,views,suggest,targets,android,report
+from engine.contracts import Mission,GoalRequest,RunRequest,ContinueRequest,ContinueStepRequest,SnapshotRequest,DraftRequest,ReportRequest,ScenarioText,Step,NetworkProfile,Egress,Schedule,Project,Target
 from engine.runner import runner
 from engine.evaluate import finding_identity
 from engine.outcomes import gate,scores,executive_summary,sync_findings
@@ -477,6 +477,29 @@ def artifact(id:str,filename:str):
     if p.suffix=='.mp4':return FileResponse(p,media_type='video/mp4')
     if p.suffix=='.txt':return FileResponse(p,media_type='text/plain')
     return FileResponse(p,filename=filename,media_type='application/octet-stream')
+
+async def evidence_folder(id,r):
+    """Where this run's screenshots are. A run owned by the team server is cached locally first."""
+    if not store.remote('run',r):return store.ARTIFACTS/id
+    ws=store.workspace_of('run',r);folder=hub.cached_artifact(id,'run.json',ws).parent
+    missing=[o['id']+'.png' for o in r.get('observations') or [] if not hub.cached_artifact(id,o['id']+'.png',ws).is_file()]
+    # One trip each, at the same time; a screen the server no longer holds is left out of the report, not fatal to it.
+    await asyncio.gather(*(hub.io(hub.fetch_artifact,id,name,ws) for name in missing),return_exceptions=True)
+    return folder
+
+@app.post('/api/runs/{id}/report')
+async def report_html(id:str,req:ReportRequest):
+    """The shareable HTML report. One AI call writes the reading; every number stays the run's own."""
+    r=await hub.io(required,'run',id)
+    if r['status'] in ('queued','running'):raise HTTPException(409,'Wait for this run to finish')
+    account=req.codex_account or ((await hub.io(store.get,'project',store.workspace_of('run',r)) or {}).get('codex_account') or 'default')
+    folder=await evidence_folder(id,r)
+    try:page=await report.write_report(r,folder,req.provider,req.model,account,req.refresh)
+    except LookupError as e:raise HTTPException(409,str(e))
+    except SystemExit as e:raise HTTPException(422,str(e))
+    except TimeoutError:raise HTTPException(504,'The AI worker did not answer within ten minutes. Try again, or pick a faster model.')
+    except RuntimeError as e:raise HTTPException(502,str(e))
+    return Response(page,media_type='text/html',headers={'Content-Disposition':f'attachment; filename="run-{id}.html"'})
 
 @app.get('/api/runs/{id}/export')
 def export(id:str,format:str='md'):

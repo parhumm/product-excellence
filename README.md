@@ -212,15 +212,16 @@ command. Leave its terminal window open while you use the app.
    findings, and check the evidence behind each one. **Replay** runs the same
    test again to see whether a finding comes back.
 
-Download a report from the finished run to share it, or publish it to your team
-server, below.
+Press **Export HTML** on the finished run to write a one-file report with the
+screenshots inside it, or **Export Markdown** for a brief to paste into a
+ticket. You can also publish the run to your team server, below.
 
 The [user manual](docs/USER_MANUAL.md) explains missions, scores, competitor
 benchmarks, test accounts and the limits of what any of this proves.
 
 To test something the ten presets do not cover, open Claude Code in this folder
 and type `/pex-mission-write` followed by a plain sentence. The
-[skills guide](docs/SKILLS.md) lists the eight skills that come with the app.
+[skills guide](docs/SKILLS.md) lists the ten skills that come with the app.
 
 ## Stop and restart
 

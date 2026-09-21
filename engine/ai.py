@@ -228,9 +228,13 @@ def usage_record(provider,model_requested,model_reported,effort,**counts):
 
 
 async def call(provider,prompt,schema,image=None,timeout=100,model='',effort='low',codex_account=''):
-    """Run one reasoning call; returns (validated result, usage record)."""
+    """Run one reasoning call; returns (validated result, usage record).
+
+    `image` is one screenshot path or several; a report reads a whole journey.
+    """
     binary=client_binary(provider)
     if not binary: raise RuntimeError(f'{provider} is not installed. Open Settings for setup.')
+    images=[image] if isinstance(image,(str,Path)) else list(image or [])
     import tempfile
     with tempfile.TemporaryDirectory(prefix='ai-',dir=DATA) as td:
         folder=Path(td)
@@ -241,7 +245,7 @@ async def call(provider,prompt,schema,image=None,timeout=100,model='',effort='lo
             safe=SAFE_SYSTEM+'\n'+prompt
             args=[binary,'exec','--skip-git-repo-check','--ephemeral','--ignore-user-config','--sandbox','read-only','--json','-c','features.shell_tool=false','-c','features.multi_agent=false','-c',f'model_reasoning_effort="{effort}"','--output-schema',str(sp),'-o',str(folder/'answer.json')]
             if model: args+=['--model',model]
-            if image: args+=['--image',str(image)]
+            for p in images: args+=['--image',str(p)]
             args+=['-']
             raw=await process(args,safe,timeout,folder,env_overrides={'CODEX_HOME':codex_home(codex_account)})
             result=json.loads((folder/'answer.json').read_text())
@@ -254,11 +258,12 @@ async def call(provider,prompt,schema,image=None,timeout=100,model='',effort='lo
         else:
             args=[binary,'-p','--json-schema',json.dumps(schema),'--system-prompt',SAFE_SYSTEM,'--tools','','--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--safe-mode','--no-session-persistence','--disable-slash-commands','--permission-mode','dontAsk','--effort',effort]
             if model: args+=['--model',model]
-            if not image: args+=['--output-format','json']
-            if image:
+            if not images: args+=['--output-format','json']
+            if images:
                 # Streaming image input is only accepted alongside streaming output, which the CLI emits as NDJSON.
                 args+=['--input-format','stream-json','--output-format','stream-json','--verbose']
-                payload={'type':'user','message':{'role':'user','content':[{'type':'image','source':{'type':'base64','media_type':'image/png','data':base64.b64encode(Path(image).read_bytes()).decode()}},{'type':'text','text':prompt}]}}
+                blocks=[{'type':'image','source':{'type':'base64','media_type':'image/png','data':base64.b64encode(Path(p).read_bytes()).decode()}} for p in images]
+                payload={'type':'user','message':{'role':'user','content':blocks+[{'type':'text','text':prompt}]}}
                 raw=await process(args,json.dumps(payload)+'\n',timeout,folder)
                 outer=stream_result(raw)
             else:

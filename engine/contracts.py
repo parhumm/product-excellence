@@ -320,6 +320,20 @@ class DraftRequest(BaseModel):
     @field_validator('codex_account')
     @classmethod
     def account_alias(cls,v):return Mission.account_alias(v)
+class ReportRequest(BaseModel):
+    """Export one finished run as a shareable HTML report. One AI call writes the narrative."""
+    model_config=ConfigDict(extra='forbid')
+    provider: Literal['codex','claude','auto'] = 'auto'
+    model: str = Field(default='', max_length=60)
+    codex_account: str = Field(default='', max_length=80)
+    # A report already written for this worker and model is reused; refresh asks for another reading.
+    refresh: bool = False
+    @field_validator('model')
+    @classmethod
+    def report_model(cls,v):return Mission.model_alias(v)
+    @field_validator('codex_account')
+    @classmethod
+    def account_alias(cls,v):return Mission.account_alias(v)
 class ScenarioText(BaseModel):
     """Translate between the step rows and their YAML spelling. Comments are not preserved."""
     model_config=ConfigDict(extra='forbid')

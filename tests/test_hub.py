@@ -284,7 +284,8 @@ def test_traces_stay_on_the_machine_that_ran_the_mission(hub_client,tmp_path):
     r['videos']=[f'/api/runs/{r["id"]}/artifacts/journey.webm']
     r['observations']=[{'screenshot':f'/api/runs/{r["id"]}/artifacts/s.png'}]
     folder=store.ARTIFACTS/r['id'];folder.mkdir()
-    for name in ('trace.zip','trace-2.zip','s.png','journey.webm','run.json'):(folder/name).write_bytes(b'x')
+    # The cached report narrative is raw model text, redacted only when a report page is rendered from it.
+    for name in ('trace.zip','trace-2.zip','s.png','journey.webm','run.json','report-narrative.json'):(folder/name).write_bytes(b'x')
     shared=hub.shareable(r)
     assert 'trace' not in shared and shared['traces']==[] and shared['observations']==r['observations']
     assert shared['videos']==r['videos']

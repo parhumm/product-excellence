@@ -7,6 +7,7 @@ monotonic deadline that the whole run shares.
 import asyncio, time
 from . import store
 from .contracts import EVENTS, one_operation
+from .policy import allowed_url
 
 # A hold aims for a sample every two seconds. Hierarchy dumps are slow on a busy device,
 # so the real sample times are recorded and a longer blind stretch makes the hold unavailable.
@@ -213,7 +214,10 @@ class Scenario:
         elif name=='wait':await self.sleep(event['wait'])
         elif name=='relaunch':await self.device.relaunch()
         elif name=='kill':await self.device.background_kill()
-        elif name=='deep_link':await self.device.open_deep_link(event['deep_link'])
+        elif name=='deep_link':
+            # Checked here, where every platform passes, so no device can open an off-scope link.
+            if not allowed_url(event['deep_link'],self.device.mission):raise ScenarioError('This link is outside the hosts this mission may open: '+event['deep_link'][:120])
+            await self.device.open_deep_link(event['deep_link'])
         else:await self.device.open_notification(event['open_notification'])
 
     def record(self,result,verdict,sample,elapsed):

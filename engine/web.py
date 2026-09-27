@@ -4,7 +4,6 @@ Method names and return shapes match engine/android.py Device, so one interprete
 the same ordered scenario against a native app or a website.
 """
 from . import store
-from .policy import allowed_url
 from .scenario import ScenarioError
 
 # Chromium's own throttling, as download Mbps, upload Mbps and added latency.
@@ -110,7 +109,6 @@ class Browser:
         await self.page.go_back(wait_until='domcontentloaded')
 
     async def open_deep_link(self,url):
-        if not allowed_url(url,self.mission):raise ScenarioError('This link is outside the hosts this mission may open: '+url[:120])
         await self.page.goto(url,wait_until='domcontentloaded')
 
     # ponytail: the web recording is one video per context, so a pause cannot cut it the way

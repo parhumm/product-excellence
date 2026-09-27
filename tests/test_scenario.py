@@ -129,6 +129,16 @@ async def test_an_optional_failure_lets_the_scenario_continue():
     results=await play([{'check':{'text':'Downloads','within':1,'required':False}},{'check':{'text':'Now playing','within':2}}],device)
     assert [r['status'] for r in results]==['failed','passed']
 
+async def test_a_deep_link_opens_only_on_the_mission_hosts():
+    # An Android mission with no deep link of its own is scoped by its target domains alone.
+    device=Stub([screen()]);device.mission={'url':'','allowed_domains':['shop.example']};device.opened=[]
+    async def open_deep_link(url):device.opened.append(url)
+    device.open_deep_link=open_deep_link
+    script=engine.Scenario([],device,notify=quiet,goal=None,deadline=time.monotonic()+30)
+    with pytest.raises(engine.ScenarioError,match='outside'):await script.apply({'deep_link':'https://attacker.example/x'})
+    await script.apply({'deep_link':'https://shop.example/cart'})
+    assert device.opened==['https://shop.example/cart']
+
 # --- replay eligibility ------------------------------------------------------
 
 def android_run(**extra):

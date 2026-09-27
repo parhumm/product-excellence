@@ -59,7 +59,7 @@ def allowed_url(url, mission):
         u=urlsplit(url);port=u.port
     except ValueError:return False
     if u.scheme not in ('http','https') or not u.hostname or u.username or u.password: return False
-    h=u.hostname.lower(); base=urlsplit(mission['url']).hostname.lower()
+    h=u.hostname.lower(); base=(urlsplit(mission['url']).hostname or '').lower()  # an Android mission may have no deep link
     if h not in allowed_hosts(mission): return False
     if h in ('localhost','127.0.0.1','::1'):
         return base in ('localhost','127.0.0.1','::1') and port==urlsplit(mission['url']).port and (u.path=='/demo' or u.path.startswith('/demo/'))

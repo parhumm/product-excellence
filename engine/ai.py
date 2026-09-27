@@ -41,8 +41,8 @@ def dynamic_choice(provider,purpose,ceiling='',boost=0):
     stays within what the user allowed and never receives the other CLI's id.
     """
     ladder=list(pricing.LADDER[provider])
-    top=next((max(i for i,m in enumerate(l) if m==ceiling)
-              for l in (*pricing.LADDER.values(),*pricing.RETIRED_LADDERS) if ceiling in l),None)
+    top=max((i for l in (*pricing.LADDER.values(),*pricing.RETIRED_LADDERS)
+             for i,m in enumerate(l) if m==ceiling),default=None)
     if top is None and ceiling:ladder,top=ladder[:2]+[ceiling],2  # custom review tier and ceiling
     elif top is None:top=len(ladder)-1
     tier,effort=ROUTES.get(purpose,(1,'medium'))

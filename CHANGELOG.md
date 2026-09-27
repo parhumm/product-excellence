@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **The landing page describes the shareable HTML report and the benchmark
+  playbook.**
+
 ## 1.9.0 — 2026-09-27
 
 - **Claude Opus 5.5 is in the picker, and Dynamic runs on it.** Opus 5.5

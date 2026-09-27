@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.9.0 — 2026-09-27
+
+- **Claude Opus 5.5 is in the picker, and Dynamic runs on it.** Opus 5.5
+  replaces Opus 5 in the Claude list and fills both upper tiers of Dynamic: the
+  evidence review runs on it at high effort, and the top tier runs it at more
+  effort, for less than Fable 5.1, which stays a fixed choice. A call that
+  reported `claude-opus-5-5` used to be priced as Opus 5; it now has its own
+  price. A ceiling saved with Claude Opus 5 or Fable 5.1 keeps its tier and
+  becomes Opus 5.5.
+- **GPT-6 Sol and Luna are priced, not offered.** A run that reports either is
+  estimated at its list price, but Codex refused both on a ChatGPT sign-in on
+  27 September 2026, so the Codex picker and Dynamic stay on GPT-5.6. Prices
+  are dated 27 September 2026.
+- **A scenario's deep link stays on the mission's hosts on Android too.** A web
+  scenario already refused a `deep_link` step outside the hosts its mission may
+  visit; an Android scenario did not check. The check now runs once for every
+  platform, and an Android mission with no deep link of its own is limited to
+  its target's allowed domains.
+
 ## 1.8.0 — 2026-09-21
 
 - **A run page can write its own shareable report.** **Export HTML** on a

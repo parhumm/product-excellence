@@ -10,7 +10,7 @@ return None so the console can show "n/a"; an unpriced call is never shown as
 costing zero.
 """
 
-PRICE_DATE = '2026-09-07'
+PRICE_DATE = '2026-09-27'
 DISCLAIMER = ('Estimate at published standard API prices. Runs use your Codex/Claude '
               'subscription; nothing is billed per call here.')
 MILLION = 1_000_000
@@ -25,6 +25,8 @@ def _prices(model_input, cached, output, write_5m=None, write_1h=None):
 # long-context variant such as claude-haiku-4-5-20251001 resolves to its family.
 PRICES = {
     'gpt-6-astra': _prices(10.0, 1.0, 50.0),
+    'gpt-6-sol': _prices(2.0, 0.20, 10.0),
+    'gpt-6-luna': _prices(0.10, 0.01, 0.50),
     # Promo through at least 2026-11-21; recheck then (regular list $5/$30).
     'gpt-5.6-sol': _prices(4.0, 0.40, 20.0),
     'gpt-5.6-terra': _prices(2.0, 0.20, 12.0),
@@ -46,6 +48,7 @@ PRICES = {
     'claude-mythos-5-1': _prices(10.0, 0.25, 50.0, 12.50, 20.0),
     'claude-fable-5': _prices(10.0, 1.0, 50.0, 12.50, 20.0),
     'claude-mythos-5': _prices(10.0, 1.0, 50.0, 12.50, 20.0),
+    'claude-opus-5-5': _prices(4.0, 0.20, 20.0, 5.0, 8.0),
     'claude-opus-5': _prices(5.0, 0.50, 25.0, 6.25, 10.0),
     'claude-opus-4-8': _prices(5.0, 0.50, 25.0, 6.25, 10.0),
     'claude-opus-4-7': _prices(5.0, 0.50, 25.0, 6.25, 10.0),
@@ -71,13 +74,15 @@ CATALOG = {
     'claude': [
         {'value': '', 'label': 'CLI default', 'family': ''},
         {'value': 'claude-fable-5-1', 'label': 'Claude Fable 5.1', 'family': 'claude-fable-5-1'},
-        {'value': 'claude-opus-5', 'label': 'Claude Opus 5', 'family': 'claude-opus-5'},
+        {'value': 'claude-opus-5-5', 'label': 'Claude Opus 5.5', 'family': 'claude-opus-5-5'},
         {'value': 'claude-sonnet-5', 'label': 'Claude Sonnet 5', 'family': 'claude-sonnet-5'},
         {'value': 'claude-haiku-4-5', 'label': 'Claude Haiku 4.5', 'family': 'claude-haiku-4-5'},
     ],
     'codex': [
         {'value': '', 'label': 'CLI default', 'family': ''},
         {'value': 'gpt-6-astra', 'label': 'GPT-6 Astra', 'family': 'gpt-6-astra'},
+        # gpt-6-sol and gpt-6-luna are priced but not offered: on 2026-09-27 Codex
+        # answered both with "not supported when using Codex with a ChatGPT account".
         {'value': 'gpt-5.6-sol', 'label': 'GPT-5.6 Sol', 'family': 'gpt-5.6-sol'},
         {'value': 'gpt-5.6-terra', 'label': 'GPT-5.6 Terra', 'family': 'gpt-5.6-terra'},
         {'value': 'gpt-5.6-luna', 'label': 'GPT-5.6 Luna', 'family': 'gpt-5.6-luna'},
@@ -85,10 +90,17 @@ CATALOG = {
 }
 # Cheapest first, for the Dynamic model choice. The tiers line up across
 # providers, so a run that falls back to the other worker keeps the same tier.
+# Opus 5.5 costs less than Fable 5.1 and matches it, so it fills both upper
+# Claude tiers; the higher one runs at more effort.
 LADDER = {
-    'claude': ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5', 'claude-fable-5-1'],
+    'claude': ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5-5', 'claude-opus-5-5'],
     'codex': ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra'],
 }
+# Ladders a release replaced, so a ceiling saved with one of their models keeps
+# its tier. Append the old ladder here when you change LADDER; never overwrite.
+RETIRED_LADDERS = [
+    ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5', 'claude-fable-5-1'],  # 1.8
+]
 
 
 def normalize(model_id):

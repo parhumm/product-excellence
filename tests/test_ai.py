@@ -249,9 +249,9 @@ def test_dynamic_choice_uses_deep_review_below_the_frontier():
     assert choose('claude', 'verify') == ('claude-sonnet-5', 'low')
     assert choose('claude', 'judgment') == ('claude-sonnet-5', 'medium')
     # Deep review needs Opus/Sol; a frontier ceiling is an allowance, not a target.
-    assert choose('claude', 'review') == ('claude-opus-5', 'high')
+    assert choose('claude', 'review') == ('claude-opus-5-5', 'high')
     assert choose('codex', 'review') == ('gpt-5.6-sol', 'high')
-    assert choose('claude', 'review', 'claude-fable-5-1') == ('claude-opus-5', 'high')
+    assert choose('claude', 'review', 'claude-fable-5-1') == ('claude-opus-5-5', 'high')
     assert choose('claude', 'review', 'claude-sonnet-5') == ('claude-sonnet-5', 'high')
     # A ceiling caps the cheap calls too, and never below itself.
     assert choose('claude', 'verify', 'claude-haiku-4-5') == ('claude-haiku-4-5', 'low')
@@ -259,22 +259,35 @@ def test_dynamic_choice_uses_deep_review_below_the_frontier():
 
 def test_dynamic_choice_escalates_a_stuck_journey_within_the_ceiling():
     assert ai.dynamic_choice('claude', 'action', '', 1) == ('claude-sonnet-5', 'medium')
-    assert ai.dynamic_choice('claude', 'action', '', 2) == ('claude-opus-5', 'high')
+    assert ai.dynamic_choice('claude', 'action', '', 2) == ('claude-opus-5-5', 'high')
     assert ai.dynamic_choice('claude', 'action', 'claude-sonnet-5', 2) == ('claude-sonnet-5', 'high')
     # Effort stops at the top of the scale even when the boost keeps growing.
     assert ai.dynamic_choice('codex', 'action', '', 9) == ('gpt-6-astra', 'xhigh')
+    # Opus 5.5 fills the top Claude tier; the escalation adds effort, not Fable.
+    assert ai.dynamic_choice('claude', 'action', '', 9) == ('claude-opus-5-5', 'xhigh')
 
 
 def test_dynamic_choice_keeps_the_tier_when_the_run_falls_back_to_the_other_worker():
     # The mission named a Claude ceiling; Codex answers at the same tier, not above it.
-    assert ai.dynamic_choice('codex', 'review', 'claude-opus-5') == ('gpt-5.6-sol', 'high')
-    assert ai.dynamic_choice('codex', 'action', 'claude-opus-5') == ('gpt-5.6-luna', 'low')
+    assert ai.dynamic_choice('codex', 'review', 'claude-sonnet-5') == ('gpt-5.6-terra', 'high')
+    assert ai.dynamic_choice('codex', 'action', 'claude-sonnet-5') == ('gpt-5.6-luna', 'low')
+    assert ai.dynamic_choice('claude', 'review', 'gpt-5.6-sol') == ('claude-opus-5-5', 'high')
+    # A model on two tiers caps at the higher one: an Opus 5.5 allowance is the top tier.
+    assert ai.dynamic_choice('codex', 'action', 'claude-opus-5-5', 9) == ('gpt-6-astra', 'xhigh')
     # A model id the catalog does not list still caps the ladder.
     assert ai.dynamic_choice('claude', 'review', 'claude-sonnet-4-5') == ('claude-sonnet-4-5', 'high')
 
 
+@pytest.mark.parametrize('provider,ceiling,expected', [
+    ('codex', 'claude-opus-5', 'gpt-5.6-sol'), ('claude', 'claude-opus-5', 'claude-opus-5-5'),
+    ('claude', 'claude-fable-5-1', 'claude-opus-5-5'), ('codex', 'claude-fable-5-1', 'gpt-6-astra')])
+def test_a_ceiling_saved_before_the_new_ladder_keeps_its_tier(provider, ceiling, expected):
+    # Taking the custom-ceiling path would hand the Codex CLI a Claude id.
+    assert ai.dynamic_choice(provider, 'action', ceiling, 9)[0] == expected
+
+
 def test_dynamic_p1_critic_boost_respects_ceiling_and_provider():
-    assert ai.dynamic_choice('claude', 'verify', boost=1) == ('claude-opus-5', 'medium')
+    assert ai.dynamic_choice('claude', 'verify', boost=1) == ('claude-opus-5-5', 'medium')
     assert ai.dynamic_choice('codex', 'verify', boost=1) == ('gpt-5.6-sol', 'medium')
     assert ai.dynamic_choice('codex', 'verify', 'claude-sonnet-5', 1) == ('gpt-5.6-terra', 'medium')
     assert ai.dynamic_choice('claude', 'review', 'custom-model') == ('custom-model', 'high')

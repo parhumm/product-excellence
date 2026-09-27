@@ -171,11 +171,12 @@ and speed. A run asks the AI for several different things, and they do not need 
 same model. Reading a page and choosing the next click is routine work, so
 Dynamic gives it the smallest model on the list. Judging whether the goal was met
 and challenging a finding get the next model up. The review that reads all the
-evidence and writes the findings uses Opus 5 / GPT-5.6 Sol at high effort,
+evidence and writes the findings uses Opus 5.5 / GPT-5.6 Sol at high effort,
 capped by your allowance. P1 finding critics escalate to Opus/Sol at medium
 effort, also within the ceiling; other critics use Sonnet/Terra at low effort.
-Fable/Astra remain available as fixed models for the hardest work; a frontier
-ceiling does not force routine reviews onto them.
+Opus 5.5 costs less than Fable 5.1 and matches it, so it is also the top Claude
+tier, at higher effort. Fable 5.1 and Astra remain available as fixed models for
+the hardest work; a frontier ceiling does not force routine reviews onto them.
 
 That allowance is **Highest model allowed**. Set it to the strongest model this
 mission may ever use; left empty it means the strongest model the console lists.
@@ -187,16 +188,20 @@ safety policy, or the page does not change after it, the next action is planned
 one model and one effort higher, and it keeps climbing until the ceiling. When a
 run set to **First available worker** has to switch to the other worker, the
 ceiling moves with it: the Codex and Claude lists are matched tier for tier, so
-an allowance of Claude Opus 5 becomes GPT-5.6 Sol rather than the top model.
+an allowance of Claude Sonnet 5 becomes GPT-5.6 Terra rather than the top model.
 
 Choose a full model id rather than a short nickname. Probing the Claude command
 line on 6 September 2026 showed that `sonnet` was answered by Claude Opus 5 and
 `opus` by Claude Fable 5.1, while every full id answered as itself. The list
 therefore offers only full ids, and every run records the model that actually
 replied, not the one that was asked for. The Claude picker offers Fable 5.1,
-Opus 5, Sonnet 5 and Haiku 4.5. Legacy ids remain usable via Custom model id
-and retain their prices. Saved custom ceilings remain selectable; an unlisted
-ceiling becomes the review tier.
+Opus 5.5, Sonnet 5 and Haiku 4.5; the Codex picker offers GPT-6 Astra and
+GPT-5.6 Sol, Terra and Luna. GPT-6 Sol and Luna are priced but not offered: on
+27 September 2026 Codex refused both with "not supported when using Codex with a
+ChatGPT account". Legacy ids such as Claude Opus 5 remain usable via Custom
+model id and retain their prices. A ceiling saved with Claude Opus 5 or Fable 5.1
+keeps its tier and becomes Opus 5.5; any other unlisted ceiling stays selectable
+and becomes the review tier.
 
 ### Token use and cost estimates
 
@@ -216,11 +221,13 @@ not report is shown as `—`; it is never shown as zero.
 subscription. Nothing here is billed per call, and no API key is used. The
 estimate applies published standard API prices to the tokens the worker reports, so
 that two runs, two models or two phases can be compared with each other. Prices
-published 7 September 2026, per million tokens:
+published 27 September 2026, per million tokens:
 
 | Model | Input | Cached | Cache write 5m | Cache write 1h | Output |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | GPT-6 Astra | $10.00 | $1.00 | – | – | $50.00 |
+| GPT-6 Sol | $2.00 | $0.20 | – | – | $10.00 |
+| GPT-6 Luna | $0.10 | $0.01 | – | – | $0.50 |
 | GPT-5.6 Sol (promo) | $4.00 | $0.40 | – | – | $20.00 |
 | GPT-5.6 Terra | $2.00 | $0.20 | – | – | $12.00 |
 | GPT-5.6 Luna | $0.20 | $0.02 | – | – | $1.20 |
@@ -237,6 +244,7 @@ published 7 September 2026, per million tokens:
 | GPT-5-pro | $15.00 | – | – | – | $120.00 |
 | Claude Fable 5.1, Mythos 5.1 | $10.00 | $0.25 | $12.50 | $20.00 | $50.00 |
 | Claude Fable 5, Mythos 5 | $10.00 | $1.00 | $12.50 | $20.00 | $50.00 |
+| Claude Opus 5.5 | $4.00 | $0.20 | $5.00 | $8.00 | $20.00 |
 | Claude Opus 5, 4.8, 4.7, 4.6, 4.5 | $5.00 | $0.50 | $6.25 | $10.00 | $25.00 |
 | Claude Opus 4.1, Opus 4 | $15.00 | $1.50 | $18.75 | $30.00 | $75.00 |
 | Claude Sonnet 5 | $2.00 | $0.20 | $2.50 | $4.00 | $10.00 |
@@ -248,11 +256,14 @@ Pricing follows the [supplied table](researches/api-pricing-claude-openai.md);
 routing follows the [research strategy](researches/model-routing-strategy-for-software-development.md).
 These defaults have offline coverage, not a measured live quality or speed advantage.
 
-Four things to know about the numbers:
+Five things to know about the numbers:
 
-- Sol uses the current $4/$0.40/$20 promotional rate, available at least through
-  21 November 2026 per [OpenAI](https://developers.openai.com/api/docs/models/gpt-5.6-sol).
+- GPT-6 Sol and Luna are permanent list prices; they are listed so a run that
+  reports them is priced. GPT-5.6 Sol uses its $4/$0.40/$20 promotional rate, available at least through 21 November 2026
+  per [OpenAI](https://developers.openai.com/api/docs/models/gpt-5.6-sol).
   Recheck then; the research gives regular list pricing of $5/$0.50/$30.
+- Claude Opus 5.5 cache hits cost 0.05× its input price ($0.20), against the
+  usual 0.1×.
 - Estimates use base/short-context standard rates. OpenAI long-context
   surcharges and service-tier adjustments are not applied; large requests can
   be underestimated. Codex does not report separate cache-write counts here.

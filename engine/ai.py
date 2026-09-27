@@ -36,14 +36,15 @@ def dynamic_choice(provider,purpose,ceiling='',boost=0):
     """Model and effort for one call of a mission that runs on Dynamic.
 
     `ceiling` is the highest model the user allows, empty for the strongest one
-    listed. A ceiling named on the other provider maps to the same tier here, so
-    a fallback to the alternate worker stays within what the user allowed.
+    listed. A ceiling named on the other provider, or on an earlier release's
+    ladder, maps to the same tier here, so a fallback to the alternate worker
+    stays within what the user allowed and never receives the other CLI's id.
     """
     ladder=list(pricing.LADDER[provider])
-    other=next((l for p,l in pricing.LADDER.items() if p!=provider and ceiling in l),None)
-    if other:ceiling=ladder[other.index(ceiling)]
-    elif ceiling and ceiling not in ladder:ladder=ladder[:2]+[ceiling]  # custom review tier and ceiling
-    top=ladder.index(ceiling) if ceiling else len(ladder)-1
+    top=max((i for l in (*pricing.LADDER.values(),*pricing.RETIRED_LADDERS)
+             for i,m in enumerate(l) if m==ceiling),default=None)
+    if top is None and ceiling:ladder,top=ladder[:2]+[ceiling],2  # custom review tier and ceiling
+    elif top is None:top=len(ladder)-1
     tier,effort=ROUTES.get(purpose,(1,'medium'))
     tier=min(top,tier+boost)
     effort=EFFORTS[min(len(EFFORTS)-1,EFFORTS.index(effort)+boost)]

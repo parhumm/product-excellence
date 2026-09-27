@@ -266,7 +266,7 @@ async def main():
     assert await page.locator('select[name=model_max]').is_visible(),'Highest model allowed is hidden'
     assert not await page.locator('select[name=effort]').is_visible(),'Reasoning effort shows next to Dynamic'
     assert not await page.locator('#competitors-field').is_visible(),'Competitor URLs show outside benchmark mode'
-    await page.select_option('select[name=model]','claude-opus-5')
+    await page.select_option('select[name=model]','claude-opus-5-5')
     assert await page.locator('select[name=effort]').is_visible(),'Reasoning effort stays hidden for a fixed model'
     assert not await page.locator('select[name=model_max]').is_visible(),'Ceiling shows for a fixed model'
     await page.select_option('select[name=model]','dynamic')

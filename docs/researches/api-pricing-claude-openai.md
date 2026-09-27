@@ -1,6 +1,6 @@
 # API Pricing: Claude vs. OpenAI
 
-*Prices in USD per 1 million tokens (MTok). Standard tier. As of September 2026.*
+*Prices in USD per 1 million tokens (MTok). Standard tier. As of 27 September 2026.*
 
 ---
 
@@ -9,6 +9,7 @@
 | Model | Input | Output | Cache read | Cache write |
 |---|---|---|---|---|
 | Fable 5.1 | $10.00 | $50.00 | $0.25 | $12.50 |
+| Opus 5.5 | $4.00 | $20.00 | $0.20 | $5.00 |
 | Opus 5 | $5.00 | $25.00 | $0.50 | $6.25 |
 | Sonnet 5 | $2.00 | $10.00 | $0.20 | $2.50 |
 | Haiku 4.5 | $1.00 | $5.00 | $0.10 | $1.25 |
@@ -16,6 +17,7 @@
 **Positioning**
 
 - **Fable 5.1** — Next-generation intelligence for long-running agents
+- **Opus 5.5** — Released 2026-09-22; flagship of the Claude 5.5 family, cheaper than Opus 5 and comparable to Fable 5.1
 - **Opus 5** — Complex agentic coding and enterprise work
 - **Sonnet 5** — High-performance model for coding and agents
 - **Haiku 4.5** — Fastest, most cost-efficient model
@@ -33,6 +35,8 @@ OpenAI prices flagship models differently for short and long context.
 | Model | Input | Cached input | Cache writes | Output |
 |---|---|---|---|---|
 | gpt-6-astra | $10.00 | $1.00 | $12.50 | $50.00 |
+| gpt-6-sol | $2.00 | $0.20 | $2.50 | $10.00 |
+| gpt-6-luna | $0.10 | $0.01 | $0.125 | $0.50 |
 | gpt-5.6-sol | $4.00 | $0.40 | $5.00 | $20.00 |
 | gpt-5.6-terra | $2.00 | $0.20 | $2.50 | $12.00 |
 | gpt-5.6-luna | $0.20 | $0.02 | $0.25 | $1.20 |
@@ -46,6 +50,7 @@ OpenAI prices flagship models differently for short and long context.
 | Model | Input | Cached input | Cache writes | Output |
 |---|---|---|---|---|
 | gpt-6-astra | $20.00 | $2.00 | $25.00 | $75.00 |
+| gpt-6-sol | $4.00 | $0.40 | $5.00 | $15.00 |
 | gpt-5.6-sol | $8.00 | $0.80 | $10.00 | $30.00 |
 | gpt-5.6-terra | $4.00 | $0.40 | $5.00 | $18.00 |
 | gpt-5.6-luna | $0.40 | $0.04 | $0.50 | $1.80 |
@@ -112,9 +117,9 @@ Comparable tiers, standard input/output (OpenAI short context):
 | Tier | Claude | Input / Output | OpenAI | Input / Output |
 |---|---|---|---|---|
 | Frontier | Fable 5.1 | $10 / $50 | gpt-6-astra | $10 / $50 |
-| High-end | Opus 5 | $5 / $25 | gpt-5.6-sol | $4 / $20 |
-| Mid-range | Sonnet 5 | $2 / $10 | gpt-5.6-terra | $2 / $12 |
-| Budget | Haiku 4.5 | $1 / $5 | gpt-5.6-luna | $0.20 / $1.20 |
+| High-end | Opus 5.5 | $4 / $20 | gpt-6-sol | $2 / $10 |
+| Mid-range | Sonnet 5 | $2 / $10 | gpt-6-sol | $2 / $10 |
+| Budget | Haiku 4.5 | $1 / $5 | gpt-6-luna | $0.10 / $0.50 |
 
 **Notes**
 
@@ -123,3 +128,6 @@ Comparable tiers, standard input/output (OpenAI short context):
 - OpenAI doubles input and raises output ~50% for long-context requests; Claude's listed prices do not vary by context length.
 - OpenAI's "pro" variants (gpt-5.5-pro, gpt-5.4-pro) carry a 6× premium over their base models.
 - OpenAI also offers Batch, Flex, and Fast mode tiers at different rates (not shown here).
+- GPT-6 has no Terra; gpt-6-sol and gpt-6-luna prices are permanent list prices. Claude Opus 5.5 cache hits are 0.05× input.
+- Codex refused gpt-6-sol and gpt-6-luna on a ChatGPT sign-in (2026-09-27), so Product Excellence still routes Codex through GPT-5.6.
+- Checked 2026-09-27 against platform.claude.com/docs/en/about-claude/pricing and developers.openai.com/api/docs/pricing.

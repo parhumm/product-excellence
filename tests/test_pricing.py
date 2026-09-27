@@ -12,6 +12,13 @@ def test_lookup_resolves_dated_and_long_context_ids():
     assert pricing.lookup('gpt-5.6-sol') == pricing.PRICES['gpt-5.6-sol']
 
 
+def test_opus_5_5_is_not_priced_as_opus_5():
+    # `claude-opus-5-5` also starts with `claude-opus-5-`; only its own key may price it.
+    assert pricing.lookup('claude-opus-5-5') == pricing._prices(4, .2, 20, 5, 8)
+    assert pricing.lookup('claude-opus-5-5[1m]') != pricing.PRICES['claude-opus-5']
+    assert pricing.lookup('claude-opus-5-20260101') == pricing.PRICES['claude-opus-5']
+
+
 # The CLI aliases are not priced: measured locally, `sonnet` answers as Opus 5 and
 # `opus` as Fable 5.1, so guessing a family from an alias would report a wrong cost.
 @pytest.mark.parametrize('model', ['unknown-model', 'codex-auto-review', '', None, 'claude', 'opus-5',
@@ -121,5 +128,10 @@ def test_research_prices_and_current_catalog():
     assert pricing.lookup('gpt-5.4-mini-20260317') == pricing._prices(.75, .075, 4.5)
     assert pricing.lookup('gpt-5.5-pro') == pricing._prices(30, None, 180)
     assert pricing.catalog('codex', ['gpt-5.5'])[-1]['price_hint'] == '$5 in / $30 out per MTok'
-    assert {e['value'] for e in pricing.catalog('claude')[1:]} == set(pricing.LADDER['claude'])
+    assert pricing.lookup('gpt-6-sol') == pricing._prices(2, .2, 10)
+    assert pricing.lookup('gpt-6-luna') == pricing._prices(.1, .01, .5)
+    # The picker offers every Dynamic model; Fable stays a fixed choice above the ladder.
+    assert {e['value'] for e in pricing.catalog('claude')[1:]} == set(pricing.LADDER['claude']) | {'claude-fable-5-1'}
+    # Codex refuses GPT-6 Sol and Luna on a ChatGPT sign-in, so the picker keeps GPT-5.6.
+    assert {e['value'] for e in pricing.catalog('codex')[1:]} == set(pricing.LADDER['codex'])
     assert pricing.lookup('claude-sonnet-4-5')['input'] == 3
